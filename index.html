@@ -327,6 +327,7 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:#003
       <label class="login-remember"><input type="checkbox" id="loginRemember"> Remember Me</label>
       <button class="login-btn" id="loginBtn">LOG IN</button>
       <div class="login-err" id="loginErr"></div>
+      <div id="loginStatus" style="font-size:11px;color:rgba(255,255,255,.55);text-align:center;margin-top:8px;direction:ltr;"></div>
     </div>
   </div>
 </div>
@@ -534,34 +535,70 @@ function $(id){return document.getElementById(id);}
    وابقِ بقية الأداة كما هي.
    ============================================================ */
 var Auth = (function(){
-  // ⬇⬇ رابط Worker المصادقة — عدّله لو رابطك الفعلي مختلف
   var WORKER="https://studyzone-auth.ct-aleppo3.workers.dev";
   var TOKKEY="sz_auth_token";
+  var BUILD="2026-07-13-fix3";
   var current=null, token=null;
 
   function getToken(){ if(token) return token; try{return localStorage.getItem(TOKKEY)||sessionStorage.getItem(TOKKEY);}catch(e){return null;} }
   function setToken(t,remember){ token=t; try{ (remember?localStorage:sessionStorage).setItem(TOKKEY,t); }catch(e){} }
   function clearToken(){ token=null; try{localStorage.removeItem(TOKKEY);sessionStorage.removeItem(TOKKEY);}catch(e){} }
 
+  function xhrApi(url,method,headers,body){
+    return new Promise(function(resolve,reject){
+      var x=new XMLHttpRequest();
+      x.open(method||"GET",url,true);
+      try{ Object.keys(headers||{}).forEach(function(k){ x.setRequestHeader(k,headers[k]); }); }catch(e){}
+      x.onload=function(){
+        var d={}; try{ d=JSON.parse(x.responseText); }catch(e){}
+        resolve({ok:x.status>=200&&x.status<300,status:x.status,data:d});
+      };
+      x.onerror=function(){ reject(new Error("XHR network error")); };
+      x.ontimeout=function(){ reject(new Error("XHR timeout")); };
+      x.timeout=30000;
+      x.send(body||null);
+    });
+  }
+
   async function api(path,method,body){
     var headers={"Content-Type":"application/json"};
     var t=getToken(); if(t) headers["Authorization"]="Bearer "+t;
-    var r=await fetch(WORKER+path,{method:method||"GET",headers:headers,body:body?JSON.stringify(body):undefined});
-    var d={}; try{ d=await r.json(); }catch(e){}
-    return {ok:r.ok,status:r.status,data:d};
+    var url=WORKER+path;
+    var payload=body?JSON.stringify(body):undefined;
+    try{
+      var r=await fetch(url,{method:method||"GET",mode:"cors",cache:"no-store",headers:headers,body:payload});
+      var d={}; try{ d=await r.json(); }catch(e){}
+      return {ok:r.ok,status:r.status,data:d,transport:"fetch"};
+    }catch(fetchErr){
+      try{
+        var xr=await xhrApi(url,method||"GET",headers,payload);
+        xr.transport="xhr";
+        return xr;
+      }catch(xhrErr){
+        return {ok:false,status:0,data:{},transport:"none",networkError:(fetchErr&&fetchErr.message)||String(fetchErr)||"network"};
+      }
+    }
+  }
+
+  async function ping(){
+    try{
+      var r=await api("/health","GET");
+      return {ok:!!(r.ok||r.status===200),detail:r.transport||"?"};
+    }catch(e){ return {ok:false,detail:(e&&e.message)||String(e)}; }
   }
 
   async function restore(){
     if(!getToken()) return false;
-    try{ var res=await api("/me","GET"); if(res.ok&&res.data.user){ current=res.data.user; return true; } }catch(e){}
-    clearToken(); return false;
+    var res=await api("/me","GET");
+    if(res.ok&&res.data.user){ current=res.data.user; return true; }
+    clearToken(); current=null; return false;
   }
   async function login(email,password,remember){
-    try{
-      var res=await api("/login","POST",{email:email,password:password,remember:!!remember});
-      if(res.ok&&res.data.token){ setToken(res.data.token,remember); current=res.data.user; return {ok:true}; }
-      return {ok:false,error:(res.data&&res.data.error)||"فشل تسجيل الدخول"};
-    }catch(e){ return {ok:false,error:"تعذّر الاتصال بالخادم"}; }
+    clearToken();
+    var res=await api("/login","POST",{email:email,password:password,remember:!!remember});
+    if(res.networkError) return {ok:false,error:"تعذّر الاتصال بالخادم — "+res.networkError};
+    if(res.ok&&res.data.token){ setToken(res.data.token,remember); current=res.data.user; return {ok:true}; }
+    return {ok:false,error:(res.data&&res.data.error)||"فشل تسجيل الدخول"};
   }
   async function logout(){ try{ await api("/logout","POST",{}); }catch(e){} clearToken(); current=null; }
   function can(action){
@@ -593,10 +630,24 @@ var Auth = (function(){
     catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
   }
   return {restore:restore, login:login, logout:logout, can:can, current:function(){return current;},
-          listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify};
+          listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify, ping:ping, BUILD:BUILD};
 })();
 
 var heroIMG=null, origIMG=null, fmt="square";
+function isSafeDataImage(src){
+  return typeof src==="string" && /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(src);
+}
+function setHeroPreview(el,src){
+  el.textContent="";
+  if(src&&isSafeDataImage(src)){
+    var img=document.createElement("img"); img.src=src; el.appendChild(img);
+  }else{
+    var ph=document.createElement("div"); ph.className="img-ph"; ph.textContent="صورة الدورة"; el.appendChild(ph);
+  }
+}
+function isAllowedWorkerUrl(raw){
+  try{ var u=new URL(raw); return u.protocol==="https:"&&u.hostname==="empty-fog-2a2b.ct-aleppo3.workers.dev"; }catch(e){ return false; }
+}
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function emph(t){var p=esc(t).split("**"),o="";for(var i=0;i<p.length;i++){o+=(i%2)?'<b class="em">'+p[i]+'</b>':p[i];}return o;}
 function render(){
@@ -612,7 +663,7 @@ function render(){
   var rows=document.querySelectorAll("#bullets .brow input"),bh="";
   rows.forEach(function(inp){if(inp.value.trim()){bh+='<div class="bullet"><span class="dot">&#8226;</span><span>'+emph(inp.value)+'</span></div>';}});
   $("pBullets").innerHTML=bh;
-  $("pHero").innerHTML=heroIMG?'<img src="'+heroIMG+'">':'<div class="img-ph">صورة الدورة</div>';
+  setHeroPreview($("pHero"), heroIMG);
   fitTitle();
 }
 /* تصغير تلقائي للعنوان ليبقى بسطر واحد (حد 80%، وبعده سطران).
@@ -902,7 +953,7 @@ function loadProject(d){
   $("note").value=d.note||"";$("contact").value=d.contact||"";
   $("address").value=d.address||"";
   $("bullets").innerHTML="";(d.bullets||[]).forEach(addBulletRow);
-  heroIMG=d.image||null;
+  heroIMG=(d.image&&isSafeDataImage(d.image))?d.image:null;
   if(heroIMG){$("imgUp").classList.add("has");$("imgUp").childNodes[0].nodeValue="\u2713 تم رفع الصورة";}
   else{$("imgUp").classList.remove("has");$("imgUp").childNodes[0].nodeValue="اضغط لرفع الصورة";}
   render();
@@ -965,14 +1016,18 @@ COMPOSITION:
 - Subject well-framed within the wide format, visually balanced
 OUTPUT: A polished, ready-to-use flat illustration on a pure white background, 5:3 landscape.`;
 
-try{var wu=localStorage.getItem("sz_worker_url");if(wu)$("workerUrl").value=wu;}catch(e){}
-$("workerUrl").addEventListener("change",function(){try{localStorage.setItem("sz_worker_url",this.value.trim());}catch(e){}});
+try{var wu=localStorage.getItem("sz_worker_url");if(wu&&isAllowedWorkerUrl(wu))$("workerUrl").value=wu;}catch(e){}
+$("workerUrl").addEventListener("change",function(){
+  var v=this.value.trim();
+  if(v&&!isAllowedWorkerUrl(v)){alert("رابط Worker غير مسموح.");this.value="https://empty-fog-2a2b.ct-aleppo3.workers.dev/";return;}
+  try{localStorage.setItem("sz_worker_url",v);}catch(e){}
+});
 
 $("aiBtn").onclick=async function(){
   var src=origIMG||heroIMG;
   if(!src){alert("ارفع صورة أولاً.");return;}
   var workerURL=($("workerUrl")&&$("workerUrl").value||"").trim();
-  if(!workerURL){alert("أدخل رابط Cloudflare Worker من إعدادات التحويل.");return;}
+  if(!workerURL||!isAllowedWorkerUrl(workerURL)){alert("رابط Cloudflare Worker غير صالح أو غير مسموح.");return;}
   var btn=this,prev=btn.textContent;btn.disabled=true;btn.textContent="جاري التحويل…";
   var ph=$("pHero");var oldHero=ph.innerHTML;
   ph.innerHTML='<div class="img-ph">… جاري توليد الستايل</div>';
@@ -1088,6 +1143,15 @@ $("loginEmail").addEventListener("keydown",function(e){if(e.key==="Enter")doLogi
 
 /* بدء التشغيل: استعادة جلسة سابقة أو عرض البوّابة */
 (async function(){
+  var st=$("loginStatus");
+  if(st) st.textContent="build "+Auth.BUILD+" · checking server…";
+  if(location.protocol==="file:"&&st){
+    st.textContent="build "+Auth.BUILD+" · ⚠ file:// — run: python -m http.server 8080 then open http://localhost:8080";
+  }
+  var ping=await Auth.ping();
+  if(st){
+    st.textContent="build "+Auth.BUILD+" · server "+(ping.ok?"OK":"FAIL")+(ping.detail?" ("+ping.detail+")":"");
+  }
   var ok=false; try{ ok=await Auth.restore(); }catch(e){}
   if(ok){ startApp(); }
   else { $("loginGate").style.display="flex"; $("appRoot").style.display="none"; }
