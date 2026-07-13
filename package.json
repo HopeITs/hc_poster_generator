@@ -1,0 +1,8 @@
+{
+  "name": "post-gen",
+  "private": true,
+  "description": "STUDY ZONE poster generator",
+  "dependencies": {
+    "html2canvas": "1.4.1"
+  }
+}
