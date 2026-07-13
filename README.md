@@ -1,4 +1,4 @@
-# post-gen (STUDY ZONE)
+# post-gen
 
 Single-page poster/story generator (`index.html`) with a Cloudflare Worker auth API (`auth_worker.js`).
 
@@ -16,7 +16,7 @@ Single-page poster/story generator (`index.html`) with a Cloudflare Worker auth 
 Apply the schema:
 
 ```bash
-wrangler d1 execute studyzone-db --file=schema.sql
+wrangler d1 execute post-gen-db --file=schema.sql
 ```
 
 ### 2. Auth worker secrets

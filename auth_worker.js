@@ -1,6 +1,6 @@
 // ============================================================
-// STUDY ZONE — Auth Worker  (تسجيل دخول + إدارة مستخدمين + أدوار)
-// قاعدة البيانات: D1 (studyzone-db) — مربوطة باسم  DB
+// post-gen — Auth Worker  (تسجيل دخول + إدارة مستخدمين + أدوار)
+// قاعدة البيانات: D1 (post-gen-db) — مربوطة باسم  DB
 // أسرار: SETUP_SECRET, RESEND_API_KEY, ALLOWED_ORIGINS (مطلوب للإنتاج)
 // ============================================================
 
@@ -11,7 +11,7 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const NOTIFY_MAX_PER_HOUR = 10;
 const NOTIFY_MAX_ATTACHMENTS = 6;
 const NOTIFY_MAX_TOTAL_B64 = 12 * 1024 * 1024;
-const SESSION_COOKIE = "sz_auth";
+const SESSION_COOKIE = "pg_auth";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -231,7 +231,7 @@ export default {
 
     try {
       if (request.method === "GET" && (path === "" || path === "/health")) {
-        return json(request, env, { ok: true, service: "studyzone-auth" });
+        return json(request, env, { ok: true, service: "post-gen-auth" });
       }
 
       if (request.method === "POST" && path === "/setup-owner") {
@@ -370,7 +370,7 @@ export default {
         var safeSender = escapeHtml(sender.email);
         var html =
           "<div style='font-family:Arial,sans-serif;direction:rtl;text-align:right'>" +
-          "<h2 style='color:#003c54'>مشروع جديد من STUDY ZONE</h2>" +
+          "<h2 style='color:#003c54'>مشروع جديد من post-gen</h2>" +
           "<p><b>العنوان:</b> " + safeTitle + "</p>" +
           "<p><b>أنشأه:</b> " + safeSender + "</p>" +
           "<p><b>التوقيت:</b> " + when + "</p>" +
@@ -382,7 +382,7 @@ export default {
         });
 
         var payload = {
-          from: "STUDY ZONE <onboarding@resend.dev>",
+          from: "post-gen <onboarding@resend.dev>",
           to: recipients,
           subject: "مشروع جديد: " + title.replace(/[\r\n]/g, " ") + " — " + sender.email,
           html: html,

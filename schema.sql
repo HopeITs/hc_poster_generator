@@ -1,5 +1,5 @@
--- STUDY ZONE auth worker (D1)
--- Run once: wrangler d1 execute studyzone-db --file=schema.sql
+-- post-gen auth worker (D1)
+-- Run once: wrangler d1 execute post-gen-db --file=schema.sql
 
 CREATE TABLE IF NOT EXISTS users (
   email TEXT PRIMARY KEY,
