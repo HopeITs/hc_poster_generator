@@ -1,0 +1,28 @@
+# Security response headers.
+# Requires mod_headers and AllowOverride All (or at least FileInfo).
+
+<IfModule mod_headers.c>
+    # Block MIME-type sniffing.
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Disallow framing (clickjacking). Use SAMEORIGIN if you ever embed this.
+    Header always set X-Frame-Options "DENY"
+
+    # Don't leak the full URL to third parties.
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # No need for camera/mic/geolocation in this app.
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+
+    # Content Security Policy.
+    #
+    # NOTE: 'unsafe-inline' is required for script-src because index.html has two
+    # inline <script> blocks and an inline onclick handler. That significantly
+    # weakens CSP's XSS protection -- it still restricts WHICH external origins
+    # may serve scripts, but cannot stop injected inline script. Removing the
+    # inline code and dropping 'unsafe-inline' is the real hardening step.
+    #
+    # data: is needed for the embedded base64 fonts and images.
+    # connect-src lists the Cloudflare Workers the app calls.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://studyzone-auth.ct-aleppo3.workers.dev https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+</IfModule>
