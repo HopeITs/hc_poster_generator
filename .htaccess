@@ -16,13 +16,21 @@
 
     # Content Security Policy.
     #
-    # NOTE: 'unsafe-inline' is required for script-src because index.html has two
-    # inline <script> blocks and an inline onclick handler. That significantly
-    # weakens CSP's XSS protection -- it still restricts WHICH external origins
-    # may serve scripts, but cannot stop injected inline script. Removing the
-    # inline code and dropping 'unsafe-inline' is the real hardening step.
+    # The inline scripts are allowed by sha256 hash rather than 'unsafe-inline',
+    # so injected script is blocked while the app's own code still runs. The
+    # hashes cover the exact bytes of each inline block, so they go stale on any
+    # JavaScript edit and the app then silently fails to boot. Regenerate with:
+    #
+    #     python tools/csp-hashes.py
+    #
+    # Inline event handlers cannot be hashed, only allowed wholesale by
+    # 'unsafe-inline' -- keep them out of index.html.
+    #
+    # style-src keeps 'unsafe-inline' for the many inline style="..." attributes.
+    # CSS injection is a far smaller risk than script injection, and removing it
+    # would mean rewriting the markup.
     #
     # data: is needed for the embedded base64 fonts and images.
     # connect-src lists the Cloudflare Workers the app calls.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://studyzone-auth.ct-aleppo3.workers.dev https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-YzvcSNSbk9RTXsPdtZnf9M5QnlvEnT4i1m5iKugAoPM=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY=' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://studyzone-auth.ct-aleppo3.workers.dev https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 </IfModule>

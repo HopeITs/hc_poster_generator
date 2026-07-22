@@ -575,7 +575,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <p>ادخل المحتوى، التصميم مقفول بمعايير ثابتة</p>
   </div>
   <div class="user-bar">
-    <button id="backToProjects" onclick="showProjectPicker()">← المشاريع</button>
+    <button id="backToProjects">← المشاريع</button>
     <span class="who" id="whoami"></span>
     <span class="role-badge" id="roleBadge"></span>
   </div>
@@ -1502,6 +1502,9 @@ function openProject(p){
   if(p && p.template_type==="hopecenter_v1"){ openHopeCenter(p); }
   else { try{ Auth.applyBrand(p); }catch(e){} try{ document.title="HC GENERATOR"; }catch(e){} startApp(); }
 }
+// Wired here rather than as an inline onclick: CSP cannot allow inline event
+// handlers by hash, only by 'unsafe-inline', which would defeat the policy.
+if($("backToProjects")) $("backToProjects").onclick=showProjectPicker;
 async function showProjectPicker(){
   $("loginGate").style.display="none";
   $("appRoot").style.display="none";
