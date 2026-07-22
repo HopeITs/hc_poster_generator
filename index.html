@@ -1358,11 +1358,12 @@ function acctReadPhoto(file){
     }catch(err){ alert("تعذّر تحميل الصورة: "+err.message); }
   };
 })();
-var ROLE_AR={owner:"المالك",admin:"مدير",user:"مستخدم",comms:"مدير فريق التواصل"};
+// Role names are shown in English everywhere; the stored keys stay lowercase.
+var ROLE_LABEL={owner:"Owner",admin:"Admin",user:"User",comms:"Comms Manager"};
 function applyRole(){
   var u=Auth.current(); if(!u) return;
   $("whoami").textContent=u.email;
-  $("roleBadge").textContent=(ROLE_AR[u.role]||u.role);
+  $("roleBadge").textContent=(ROLE_LABEL[u.role]||u.role);
   acctLoadPhoto();   // reads from the session, so load once the user is known
   var canManage=Auth.can("manage_users");
   $("mgmtToggle").style.display=canManage?"":"none";
@@ -1384,7 +1385,7 @@ async function renderUsers(){
   us.forEach(function(u){
     var row=document.createElement("div"); row.className="urow";
     var em=document.createElement("span"); em.className="uemail"; em.textContent=u.email;
-    var rl=document.createElement("span"); rl.className="urole "+u.role; rl.textContent=u.role;
+    var rl=document.createElement("span"); rl.className="urole "+u.role; rl.textContent=(ROLE_LABEL[u.role]||u.role);
     row.appendChild(em); row.appendChild(rl);
     var canDel=(u.role!=="owner") && (u.email!==me.email) && !((u.role==="admin"||u.role==="comms")&&me.role!=="owner");
     if(canDel){
@@ -1450,7 +1451,7 @@ async function renderUsersPage(){
   us.forEach(function(u){
     var row=document.createElement("div"); row.className="umprow";
     var em=document.createElement("span"); em.className="em"; em.textContent=u.email;
-    var rl=document.createElement("span"); rl.className="rl "+u.role; rl.textContent=u.role;
+    var rl=document.createElement("span"); rl.className="rl "+u.role; rl.textContent=(ROLE_LABEL[u.role]||u.role);
     row.appendChild(em); row.appendChild(rl);
     var canDel=(u.role!=="owner") && (u.email!==me.email) && !((u.role==="admin"||u.role==="comms")&&me.role!=="owner");
     if(canDel){
@@ -1642,7 +1643,7 @@ function hcExport(){
 function hcShowUserBar(){
   var u=Auth.current(); if(!u) return;
   $("hcWhoami").textContent=u.email;
-  $("hcRoleBadge").textContent=(ROLE_AR[u.role]||u.role);
+  $("hcRoleBadge").textContent=(ROLE_LABEL[u.role]||u.role);
   acctLoadPhoto();   // reads from the session, so load once the user is known
   $("hcMgmtToggle").style.display=Auth.can("manage_users")?"":"none";
 }
