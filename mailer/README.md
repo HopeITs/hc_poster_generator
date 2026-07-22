@@ -16,7 +16,10 @@ it. So there is nothing to install: no Postfix, no DKIM keygen, no PTR request,
 no IP warm-up. `mail()` hands straight to the local MTA and inherits whatever
 DKIM signing the panel has configured.
 
-This is shared hosting, not a VPS: Node and systemd are not available, PHP is.
+The server is a VPS under our control, so Node and systemd are available too.
+PHP is still the right choice here: the script runs on the same host as the
+MTA, so `mail()` needs no SMTP credentials, no listening service and no
+supervision — there is nothing to keep running.
 
 ## Install
 
@@ -58,8 +61,9 @@ harshly. Add at minimum:
 | TXT | `@` | `v=spf1 a mx ip4:195.42.143.64 ~all` |
 | TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:postmaster@hcsyria.org` |
 
-Enable DKIM from the hosting panel's email-deliverability page and publish the
-record it generates.
+Enable DKIM — from the panel's email-deliverability page if one is installed,
+otherwise with `opendkim` directly on the VPS (see MIGRATION.ar.md). Publish
+the record it generates.
 
 Note the domain also lists `mail.google.com` as a secondary MX. If mail for the
 domain is meant to be delivered to Google rather than this server, that needs

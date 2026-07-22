@@ -42,7 +42,16 @@
 | TXT | `@` | `v=spf1 a mx ip4:195.42.143.64 ~all` |
 | TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:postmaster@hcsyria.org` |
 
-ثم من صفحة **Email Deliverability** فعّل DKIM وانشر السجل الذي تولّده.
+ثم فعّل DKIM. إن كان على الخادم لوحة تحكّم، من صفحة **Email
+Deliverability**. وإن كنّا نديره مباشرة على الـVPS، فبـ`opendkim`:
+
+```bash
+sudo apt install -y opendkim opendkim-tools
+sudo opendkim-genkey -s mail -d hcsyria.org
+```
+
+ثم انشر محتوى `mail.txt` كسجل TXT باسم `mail._domainkey`، واربط
+`opendkim` بالـMTA.
 
 **لماذا الآن:** أحد المستلمين على Gmail، وGmail يرفض أو يصنّف كـSpam البريد
 غير الموثّق. هذه الخطوة ليست تحسيناً اختيارياً.
