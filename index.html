@@ -289,7 +289,10 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 /* ===== User bar + management ===== */
 .user-bar{display:flex;align-items:center;gap:8px;background:#002c40;padding:8px 22px;
   font-size:12px;color:#cfe0e8;}
-.user-bar .who{flex:1;direction:ltr;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* Left-aligned so the address sits against the role badge; margin 7px + the
+   bar's 8px flex gap = 15px between them. flex:1 stays so the badge keeps its
+   place at the end of the bar and the slack falls on the other side. */
+.user-bar .who{flex:1;direction:ltr;text-align:left;margin-left:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .user-bar .role-badge{background:var(--brand-orange);color:var(--brand-navy);font-weight:700;border-radius:5px;padding:2px 7px;font-size:10px;}
 .user-bar button{background:transparent;border:1px solid #355;color:#cfe0e8;border-radius:7px;
   padding:5px 9px;font-family:'Somar Sans';font-size:11px;font-weight:700;cursor:pointer;}
@@ -484,7 +487,8 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
    whose .panel scrolls as a whole. */
 .hc-phead{flex-shrink:0;background:#be1f24;color:#fff;padding:18px 22px;box-sizing:border-box;}
 .hc-userbar{flex-shrink:0;display:flex;align-items:center;gap:8px;background:#8f171b;padding:8px 22px;font-size:12px;color:#f5dcdd;box-sizing:border-box;}
-.hc-userbar .who{flex:1;direction:ltr;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* See .user-bar .who: 7px margin + the bar's 8px gap = 15px to the badge. */
+.hc-userbar .who{flex:1;direction:ltr;text-align:left;margin-left:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .hc-userbar .role-badge{background:#fff;color:#be1f24;font-weight:700;border-radius:5px;padding:2px 7px;font-size:10px;}
 .hc-userbar button{background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:7px;padding:5px 9px;font-family:'Somar Sans';font-size:11px;font-weight:700;cursor:pointer;}
 .hc-userbar button:hover{border-color:#fff;background:rgba(255,255,255,.12);}
