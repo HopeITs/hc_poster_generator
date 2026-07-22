@@ -12,6 +12,11 @@
 
 const ROLES = ["owner", "admin", "comms", "user"];
 
+// حدود محاولات الدخول (جدول login_attempts)
+const LOGIN_WINDOW_MIN = 15;   // نافذة الحساب بالدقائق
+const LOGIN_MAX_EMAIL  = 5;    // فشل متتالٍ لنفس الإيميل قبل الحجب
+const LOGIN_MAX_IP     = 20;   // فشل من نفس الـIP عبر أي حساب (يمنع العدّ على الحسابات)
+
 function cors() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -170,10 +175,28 @@ export default {
       if (request.method === "POST" && path === "/login") {
         var b = await request.json();
         var em = (b.email || "").trim().toLowerCase();
+        var ip = request.headers.get("CF-Connecting-IP") || "";
+
+        // تحديد المحاولات: يُفحص قبل التحقق من كلمة السر، فلا يُستهلك أي عمل
+        // تشفيري على المحاولات المحجوبة. النافذة 15 دقيقة.
+        var since = new Date(Date.now() - LOGIN_WINDOW_MIN * 60000).toISOString().replace("T", " ").slice(0, 19);
+        var att = await env.DB.prepare(
+          "SELECT (SELECT COUNT(*) FROM login_attempts WHERE email=?1 AND at>?3) AS by_email," +
+          "       (SELECT COUNT(*) FROM login_attempts WHERE ip=?2 AND ip!='' AND at>?3) AS by_ip"
+        ).bind(em, ip, since).first();
+        if (att && (att.by_email >= LOGIN_MAX_EMAIL || att.by_ip >= LOGIN_MAX_IP)) {
+          return json({ error: "محاولات كثيرة. حاول بعد " + LOGIN_WINDOW_MIN + " دقيقة." }, 429);
+        }
+
         var u = await env.DB.prepare("SELECT email,password,role,project_id,photo FROM users WHERE email=?1").bind(em).first();
         if (!u || !(await verifyPassword(b.password || "", u.password))) {
+          await env.DB.prepare("INSERT INTO login_attempts (email,ip) VALUES (?1,?2)").bind(em, ip).run();
           return json({ error: "الإيميل أو كلمة السر غير صحيحة" }, 401);
         }
+        // نجاح: امسح سجل المحاولات لهذا الحساب، ونظّف القديم
+        await env.DB.prepare("DELETE FROM login_attempts WHERE email=?1").bind(em).run();
+        await env.DB.prepare("DELETE FROM login_attempts WHERE at < datetime('now','-1 day')").run();
+
         var token = makeToken();
         var days = b.remember ? 30 : 1;
         var exp = new Date(Date.now() + days * 86400000).toISOString();
@@ -381,7 +404,7 @@ export default {
       if (request.method === "POST" && path === "/notify") {
         var sender = await getSessionUser(env, request);
         if (!sender) return json({ error: "غير مسجّل دخول" }, 401);
-        if (!env.MAIL_ENDPOINT || !env.MAIL_SECRET) return json({ error: "خدمة البريد غير مضبوطة (MAIL_ENDPOINT / MAIL_SECRET)" }, 500);
+        if (!env.RESEND_API_KEY) return json({ error: "مفتاح Resend غير مضبوط (RESEND_API_KEY)" }, 500);
 
         var nb2 = await request.json();
         var atts = Array.isArray(nb2.attachments) ? nb2.attachments : [];
@@ -413,22 +436,21 @@ export default {
           return { filename: a.filename, content: a.b64 };
         });
 
-        // يُرسَل عبر خدمة التحويل على mail.hcsyria.org لأن Workers لا تتكلم SMTP.
-        // اسم المُرسِل يأتي من إعدادات الخدمة، لا من هنا.
         var payload = {
+          from: safeProj + " <onboarding@resend.dev>",
           to: recipients,
           subject: "مشروع جديد: " + safeTitle + " — " + safeProj + " — " + sender.email,
           html: html,
           attachments: attachments,
         };
 
-        var rr = await fetch(env.MAIL_ENDPOINT, {
+        var rr = await fetch("https://api.resend.com/emails", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Auth": env.MAIL_SECRET },
+          headers: { "Authorization": "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
         var rd = {}; try { rd = await rr.json(); } catch (e) {}
-        if (!rr.ok) return json({ error: (rd && rd.error) || ("Mailer HTTP " + rr.status) }, 502);
+        if (!rr.ok) return json({ error: (rd && (rd.message || rd.name)) || ("Resend HTTP " + rr.status) }, 502);
         return json({ ok: true, recipients: recipients.length });
       }
 
