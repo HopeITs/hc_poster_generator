@@ -1,0 +1,2 @@
+# Wrangler local state (account cache, build artifacts) -- machine-specific.
+.wrangler/

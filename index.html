@@ -322,6 +322,14 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 .acct .acct-av{width:var(--acct-box);height:var(--acct-box);border:none;padding:0;
   background:transparent;cursor:pointer;display:block;line-height:0;}
 .acct .acct-av svg{width:100%;height:100%;display:block;}
+/* The chosen photo sits exactly over the SVG's white disc, using the same
+   viewBox fractions, so the icon's drop shadow still frames it. Hidden until
+   a photo is set, at which point it covers the default person glyph. */
+.acct .acct-photo{display:none;position:absolute;pointer-events:none;
+  width:var(--acct-disc);height:var(--acct-disc);border-radius:50%;object-fit:cover;
+  left:calc(0.19504 * var(--acct-box));   /* 25.16/129 */
+  top:calc(0.12341 * var(--acct-box));    /* 15.92/129 */}
+.acct.has-photo .acct-photo{display:block;}
 /* Opens upward, aligned to the visible disc rather than the button box. */
 .acct .acct-menu{display:none;position:absolute;
   bottom:calc(0.87659 * var(--acct-box) + 8px);   /* disc top (1 - 15.92/129) */
@@ -550,7 +558,9 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
   <div class="hc-preview"><div class="hc-stage" id="hcStage"></div></div>
   <div class="acct">
     <button class="acct-av" id="hcAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="acctShadowHc" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="acctClipHc"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#acctShadowHc)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#acctClipHc)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
+    <img class="acct-photo" id="hcAvatarPhoto" alt="">
     <div class="acct-menu hc-acct-menu" id="hcAcctMenu">
+      <button id="hcPhotoBtn">تغيير الصورة الشخصية</button>
       <button id="hcMgmtToggle" style="display:none">إدارة المستخدمين</button>
       <button id="hcLogout">تسجيل خروج</button>
     </div>
@@ -751,10 +761,13 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 </div></div>
 <div class="acct">
   <button class="acct-av" id="szAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="acctShadowSz" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="acctClipSz"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#acctShadowSz)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#acctClipSz)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
+  <img class="acct-photo" id="szAvatarPhoto" alt="">
   <div class="acct-menu sz-acct-menu" id="szAcctMenu">
+    <button id="szPhotoBtn">تغيير الصورة الشخصية</button>
     <button id="mgmtToggle" style="display:none">إدارة المستخدمين</button>
     <button id="logoutBtn">تسجيل خروج</button>
   </div>
+<input type="file" id="acctPhotoFile" accept="image/*" style="display:none">
 </div>
 </div>
 <script>
@@ -837,6 +850,12 @@ var Auth = (function(){
   return {restore:restore, login:login, logout:logout, can:can, current:function(){return current;},
           projects:async function(){ try{ var r=await api("/projects","GET"); return r.ok?{ok:true,projects:r.data.projects||[]}:{ok:false,error:(r.data&&r.data.error)||"تعذّر الجلب",projects:[]}; }catch(e){ return {ok:false,error:"تعذّر الاتصال",projects:[]}; } },
           applyBrand:applyBrand,
+          setPhoto:async function(dataUrl){
+            try{ var r=await api("/me/photo","POST",{photo:dataUrl});
+                 if(r.ok&&current) current.photo=r.data.photo;
+                 return r.ok?{ok:true}:{ok:false,error:(r.data&&r.data.error)||"تعذّر الحفظ"}; }
+            catch(e){ return {ok:false,error:"تعذّر الاتصال بالخادم"}; }
+          },
           listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify};
 })();
 
@@ -1282,11 +1301,69 @@ document.addEventListener("click",closeAcctMenus);
 document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeAcctMenus(); });
 wireAcct("szAvatar","szAcctMenu");
 wireAcct("hcAvatar","hcAcctMenu");
+
+/* ---------- الصورة الشخصية ----------
+   Stored server-side on the users row and returned by /login and /me, so it
+   follows the user across devices and browsers. */
+var ACCT_PHOTO_PX=256;
+function acctApplyPhoto(src){
+  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"]];
+  for(var i=0;i<ids.length;i++){
+    var img=$(ids[i][0]), av=$(ids[i][1]);
+    if(!img||!av) continue;
+    var box=av.parentElement;                 // .acct
+    if(src){ img.src=src; box.classList.add("has-photo"); }
+    else { img.removeAttribute("src"); box.classList.remove("has-photo"); }
+  }
+}
+function acctLoadPhoto(){
+  var u=(typeof Auth!=="undefined"&&Auth.current&&Auth.current())||null;
+  acctApplyPhoto((u&&u.photo)||null);
+}
+// Downscale to a square before upload: the endpoint caps the payload at 300KB
+// and a raw phone photo is far past that.
+function acctReadPhoto(file){
+  return new Promise(function(res,rej){
+    var fr=new FileReader();
+    fr.onerror=function(){ rej(new Error("تعذّر قراءة الملف")); };
+    fr.onload=function(){
+      var im=new Image();
+      im.onerror=function(){ rej(new Error("ملف الصورة غير صالح")); };
+      im.onload=function(){
+        var side=Math.min(im.naturalWidth,im.naturalHeight);   // centre-crop to square
+        var c=document.createElement("canvas");
+        c.width=c.height=ACCT_PHOTO_PX;
+        c.getContext("2d").drawImage(im,(im.naturalWidth-side)/2,(im.naturalHeight-side)/2,
+                                     side,side,0,0,ACCT_PHOTO_PX,ACCT_PHOTO_PX);
+        res(c.toDataURL("image/jpeg",0.85));
+      };
+      im.src=fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+(function(){
+  var fileInput=$("acctPhotoFile"); if(!fileInput) return;
+  function pick(){ fileInput.value=""; fileInput.click(); }
+  if($("szPhotoBtn")) $("szPhotoBtn").onclick=pick;
+  if($("hcPhotoBtn")) $("hcPhotoBtn").onclick=pick;
+  fileInput.onchange=async function(){
+    var f=this.files&&this.files[0]; if(!f) return;
+    if(!/^image\//.test(f.type)){ alert("الرجاء اختيار ملف صورة."); return; }
+    try{
+      var url=await acctReadPhoto(f);
+      var r=await Auth.setPhoto(url);
+      if(!r.ok){ alert("تعذّر حفظ الصورة: "+r.error); return; }
+      acctApplyPhoto(url);
+    }catch(err){ alert("تعذّر تحميل الصورة: "+err.message); }
+  };
+})();
 var ROLE_AR={owner:"المالك",admin:"مدير",user:"مستخدم",comms:"مدير اتصالات"};
 function applyRole(){
   var u=Auth.current(); if(!u) return;
   $("whoami").textContent=u.email;
   $("roleBadge").textContent=(ROLE_AR[u.role]||u.role);
+  acctLoadPhoto();   // reads from the session, so load once the user is known
   var canManage=Auth.can("manage_users");
   $("mgmtToggle").style.display=canManage?"":"none";
   $("userMgmt").style.display="none";  // تُغلق دائماً عند الدخول وتُعاد عند الفتح
@@ -1566,6 +1643,7 @@ function hcShowUserBar(){
   var u=Auth.current(); if(!u) return;
   $("hcWhoami").textContent=u.email;
   $("hcRoleBadge").textContent=(ROLE_AR[u.role]||u.role);
+  acctLoadPhoto();   // reads from the session, so load once the user is known
   $("hcMgmtToggle").style.display=Auth.can("manage_users")?"":"none";
 }
 $("hcMgmtToggle").onclick=openUserMgmt;
