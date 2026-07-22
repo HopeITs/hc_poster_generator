@@ -1,2 +1,5 @@
 # Wrangler local state (account cache, build artifacts) -- machine-specific.
 .wrangler/
+
+# Holds the mail relay's shared secret. Use config.example.php as the template.
+mailer/config.php
