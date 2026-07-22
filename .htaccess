@@ -32,5 +32,5 @@
     #
     # data: is needed for the embedded base64 fonts and images.
     # connect-src lists the Cloudflare Workers the app calls.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-YzvcSNSbk9RTXsPdtZnf9M5QnlvEnT4i1m5iKugAoPM=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY=' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://studyzone-auth.ct-aleppo3.workers.dev https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-YzvcSNSbk9RTXsPdtZnf9M5QnlvEnT4i1m5iKugAoPM=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://studyzone-auth.ct-aleppo3.workers.dev https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 </IfModule>

@@ -45,7 +45,7 @@ def main():
         return 1
 
     conf = io.open(HTACCESS, encoding="utf-8").read()
-    directive = "script-src 'self' " + " ".join(found) + " https://cdnjs.cloudflare.com;"
+    directive = "script-src 'self' " + " ".join(found) + ";"
     updated, n = re.subn(r"script-src [^;]*;", directive, conf)
     if n != 1:
         print("expected exactly one script-src in .htaccess, found %d" % n, file=sys.stderr)
