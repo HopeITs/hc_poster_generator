@@ -294,6 +294,49 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 .user-bar button{background:transparent;border:1px solid #355;color:#cfe0e8;border-radius:7px;
   padding:5px 9px;font-family:'Somar Sans';font-size:11px;font-weight:700;cursor:pointer;}
 .user-bar button:hover{border-color:var(--brand-orange);color:#fff;}
+/* Account avatar + dropdown, shared by the Study Zone and Hope Center
+   generators. Holds the admin actions (user management, logout) that used to
+   sit inline in the user bar. Every rule is qualified with `.acct` to keep it
+   independent of the surrounding button styles.
+   Pinned to the bottom-left corner of the viewport, floating over the preview
+   area. It is a child of .hc-app / .app, so it only shows in whichever
+   generator is open.
+   The icon SVG carries its own white disc and drop shadow, so the button
+   itself is transparent and unstyled. The artwork is deliberately off-centre
+   in its 129x129 viewBox: the disc is r=43.81 at (68.97,59.73) and the rest
+   of the box is shadow room, which sits lower-left. The fractions below are
+   that geometry, so --acct-disc is the real on-screen diameter and
+   --acct-inset the disc's distance from the viewport corner. Change those
+   two and everything else follows. */
+.acct{
+  --acct-disc:78px;                        /* visible white circle diameter */
+  --acct-inset:19px;                       /* disc distance from the corner */
+  --acct-box:calc(var(--acct-disc) / 0.67922);  /* 87.62/129 of the viewBox */
+  position:fixed;
+  left:calc(var(--acct-inset) - 0.19504 * var(--acct-box));   /* 25.16/129 */
+  bottom:calc(var(--acct-inset) - 0.19736 * var(--acct-box)); /* 25.46/129 */
+  z-index:1100;}
+.acct .acct-av{width:var(--acct-box);height:var(--acct-box);border:none;padding:0;
+  background:transparent;cursor:pointer;display:block;line-height:0;}
+.acct .acct-av svg{width:100%;height:100%;display:block;}
+/* Opens upward, aligned to the visible disc rather than the button box. */
+.acct .acct-menu{display:none;position:absolute;
+  bottom:calc(0.87659 * var(--acct-box) + 8px);   /* disc top (1 - 15.92/129) */
+  left:calc(0.19504 * var(--acct-box));
+  min-width:172px;
+  background:#fff;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.24);padding:6px;z-index:1000;}
+.acct .acct-menu.on{display:block;}
+.acct .acct-menu button{display:block;width:100%;text-align:right;background:transparent;border:none;
+  border-radius:7px;padding:10px 11px;font-family:'Somar Sans';font-size:12.5px;font-weight:700;cursor:pointer;}
+/* The avatar artwork is a single fixed icon shared by both generators, so only
+   the menus carry per-project colours. */
+.acct .sz-acct-menu button{color:var(--brand-navy);}
+.acct .sz-acct-menu button:hover{background:#f4f8fa;}
+.acct .hc-acct-menu button{color:#414042;}
+/* Neutral silver, not a red tint: a pink hover is off-brand for Hope Center.
+   #ededee is the panel's existing silver (see .hc-preview) and matches the
+   lightness the previous #f6eaea had. */
+.acct .hc-acct-menu button:hover{background:#ededee;}
 .umgmt{border:1px solid #e2e8ec;border-radius:10px;margin:14px 0;overflow:hidden;}
 .umgmt-head{background:#f4f8fa;padding:10px 12px;font-size:12px;font-weight:700;color:var(--brand-navy);
   display:flex;justify-content:space-between;align-items:center;}
@@ -472,8 +515,6 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     </div>
     <div class="hc-userbar">
       <button class="hc-back" id="hcBack">← المشاريع</button>
-      <button id="hcMgmtToggle" style="display:none">إدارة المستخدمين</button>
-      <button id="hcLogout">تسجيل خروج</button>
       <span class="who" id="hcWhoami"></span>
       <span class="role-badge" id="hcRoleBadge"></span>
     </div>
@@ -499,6 +540,13 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     </div>
   </div>
   <div class="hc-preview"><div class="hc-stage" id="hcStage"></div></div>
+  <div class="acct">
+    <button class="acct-av" id="hcAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="acctShadowHc" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="acctClipHc"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#acctShadowHc)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#acctClipHc)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
+    <div class="acct-menu hc-acct-menu" id="hcAcctMenu">
+      <button id="hcMgmtToggle" style="display:none">إدارة المستخدمين</button>
+      <button id="hcLogout">تسجيل خروج</button>
+    </div>
+  </div>
 </div>
 <div class="app" id="appRoot" style="display:none">
 <div class="panel">
@@ -508,8 +556,6 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
   </div>
   <div class="user-bar">
     <button id="backToProjects" onclick="showProjectPicker()">← المشاريع</button>
-    <button id="mgmtToggle" style="display:none">إدارة المستخدمين</button>
-    <button id="logoutBtn">تسجيل خروج</button>
     <span class="who" id="whoami"></span>
     <span class="role-badge" id="roleBadge"></span>
   </div>
@@ -695,6 +741,13 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
   <div class="bar2 bot"></div>
 </div>
 </div></div>
+<div class="acct">
+  <button class="acct-av" id="szAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="acctShadowSz" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="acctClipSz"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#acctShadowSz)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#acctClipSz)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
+  <div class="acct-menu sz-acct-menu" id="szAcctMenu">
+    <button id="mgmtToggle" style="display:none">إدارة المستخدمين</button>
+    <button id="logoutBtn">تسجيل خروج</button>
+  </div>
+</div>
 </div>
 <script>
 function $(id){return document.getElementById(id);}
@@ -1198,6 +1251,29 @@ $("aiBtn").onclick=async function(){
   }finally{btn.disabled=false;btn.textContent=prev;}
 };
 /* ===== ربط واجهة المصادقة والصلاحيات ===== */
+/* ---------- قائمة الحساب (الأفاتار) ---------- */
+// Defined in this first <script> block; the Hope Center block below is a
+// separate <script> but shares global scope, so it can call these too.
+function closeAcctMenus(){
+  var ms=document.querySelectorAll(".acct-menu.on");
+  for(var i=0;i<ms.length;i++) ms[i].classList.remove("on");
+  var av=document.querySelectorAll(".acct-av");
+  for(var j=0;j<av.length;j++) av[j].setAttribute("aria-expanded","false");
+}
+function wireAcct(avId,menuId){
+  var a=$(avId), m=$(menuId); if(!a||!m) return;
+  a.onclick=function(e){
+    e.stopPropagation();            // otherwise the document handler below
+    var open=!m.classList.contains("on");  // closes it in the same click
+    closeAcctMenus();
+    if(open){ m.classList.add("on"); a.setAttribute("aria-expanded","true"); }
+  };
+}
+// Menu item clicks are allowed to bubble, so this closes the menu after them.
+document.addEventListener("click",closeAcctMenus);
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeAcctMenus(); });
+wireAcct("szAvatar","szAcctMenu");
+wireAcct("hcAvatar","hcAcctMenu");
 var ROLE_AR={owner:"المالك",admin:"مدير",user:"مستخدم",comms:"مدير اتصالات"};
 function applyRole(){
   var u=Auth.current(); if(!u) return;
