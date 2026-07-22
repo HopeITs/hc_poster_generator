@@ -505,8 +505,12 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 .hc-save{width:100%;margin-top:10px;background:#fff;color:#be1f24;border:1.5px solid #be1f24;border-radius:10px;padding:12px;font-family:'Somar Sans';font-weight:700;font-size:14px;cursor:pointer;}
 .hc-msg{font-size:12px;margin-top:12px;min-height:16px;color:#808285;}
 .hc-msg.err{color:#be1f24;} .hc-msg.ok{color:#1a9450;}
-.hc-preview{background:#ededee;height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;overflow:auto;}
-#hcStage svg{height:86vh;width:auto;max-width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35);display:block;}
+/* Mirrors Study Zone's .preview / .stage: the artwork renders at its native
+   pixel size and hcFitStage() scales it to fit, instead of the old
+   height:86vh which ignored the available width and the format. */
+.hc-preview{background:#ededee;height:100vh;display:flex;align-items:center;justify-content:center;padding:30px;box-sizing:border-box;overflow:hidden;}
+.hc-stage{transform-origin:center center;box-shadow:0 10px 40px rgba(0,0,0,.35);}
+#hcStage svg{display:block;}
 </style>
 <div class="hc-app" id="hcApp">
   <div class="hc-panel">
@@ -1494,7 +1498,25 @@ function hcSVG(fmt,withFonts){
     '<text direction="ltr" text-anchor="start" x="152.5" y="1631.6" font-family="Somar Sans" font-weight="700" font-size="47" fill="#fff">'+job+'</text>'+
     '</svg>';
 }
-function hcRender(){ try{ $("hcStage").innerHTML=hcSVG(HC.format,false); }catch(e){} }
+/* Same fit rule as Study Zone's fitStage(): scale the artwork to fit the
+   preview box with a 60px inset, so both generators display a given format at
+   identical on-screen size.
+   Study Zone caps at 1:1 to avoid upscaling its raster poster, but that cap is
+   deliberately absent here. The Hope Center artwork is SVG, so 1000/1080 is a
+   coordinate space rather than a resolution limit -- pngFromSVG() renders the
+   same markup at 2160px. With the cap, the 1000x1000 poster froze at 1000px
+   while Study Zone's 2048x2048 kept growing, which is the mismatch this
+   removes. */
+function hcFitStage(){
+  var pv=document.querySelector(".hc-preview"); if(!pv) return;
+  if(!pv.clientWidth||!pv.clientHeight) return;   // panel hidden: skip, hcRender refits on open
+  var poster=(HC.format==="poster");
+  var pw=poster?1000:1080, ph=poster?1000:1920;
+  var scale=Math.min((pv.clientWidth-60)/pw,(pv.clientHeight-60)/ph);
+  $("hcStage").style.transform="scale("+scale+")";
+}
+window.addEventListener("resize",hcFitStage);
+function hcRender(){ try{ $("hcStage").innerHTML=hcSVG(HC.format,false); hcFitStage(); }catch(e){} }
 function hcMsg(t,e){ var m=$("hcMsg"); if(m){ m.textContent=t; m.className="hc-msg "+(e?"err":"ok"); } }
 window.openHopeCenter=function(p){
   HC.project=p||HC.project;
