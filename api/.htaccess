@@ -1,0 +1,15 @@
+# كل الطلبات إلى index.php، فيتولّى هو التوجيه.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# دفاع في العمق: هذه الملفات لا تُطلب مباشرة أبداً. لو تعطّل تنفيذ PHP يوماً
+# لأي سبب، لصار الخادم يقدّمها كنص — وفيها بيانات قاعدة البيانات والأسرار.
+<FilesMatch "^(config\.php|config\.example\.php)$">
+    Require all denied
+</FilesMatch>
+
+RedirectMatch 404 "/api/lib/"
