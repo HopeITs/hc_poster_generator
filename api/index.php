@@ -22,6 +22,7 @@ require __DIR__ . '/routes/users.php';
 require __DIR__ . '/routes/projects.php';
 require __DIR__ . '/routes/photo.php';
 require __DIR__ . '/routes/notify.php';
+require __DIR__ . '/routes/setup.php';
 
 /** المسار المطلوب، بلا الشرطة الأخيرة. مثال: /login */
 function route_path(): string
@@ -58,6 +59,7 @@ try {
     route_projects($method, $path);
     route_photo($method, $path);
     route_notify($method, $path);
+    route_setup($method, $path);
 
     fail('Not found', 404);
 
