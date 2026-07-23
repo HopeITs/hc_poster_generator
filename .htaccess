@@ -53,6 +53,8 @@ RedirectMatch 404 "/\.(git|env|htaccess|htpasswd)"
     # would mean rewriting the markup.
     #
     # data: is needed for the embedded base64 fonts and images.
-    # connect-src lists the Cloudflare Workers the app calls.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-YzvcSNSbk9RTXsPdtZnf9M5QnlvEnT4i1m5iKugAoPM=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://studyzone-auth.ct-aleppo3.workers.dev https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    # connect-src: the auth Worker is gone -- the API is same-origin now, so
+    # 'self' covers it. The remaining external origin is the AI image
+    # conversion Worker, still called by Study Zone's "تحويل لستايل" button.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-v7E/aq+CgNuNOM8CP0tubcknkStkPfIzJwTSa5IEIx4=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 </IfModule>
