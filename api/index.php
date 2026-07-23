@@ -18,6 +18,8 @@ require __DIR__ . '/lib/auth.php';
 require __DIR__ . '/lib/projects.php';
 require __DIR__ . '/routes/auth.php';
 require __DIR__ . '/routes/users.php';
+require __DIR__ . '/routes/projects.php';
+require __DIR__ . '/routes/photo.php';
 
 /** المسار المطلوب، بلا الشرطة الأخيرة. مثال: /login */
 function route_path(): string
@@ -51,6 +53,8 @@ try {
     // كل دالة route_* ترد وتنهي الطلب إن طابق المسار، وإلا عادت هنا
     route_auth($method, $path);
     route_users($method, $path);
+    route_projects($method, $path);
+    route_photo($method, $path);
 
     fail('Not found', 404);
 
