@@ -17,6 +17,7 @@ require __DIR__ . '/lib/perms.php';
 require __DIR__ . '/lib/auth.php';
 require __DIR__ . '/lib/projects.php';
 require __DIR__ . '/routes/auth.php';
+require __DIR__ . '/routes/users.php';
 
 /** المسار المطلوب، بلا الشرطة الأخيرة. مثال: /login */
 function route_path(): string
@@ -49,6 +50,7 @@ try {
 
     // كل دالة route_* ترد وتنهي الطلب إن طابق المسار، وإلا عادت هنا
     route_auth($method, $path);
+    route_users($method, $path);
 
     fail('Not found', 404);
 
