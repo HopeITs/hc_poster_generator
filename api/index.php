@@ -16,10 +16,12 @@ require __DIR__ . '/lib/db.php';
 require __DIR__ . '/lib/perms.php';
 require __DIR__ . '/lib/auth.php';
 require __DIR__ . '/lib/projects.php';
+require __DIR__ . '/lib/mail.php';
 require __DIR__ . '/routes/auth.php';
 require __DIR__ . '/routes/users.php';
 require __DIR__ . '/routes/projects.php';
 require __DIR__ . '/routes/photo.php';
+require __DIR__ . '/routes/notify.php';
 
 /** المسار المطلوب، بلا الشرطة الأخيرة. مثال: /login */
 function route_path(): string
@@ -55,6 +57,7 @@ try {
     route_users($method, $path);
     route_projects($method, $path);
     route_photo($method, $path);
+    route_notify($method, $path);
 
     fail('Not found', 404);
 
