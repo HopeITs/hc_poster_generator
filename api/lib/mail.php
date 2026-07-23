@@ -1,9 +1,13 @@
 <?php
 /**
- * بناء وإرسال رسائل MIME عبر الـMTA المحلي.
+ * بناء وإرسال رسائل MIME.
  *
- * لا Resend ولا SMTP ولا جسر HTTP: هذا الكود يعمل على خادم البريد نفسه،
- * فـmail() تسلّم مباشرة إلى الـMTA وترث توقيع DKIM المضبوط على الخادم.
+ * لا Resend ولا أي خدمة خارجية: التسليم إلى خادم بريد الاستضافة نفسه عبر
+ * جلسة SMTP موثّقة (smtp.php)، فتصدر الرسالة عن no-reply@hcsyria.org حقاً
+ * وتُوقَّع بـDKIM النطاق.
+ *
+ * mail() باقية كخيار احتياطي فقط: تعمل حين يكون التطبيق على خادم البريد
+ * نفسه، وتُستعمل تلقائياً إن لم تُضبط إعدادات smtp (كالتطوير المحلي).
  *
  * بناء الرسالة مفصول عن إرسالها ليبقى قابلاً للاختبار بلا خادم بريد.
  */
@@ -25,17 +29,28 @@ function encode_subject(string $subject): string
 /**
  * يبني جسم الرسالة ورؤوسها.
  *
- * @param array $attachments عناصر [filename, content] والمحتوى base64 جاهز
- * @return array{0:string,1:string} [الجسم، الرؤوس]
+ * الرؤوس تُعاد كمصفوفة بلا To وSubject عمداً: mail() تضيفهما بنفسها من
+ * معاملاتها، فإدراجهما هنا يُنتج رأسين مكرّرين. مسار SMTP يضيفهما في
+ * send_mail لأن أمر DATA يتطلّب رسالة كاملة.
+ *
+ * @param array  $attachments عناصر [filename, content] والمحتوى base64 جاهز
+ * @param string $replyTo     عنوان الرد — عادةً مُرسِل الطلب لا صندوق no-reply
+ * @return array{0:string,1:string[]} [الجسم، الرؤوس]
  */
-function build_mime(string $html, array $attachments, string $fromEmail, string $fromName, string $boundary): array
+function build_mime(string $html, array $attachments, string $fromEmail, string $fromName, string $boundary, string $replyTo = ''): array
 {
-    $headers = implode("\r\n", [
+    $domain = substr(strrchr($fromEmail, '@') ?: '@localhost', 1);
+
+    $headers = [
         'From: ' . header_safe($fromName) . ' <' . $fromEmail . '>',
-        'Reply-To: ' . $fromEmail,
+        'Reply-To: ' . header_safe($replyTo !== '' ? $replyTo : $fromEmail),
+        // Date وMessage-ID مطلوبان في RFC 5322. الـMTA يضيفهما حين تُستعمل
+        // mail()، أما في SMTP المباشر فغيابهما يرفع تقييم السبام.
+        'Date: ' . date('r'),
+        'Message-ID: <' . bin2hex(random_bytes(16)) . '@' . $domain . '>',
         'MIME-Version: 1.0',
         'Content-Type: multipart/mixed; boundary="' . $boundary . '"',
-    ]);
+    ];
 
     $body  = "--$boundary\r\n";
     $body .= "Content-Type: text/html; charset=UTF-8\r\n";
@@ -62,24 +77,39 @@ function build_mime(string $html, array $attachments, string $fromEmail, string 
     return [$body, $headers];
 }
 
-/** يرسل عبر الـMTA المحلي. يعيد false إن رفض التسليم. */
-function send_mail(array $to, string $subject, string $html, array $attachments = []): bool
+/**
+ * يرسل الرسالة. يعيد false إن رفض التسليم — والسبب في سجل الأخطاء.
+ *
+ * @param string $replyTo عنوان الرد. الافتراضي صندوق المُرسِل نفسه.
+ */
+function send_mail(array $to, string $subject, string $html, array $attachments = [], string $replyTo = ''): bool
 {
     $cfg  = config();
     $from = (string)($cfg['mail_from'] ?? '');
     $name = (string)($cfg['mail_from_name'] ?? '');
-    if ($from === '') return false;
+    if ($from === '' || !$to) return false;
 
     [$body, $headers] = build_mime(
-        $html, $attachments, $from, $name, 'b' . bin2hex(random_bytes(16))
+        $html, $attachments, $from, $name, 'b' . bin2hex(random_bytes(16)), $replyTo
     );
 
-    // -f يضبط عنوان المُرسِل في المغلّف (Return-Path)، وهو ما يفحصه SPF
+    $encSubject = encode_subject(header_safe($subject));
+
+    // إعدادات smtp موجودة => الخادم المشترك: نسلّم عبر جلسة موثّقة
+    if (($cfg['smtp']['host'] ?? '') !== '') {
+        $full = array_merge(
+            ['To: ' . header_safe(implode(', ', $to)), 'Subject: ' . $encSubject],
+            $headers
+        );
+        return smtp_send($from, $to, implode("\r\n", $full), $body);
+    }
+
+    // احتياطي: MTA محلي. -f يضبط مُرسِل المغلّف (Return-Path) الذي يفحصه SPF
     return mail(
         implode(', ', $to),
-        encode_subject(header_safe($subject)),
+        $encSubject,
         $body,
-        $headers,
+        implode("\r\n", $headers),
         '-f' . $from
     );
 }

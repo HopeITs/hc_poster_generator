@@ -2,8 +2,11 @@
 /**
  * /notify — إشعار بمشروع جديد مع المرفقات.
  *
- * المستلمون يُحسبون من قاعدة البيانات: كل owner و comms. لا يقبل الطلب
- * قائمة مستلمين، فلا يمكن استعمال هذه النقطة لإرسال بريد إلى أي عنوان.
+ * المستلمون من الإعدادات (notify_to) لا من الطلب: لا يمكن استعمال هذه
+ * النقطة لإرسال بريد إلى أي عنوان يختاره الطالب.
+ *
+ * كانت القائمة تُحسب من قاعدة البيانات (كل owner و comms)، فكان إضافة
+ * مستخدم بأحد الدورين يغيّر وجهة البريد ضمناً. صارت الوجهة صريحة.
  */
 
 declare(strict_types=1);
@@ -24,12 +27,12 @@ function route_notify(string $method, string $path): void
         $projName = $p['name'] ?? 'STUDY ZONE';
     }
 
-    $rows       = db_all("SELECT email FROM users WHERE role IN ('owner','comms')");
     $recipients = array_values(array_filter(array_map(
-        fn($r) => filter_var($r['email'], FILTER_VALIDATE_EMAIL),
-        $rows
+        fn($e) => filter_var(trim((string)$e), FILTER_VALIDATE_EMAIL),
+        (array)(config()['notify_to'] ?? [])
     )));
-    if (!$recipients) fail('لا يوجد مستلمون (Owner/Comms)', 400);
+    // 500 لا 400: الخطأ في إعداد الخادم، والطالب لا يستطيع تصحيحه
+    if (!$recipients) fail('لا يوجد مستلمون مضبوطون على الخادم', 500);
 
     $when = gmdate('Y-m-d H:i:s') . ' UTC';
     // htmlspecialchars: اسم المشروع والعنوان يأتيان من المستخدم
@@ -56,7 +59,10 @@ function route_notify(string $method, string $path): void
 
     $subject = 'مشروع جديد: ' . $title . ' — ' . $projName . ' — ' . $me['email'];
 
-    if (!send_mail($recipients, $subject, $html, $attachments)) {
+    // الرد على الإشعار يصل إلى من أرسل الطلب، لا إلى صندوق no-reply
+    $replyTo = (string)(filter_var($me['email'], FILTER_VALIDATE_EMAIL) ?: '');
+
+    if (!send_mail($recipients, $subject, $html, $attachments, $replyTo)) {
         // سبب الرفض يظهر في سجل بريد الخادم، لا في الرد
         error_log('notify: mail() refused delivery to ' . implode(',', $recipients));
         fail('تعذّر إرسال البريد — راجع سجل البريد على الخادم', 502);

@@ -16,6 +16,7 @@ require __DIR__ . '/lib/db.php';
 require __DIR__ . '/lib/perms.php';
 require __DIR__ . '/lib/auth.php';
 require __DIR__ . '/lib/projects.php';
+require __DIR__ . '/lib/smtp.php';
 require __DIR__ . '/lib/mail.php';
 require __DIR__ . '/routes/auth.php';
 require __DIR__ . '/routes/users.php';
