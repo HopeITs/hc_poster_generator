@@ -404,7 +404,7 @@ export default {
       if (request.method === "POST" && path === "/notify") {
         var sender = await getSessionUser(env, request);
         if (!sender) return json({ error: "غير مسجّل دخول" }, 401);
-        if (!env.RESEND_API_KEY) return json({ error: "مفتاح Resend غير مضبوط (RESEND_API_KEY)" }, 500);
+        if (!env.MAIL_ENDPOINT || !env.MAIL_SECRET) return json({ error: "خدمة البريد غير مضبوطة (MAIL_ENDPOINT / MAIL_SECRET)" }, 500);
 
         var nb2 = await request.json();
         var atts = Array.isArray(nb2.attachments) ? nb2.attachments : [];
@@ -436,21 +436,22 @@ export default {
           return { filename: a.filename, content: a.b64 };
         });
 
+        // يُرسَل عبر خدمة التحويل على mail.hcsyria.org لأن Workers لا تتكلم SMTP.
+        // اسم المُرسِل يأتي من إعدادات الخدمة، لا من هنا.
         var payload = {
-          from: safeProj + " <onboarding@resend.dev>",
           to: recipients,
           subject: "مشروع جديد: " + safeTitle + " — " + safeProj + " — " + sender.email,
           html: html,
           attachments: attachments,
         };
 
-        var rr = await fetch("https://api.resend.com/emails", {
+        var rr = await fetch(env.MAIL_ENDPOINT, {
           method: "POST",
-          headers: { "Authorization": "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Auth": env.MAIL_SECRET },
           body: JSON.stringify(payload),
         });
         var rd = {}; try { rd = await rr.json(); } catch (e) {}
-        if (!rr.ok) return json({ error: (rd && (rd.message || rd.name)) || ("Resend HTTP " + rr.status) }, 502);
+        if (!rr.ok) return json({ error: (rd && rd.error) || ("Mailer HTTP " + rr.status) }, 502);
         return json({ ok: true, recipients: recipients.length });
       }
 
