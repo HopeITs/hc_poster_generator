@@ -18,11 +18,48 @@
 # and 404 rather than 403 so it does not confirm the directory exists.
 RedirectMatch 404 "/\.(git|env|htaccess|htpasswd)"
 
+# ---------------------------------------------------------------------------
+# Compression. text/HTML/CSS/JS is ~1.1MB and was served uncompressed. Brotli
+# where available, gzip otherwise. Both skip already-compressed binaries.
+# ---------------------------------------------------------------------------
+<IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/css text/xml \
+        application/javascript application/json application/xml \
+        image/svg+xml application/manifest+json
+</IfModule>
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml \
+        application/javascript application/json application/xml \
+        image/svg+xml application/manifest+json
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# Caching. The HTML embeds app state and must always revalidate; the versioned
+# static asset (html2canvas 1.4.1) and images/fonts can sit in cache. There are
+# no filename-hashed assets, so no immutable year-long TTLs here.
+# ---------------------------------------------------------------------------
 <IfModule mod_headers.c>
-    # Tell browsers to use HTTPS for a year. Deliberately without
-    # includeSubDomains: other hcsyria-apps.org subdomains may not have TLS yet
-    # and would break. No preload -- that is painful to undo.
-    Header always set Strict-Transport-Security "max-age=31536000"
+    <FilesMatch "\.html$">
+        Header set Cache-Control "public, max-age=0, must-revalidate"
+    </FilesMatch>
+    <FilesMatch "\.(js|css|png|jpg|jpeg|svg|webp|woff2?|ttf|otf|ico)$">
+        Header set Cache-Control "public, max-age=604800"
+    </FilesMatch>
+    # index.html is served for "/" without a .html suffix -- catch that too.
+    <If "%{REQUEST_URI} =~ m#^/?$#">
+        Header set Cache-Control "public, max-age=0, must-revalidate"
+    </If>
+</IfModule>
+
+<IfModule mod_headers.c>
+    # HSTS for two years, covering this host and any of its subdomains. It does
+    # NOT affect sibling subdomains of hcsyria-apps.org -- includeSubDomains
+    # applies only to subdomains of the issuing host (post-gen.*), of which
+    # there are none, so it is safe. `preload` is intentionally omitted: it is a
+    # near-irreversible commitment and requires the apex hcsyria-apps.org to
+    # also serve HSTS over HTTPS, which is not under this app's control. Add it
+    # only after the apex is verified HTTPS-only (see the deploy notes).
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
 
     # Block MIME-type sniffing.
     Header always set X-Content-Type-Options "nosniff"
@@ -35,6 +72,13 @@ RedirectMatch 404 "/\.(git|env|htaccess|htpasswd)"
 
     # No need for camera/mic/geolocation in this app.
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+
+    # Cross-origin isolation. Keep this document in its own browsing-context
+    # group and stop its resources being embedded off-origin. COEP is left off
+    # deliberately -- it would block the data:/blob: images and the cross-origin
+    # AI-conversion Worker call, and nothing here needs SharedArrayBuffer.
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Cross-Origin-Resource-Policy "same-origin"
 
     # Content Security Policy.
     #
@@ -56,5 +100,5 @@ RedirectMatch 404 "/\.(git|env|htaccess|htpasswd)"
     # connect-src: the auth Worker is gone -- the API is same-origin now, so
     # 'self' covers it. The remaining external origin is the AI image
     # conversion Worker, still called by Study Zone's "تحويل لستايل" button.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-v7E/aq+CgNuNOM8CP0tubcknkStkPfIzJwTSa5IEIx4=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-ioCF6NBDF2GTvLD/i5NaJxlbRYmyVL06Lj1XGzFtwX4=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 </IfModule>

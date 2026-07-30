@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /$
+Disallow: /api/
+Disallow: /vendor/
+Disallow: /mailer/
+
+Sitemap: https://post-gen.hcsyria-apps.org/sitemap.xml
