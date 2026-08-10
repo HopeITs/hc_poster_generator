@@ -56,5 +56,5 @@ RedirectMatch 404 "/\.(git|env|htaccess|htpasswd)"
     # connect-src: the auth Worker is gone -- the API is same-origin now, so
     # 'self' covers it. The remaining external origin is the AI image
     # conversion Worker, still called by Study Zone's "تحويل لستايل" button.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-2pGtqHMgKMkENTnmY4/izf17+Rl3n4i5l/mKtdYMtos=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY=' 'sha256-V1f9tSm18v4Lfa9lKfXqsQ/Hk32Rr9I2zxKOpBWGj34='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-2pGtqHMgKMkENTnmY4/izf17+Rl3n4i5l/mKtdYMtos=' 'sha256-hcg+6l8F49DfWhyNIfsGh37hBTvb8aQSrymSHex+0RY=' 'sha256-xiQAIu8WS7CdW2HFxXufl5kGekUTFThD1rGXkCYWjGo='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 </IfModule>

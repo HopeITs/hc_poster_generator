@@ -835,6 +835,11 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <span class="role-badge" id="cuRoleBadge"></span>
     </div>
     <div class="panel-body">
+      <div class="field"><label>المحافظة</label>
+        <select id="cuCity">
+          <option value="حلب">حلب</option>
+          <option value="حمص">حمص</option>
+        </select></div>
       <div class="sec-divider">المحتوى</div>
       <div class="field"><label>الفقرة التعريفية <span class="hint">**نص** = عريض</span></label>
         <textarea id="cuBody" rows="5">برنامجها **التعليمي التفاعلي** للأطفال من عمر **8** أعوام حتى **17** عاماً،
@@ -1816,7 +1821,14 @@ $("hcExportBtn").onclick=hcExport;
   /* City code for the export filename, detected from the city named in the
      footer address line (حلب -> ALP, حمص -> HMS, ...). */
   var CU_CITY={"حلب":"ALP","حمص":"HMS","دمشق":"DMS","اللاذقية":"LAT","اللاذقيه":"LAT","طرطوس":"TAR"};
-  function cuCityCode(){var f=$("cuFooter")?($("cuFooter").value||""):"";for(var n in CU_CITY){if(f.indexOf(n)>-1)return CU_CITY[n];}return "";}
+  /* Full footer address line per governorate, swapped in by the المحافظة
+     dropdown. The phone number is wrapped in LRI/PDI (U+2066/U+2069) so its
+     groups keep LTR order inside the RTL footer. */
+  var CU_ADDR={
+    "حلب":"العنوان: حلب، الفيلات الشرقية - رقم التواصل: ⁦0993 341 399⁩",
+    "حمص":"العنوان: حمص، النزهة - رقم التواصل: ⁦0950 018 440⁩"
+  };
+  function cuCityCode(){var s=$("cuCity");if(s&&CU_CITY[s.value])return CU_CITY[s.value];var f=$("cuFooter")?($("cuFooter").value||""):"";for(var n in CU_CITY){if(f.indexOf(n)>-1)return CU_CITY[n];}return "";}
   function cuFit(){
     var st=$("cuStage"); if(!st) return;
     var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return;
@@ -1834,6 +1846,16 @@ $("hcExportBtn").onclick=hcExport;
   }
   window.addEventListener("resize",cuFit);
   ["cuBody","cuSpecs","cuNote","cuFooter"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cuRender); });
+  if($("cuCity")) $("cuCity").addEventListener("change",function(){
+    var city=this.value, ta=$("cuFooter"), addr=CU_ADDR[city];
+    if(ta&&addr){
+      var lines=ta.value.split("\n"), done=false;
+      for(var i=0;i<lines.length;i++){ if(lines[i].indexOf("العنوان")>-1){ lines[i]=addr; done=true; break; } }
+      if(!done) lines.push(addr);
+      ta.value=lines.join("\n");
+    }
+    cuRender();
+  });
   if($("cuImgFile")) $("cuImgFile").addEventListener("change",function(e){
     var f=e.target.files[0]; if(!f) return;
     var r=new FileReader();
