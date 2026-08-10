@@ -794,24 +794,32 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 <style>
 .cu-app{display:none;}
 .cu-app.on{display:block;}
+/* Pin the save / open / download bar to the bottom of the panel like the other
+   generators. Study Zone's sticky bar only reaches the bottom because its long
+   form scrolls; CU's short form does not, so lay the panel out as a flex column
+   and let the body take up the slack. */
+.cu-app .panel{display:flex;flex-direction:column;overflow:hidden;}
+.cu-app .panel-body{flex:1 1 auto;min-height:0;overflow-y:auto;}
 .cu-poster{position:relative;width:1080px;height:1350px;background:#fff;box-sizing:border-box;
   font-family:'Somar Sans',sans-serif;color:#023c54;direction:rtl;text-align:center;overflow:hidden;
   transform-origin:center center;}
-.cu-inner{position:absolute;left:0;right:0;top:0;bottom:150px;padding:50px 90px 0;}
+.cu-inner{position:absolute;left:0;right:0;top:0;bottom:100px;padding:50px 90px 0;}
 .cu-logo{width:146px;height:185.8731px;margin:0 auto 34px;display:block;}
-.cu-title{font-size:49px;line-height:1.15;margin-bottom:10px;}
+.cu-title{font-size:49px;line-height:1.15;margin-bottom:6px;}
 .cu-title .nv{color:#023c54;font-weight:600;} .cu-title .or{color:#f99d1c;font-weight:700;}
 .cu-subtitle{font-size:30px;font-weight:400;color:#023c54;margin-bottom:31px;}
-.cu-body{font-size:31px;font-weight:400;line-height:38px;color:#023c54;max-width:910px;margin:0 auto 12px;}
+.cu-body{font-size:31px;font-weight:400;line-height:45px;color:#023c54;max-width:910px;margin:0 auto 30px;}
 .cu-body b{font-weight:700;}
-.cu-hero{max-width:640px;max-height:360px;object-fit:contain;margin:2px auto 12px;display:block;}
-.cu-sec{font-size:40px;font-weight:800;color:#023c54;margin-bottom:6px;}
-.cu-specs{font-size:33px;font-weight:600;line-height:1.45;color:#023c54;max-width:960px;margin:0 auto 12px;}
+.cu-hero{display:block;max-width:100%;max-height:430px;width:auto;height:auto;margin:0 auto 30px;}
+.cu-sec{font-size:31px;font-weight:700;color:#023c54;margin-bottom:-8px;}
+.cu-specs{font-size:31px;font-weight:400;line-height:1.45;color:#023c54;max-width:960px;margin:0 auto 12px;}
 .cu-specs b{font-weight:800;}
-.cu-note{font-size:33px;font-weight:800;color:#023c54;max-width:960px;margin:0 auto;}
-.cu-footer{position:absolute;left:0;right:0;bottom:0;height:150px;background:#023c54;color:#fff;
-  text-align:center;padding:38px 60px 0;box-sizing:border-box;}
-.cu-footer .l{font-size:25px;font-weight:700;line-height:1.35;}
+.cu-note{font-size:27px;font-weight:700;color:#023c54;max-width:960px;margin:0 auto;}
+.cu-footer{position:absolute;left:0;right:0;bottom:0;height:100px;background:#023c54;color:#fff;
+  text-align:center;padding:14px 60px 0;box-sizing:border-box;}
+.cu-footer .l{font-size:19px;font-weight:700;line-height:1.35;}
+.cu-footer .l + .l{margin-top:13px;}
+.cu-footer .l:first-child{position:relative;top:5px;}
 .cu-footer .l b{font-weight:800;}
 </style>
 <div class="cu-app" id="cuApp">
@@ -842,7 +850,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <div class="sec-divider">الشريط السفلي</div>
       <div class="field"><label>نص التسجيل والتواصل <span class="hint">سطر لكل معلومة</span></label>
         <textarea id="cuFooter" rows="3">للتسجيل الكترونياً او مراجعة المركز يومياً من الساعة 2:00 حتى الساعة 5:00 مع إحضار دفتر العائلة، عدا السبت والأحد
-العنوان: حلب، الفيلات الشرقية - رقم التواصل: 0993 341 399</textarea></div>
+العنوان: حلب، الفيلات الشرقية - رقم التواصل: &#8294;0993 341 399&#8297;</textarea></div>
     </div>
     <div class="export-bar">
       <div class="proj-row">
@@ -859,7 +867,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
         <div class="cu-title"><span class="nv">تُعلن</span> <span class="or">أكاديمية الأطفال</span></div>
         <div class="cu-subtitle">عن فتح باب التسجيل على:</div>
         <div class="cu-body" id="cuBodyOut"></div>
-        <img class="cu-hero" id="cuHero" src="assets/children-university/kids-default.png" alt="">
+        <img class="cu-hero" id="cuHero" src="assets/children-university/kids-default-v2.png" alt="">
         <div class="cu-sec">الاختصاصات المتاحة:</div>
         <div class="cu-specs" id="cuSpecsOut"></div>
         <div class="cu-note" id="cuNoteOut"></div>
@@ -1797,11 +1805,18 @@ $("hcExportBtn").onclick=hcExport;
 (function(){
   var $=function(id){return document.getElementById(id);};
   var CU={project:null,hero:null,init:false};
-  var DEFAULT_HERO="assets/children-university/kids-default.png";
+  var DEFAULT_HERO="assets/children-university/kids-default-v2.png";
   function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
   function emph(t){var p=esc(t).split("**"),o="";for(var i=0;i<p.length;i++){o+=(i%2)?"<b>"+p[i]+"</b>":p[i];}return o;}
   function nl2br(t){return emph(t).replace(/\n/g,"<br>");}
+  /* Isolate multi-group digit runs (phone numbers like "0993 341 399") as LTR so
+     the RTL footer does not reorder the groups right-to-left. */
+  function ltrNums(html){return html.replace(/[0-9]+(?: +[0-9]+)+/g,'<bdi dir="ltr">$&</bdi>');}
   function todayMMDDYYYY(){var d=new Date();function p(n){return(n<10?"0":"")+n;}return p(d.getMonth()+1)+p(d.getDate())+d.getFullYear();}
+  /* City code for the export filename, detected from the city named in the
+     footer address line (حلب -> ALP, حمص -> HMS, ...). */
+  var CU_CITY={"حلب":"ALP","حمص":"HMS","دمشق":"DMS","اللاذقية":"LAT","اللاذقيه":"LAT","طرطوس":"TAR"};
+  function cuCityCode(){var f=$("cuFooter")?($("cuFooter").value||""):"";for(var n in CU_CITY){if(f.indexOf(n)>-1)return CU_CITY[n];}return "";}
   function cuFit(){
     var st=$("cuStage"); if(!st) return;
     var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return;
@@ -1814,7 +1829,7 @@ $("hcExportBtn").onclick=hcExport;
     if($("cuSpecsOut")) $("cuSpecsOut").innerHTML=nl2br($("cuSpecs").value);
     if($("cuNoteOut")) $("cuNoteOut").innerHTML=nl2br($("cuNote").value);
     var fl=($("cuFooter").value||"").split("\n").filter(function(x){return x.trim()!=="";});
-    if($("cuFooterOut")) $("cuFooterOut").innerHTML=fl.map(function(l){return '<div class="l">'+emph(l)+'</div>';}).join("");
+    if($("cuFooterOut")) $("cuFooterOut").innerHTML=fl.map(function(l){return '<div class="l">'+ltrNums(emph(l))+'</div>';}).join("");
     cuFit();
   }
   window.addEventListener("resize",cuFit);
@@ -1839,7 +1854,8 @@ $("hcExportBtn").onclick=hcExport;
         html2canvas($("cuPoster"),{scale:2,backgroundColor:"#ffffff",useCORS:true,width:1080,height:1350,windowWidth:1080,windowHeight:1350}).then(function(canvas){
           $("cuStage").style.transform=prev;
           var url=canvas.toDataURL("image/png");
-          var fn="008CU_"+todayMMDDYYYY()+".png";
+          var code=cuCityCode();
+        var fn="008CU_"+(code?code+"_":"")+"Registration Invitation_"+todayMMDDYYYY()+".png";
           var a=document.createElement("a"); a.download=fn; a.href=url; a.click();
           btn.disabled=false; btn.textContent="DOWNLOAD";
         }).catch(function(err){ alert("خطأ بالتصدير: "+err); $("cuStage").style.transform=prev; btn.disabled=false; btn.textContent="DOWNLOAD"; });
