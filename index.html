@@ -248,6 +248,16 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 .btn-export:hover{background:#e08a16;} .btn-export:disabled{background:#ccc;cursor:wait;}
 .preview{display:flex;align-items:center;justify-content:center;padding:30px;overflow:hidden;}
 .stage{transform-origin:center center;box-shadow:0 8px 40px rgba(0,40,60,.18);}
+/* Keep the side preview visible on every screen. The desktop layout is a fixed
+   430px form panel + a flexible preview column; below this width the panel would
+   consume the whole row and squeeze the preview off-screen. Stack them instead
+   and give the preview a guaranteed slice pinned to the top, with the form
+   scrolling underneath. fitStage() refits the poster on the resize this fires. */
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;grid-template-rows:42vh 1fr;}
+  .preview{order:-1;border-bottom:1px solid #e2e8ec;}
+  .panel{border-left:none;}
+}
 
 /* ===== Login gate ===== */
 .login-gate{position:fixed;inset:0;z-index:1000;
@@ -502,9 +512,13 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 .hc-userbar .role-badge{background:#fff;color:#be1f24;font-weight:700;border-radius:5px;padding:2px 7px;font-size:10px;}
 .hc-userbar button{background:transparent;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:7px;padding:5px 9px;font-family:'Somar Sans';font-size:11px;font-weight:700;cursor:pointer;}
 .hc-userbar button:hover{border-color:#fff;background:rgba(255,255,255,.12);}
-/* Higher specificity than `.hc-userbar button` so the agreed white/#414042
-   treatment survives the move into the user bar. */
-.hc-userbar .hc-back{background:#fff;color:#414042;border:1px solid #414042;border-radius:8px;padding:7px 11px;font-family:'Somar Sans';font-weight:700;font-size:12px;cursor:pointer;}
+/* Match Study Zone's `.user-bar button` exactly: a transparent pill with a
+   white label + arrow at rest, and on hover only a white border is added (no
+   fill). The 1px border is transparent at rest so the box size never shifts
+   between states and stays identical to Study Zone. Higher specificity than the
+   generic `.hc-userbar button` / `:hover` rules so this wins in both states. */
+.hc-userbar .hc-back{background:transparent;color:#fff;border:1px solid transparent;border-radius:7px;padding:5px 9px;font-family:'Somar Sans';font-weight:700;font-size:11px;cursor:pointer;}
+.hc-userbar .hc-back:hover{background:transparent;border-color:#fff;color:#fff;}
 .hc-ptitle{font-size:15px;font-weight:800;color:#fff;}
 .hc-lbl{display:block;font-size:12px;font-weight:700;color:#414042;margin:14px 0 6px;}
 .hc-inp{width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #bcbec0;border-radius:9px;font-family:'Somar Sans';font-size:14px;color:#414042;background:#fff;}
