@@ -418,7 +418,7 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 <style>
 .project-gate{position:fixed;inset:0;background:#eef1f3;display:flex;align-items:center;justify-content:center;z-index:50;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;}
 .pg-wrap{width:min(92vw,440px);background:#fff;border-radius:18px;padding:26px 22px;box-shadow:0 10px 40px rgba(0,0,0,.12);text-align:center;}
-.pg-title{font-size:22px;font-weight:800;color:#be1f24;margin-bottom:4px;}
+.pg-title{font-size:22px;font-weight:800;color:#be1f24;margin-bottom:18px;}
 .pg-sub{font-size:13px;color:#5a7282;margin-bottom:18px;line-height:1.5;}
 .proj-grid{display:flex;flex-direction:column;gap:10px;}
 .proj-msg{font-size:13px;color:#5a7282;padding:14px;}
@@ -433,7 +433,6 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 <div class="project-gate" id="projectGate" style="display:none">
   <div class="pg-wrap">
     <div class="pg-title">اختر المشروع</div>
-    <div class="pg-sub">لديك صلاحية الوصول لكل المشاريع — اختر مشروعاً للبدء</div>
     <div class="proj-grid" id="projGrid"></div>
     <button class="pg-logout" id="pgLogout" type="button">تسجيل خروج</button>
   </div>
@@ -784,6 +783,96 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <button id="logoutBtn">تسجيل خروج</button>
   </div>
 <input type="file" id="acctPhotoFile" accept="image/*" style="display:none">
+</div>
+</div>
+
+<!-- ===== Children University generator (mixed_v1) =====
+     Reuses Study Zone's shell classes (.app/.panel/.panel-head/.user-bar/.field/
+     .sec-divider/.upload/.export-bar/.preview/.stage) so the common chrome stays
+     identical; only the .cu-poster template and the field names are project-
+     specific. Brand pulled from the logo: navy #023c54, orange #f99d1c. -->
+<style>
+.cu-app{display:none;}
+.cu-app.on{display:block;}
+.cu-poster{position:relative;width:1080px;height:1350px;background:#fff;box-sizing:border-box;
+  font-family:'Somar Sans',sans-serif;color:#023c54;direction:rtl;text-align:center;overflow:hidden;
+  transform-origin:center center;}
+.cu-inner{position:absolute;left:0;right:0;top:0;bottom:150px;padding:42px 90px 0;}
+.cu-logo{width:146px;height:auto;margin:0 auto 12px;display:block;}
+.cu-title{font-size:64px;font-weight:800;line-height:1.15;margin-bottom:2px;}
+.cu-title .nv{color:#023c54;} .cu-title .or{color:#f99d1c;}
+.cu-subtitle{font-size:37px;font-weight:600;color:#023c54;margin-bottom:16px;}
+.cu-body{font-size:33px;font-weight:500;line-height:1.5;color:#023c54;max-width:910px;margin:0 auto 12px;}
+.cu-body b{font-weight:800;}
+.cu-hero{max-width:640px;max-height:360px;object-fit:contain;margin:2px auto 12px;display:block;}
+.cu-sec{font-size:40px;font-weight:800;color:#023c54;margin-bottom:6px;}
+.cu-specs{font-size:33px;font-weight:600;line-height:1.45;color:#023c54;max-width:960px;margin:0 auto 12px;}
+.cu-specs b{font-weight:800;}
+.cu-note{font-size:33px;font-weight:800;color:#023c54;max-width:960px;margin:0 auto;}
+.cu-footer{position:absolute;left:0;right:0;bottom:0;height:150px;background:#023c54;color:#fff;
+  text-align:center;padding:38px 60px 0;box-sizing:border-box;}
+.cu-footer .l{font-size:25px;font-weight:700;line-height:1.35;}
+.cu-footer .l b{font-weight:800;}
+</style>
+<div class="cu-app" id="cuApp">
+<div class="app">
+  <div class="panel">
+    <div class="panel-head">
+      <h1><span class="wm" style="direction:ltr">CHILDREN <span class="o">U</span>NIVERSITY</span></h1>
+      <p>ادخل المحتوى، التصميم مقفول بمعايير ثابتة</p>
+    </div>
+    <div class="user-bar">
+      <button id="cuBackToProjects">← المشاريع</button>
+      <span class="who" id="cuWhoami"></span>
+      <span class="role-badge" id="cuRoleBadge"></span>
+    </div>
+    <div class="panel-body">
+      <div class="sec-divider">المحتوى</div>
+      <div class="field"><label>الفقرة التعريفية <span class="hint">**نص** = عريض</span></label>
+        <textarea id="cuBody" rows="5">برنامجها **التعليمي التفاعلي** للأطفال من عمر **8** أعوام حتى **17** عاماً، والذي يقدّم تجربة تعليمية مبتكرة مستوحاة من الجامعات، تهدف إلى تنمية الإبداع والتفكير، في بيئة آمنة داعمة.</textarea></div>
+      <div class="field"><label>الصورة <span class="hint">PNG شفاف أفضل</span></label>
+        <label class="upload has" id="cuImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="cuImgFile"></label></div>
+      <div class="field"><label>الاختصاصات المتاحة <span class="hint">سطر لكل صف</span></label>
+        <textarea id="cuSpecs" rows="3">كيمياء، ريادة أعمال، علم الفضاء، تصميم وتصوير ومونتاج،
+صحافة وإعلام، مخترع التطبيقات(AI)، روبوتيك، هندسة، طب</textarea></div>
+      <div class="field"><label>ملاحظة إضافية</label>
+        <textarea id="cuNote" rows="2">بالإضافة إلى جلسات دعم نفسي اجتماعي ولغة إنكليزية</textarea></div>
+      <div class="sec-divider">الشريط السفلي</div>
+      <div class="field"><label>نص التسجيل والتواصل <span class="hint">سطر لكل معلومة</span></label>
+        <textarea id="cuFooter" rows="3">للتسجيل الكترونياً او مراجعة المركز يومياً من الساعة 2:00 حتى الساعة 5:00 مع إحضار دفتر العائلة، عدا السبت والأحد
+العنوان: حلب، الفيلات الشرقية - رقم التواصل: 0993 341 399</textarea></div>
+    </div>
+    <div class="export-bar">
+      <div class="proj-row">
+        <button class="btn-proj" id="cuSaveBtn">حفظ مشروع</button>
+        <label class="btn-proj" id="cuLoadBtn">فتح مشروع<input type="file" accept=".json,application/json" id="cuProjFile" style="display:none"></label>
+      </div>
+      <button class="btn-export" id="cuExportBtn">DOWNLOAD</button>
+    </div>
+  </div>
+  <div class="preview"><div class="stage" id="cuStage">
+    <div class="cu-poster" id="cuPoster">
+      <div class="cu-inner">
+        <img class="cu-logo" src="assets/children-university/logo.png" alt="Children University">
+        <div class="cu-title"><span class="nv">تُعلن</span> <span class="or">أكاديمية الأطفال</span></div>
+        <div class="cu-subtitle">عن فتح باب التسجيل على:</div>
+        <div class="cu-body" id="cuBodyOut"></div>
+        <img class="cu-hero" id="cuHero" src="assets/children-university/kids-default.png" alt="">
+        <div class="cu-sec">الاختصاصات المتاحة:</div>
+        <div class="cu-specs" id="cuSpecsOut"></div>
+        <div class="cu-note" id="cuNoteOut"></div>
+      </div>
+      <div class="cu-footer" id="cuFooterOut"></div>
+    </div>
+  </div></div>
+</div>
+<div class="acct">
+  <button class="acct-av" id="cuAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="acctShadowCu" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="acctClipCu"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#acctShadowCu)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#acctClipCu)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
+  <img class="acct-photo" id="cuAvatarPhoto" alt="">
+  <div class="acct-menu" id="cuAcctMenu">
+    <button id="cuPhotoBtn">تغيير الصورة الشخصية</button>
+    <button id="cuLogout">تسجيل خروج</button>
+  </div>
 </div>
 </div>
 <script>
@@ -1519,6 +1608,7 @@ async function afterAuth(){
 }
 function openProject(p){
   if(p && p.template_type==="hopecenter_v1"){ openHopeCenter(p); }
+  else if(p && (p.template_type==="mixed_v1" || p.slug==="children-university") && typeof window.openChildrenUniversity==="function"){ window.openChildrenUniversity(p); }
   else { try{ Auth.applyBrand(p); }catch(e){} try{ document.title="HC GENERATOR"; }catch(e){} startApp(); }
 }
 // Wired here rather than as an inline onclick: CSP cannot allow inline event
@@ -1682,6 +1772,100 @@ $("hcCity").onchange=hcRender; $("hcProgram").onchange=hcRender; $("hcJob").onin
 $("hcFmtStory").onclick=function(){ HC.format="story"; $("hcFmtStory").classList.add("active"); $("hcFmtPoster").classList.remove("active"); hcRender(); };
 $("hcFmtPoster").onclick=function(){ HC.format="poster"; $("hcFmtPoster").classList.add("active"); $("hcFmtStory").classList.remove("active"); hcRender(); };
 $("hcExportBtn").onclick=hcExport;
+})();
+</script>
+<script>
+/* ===== Children University generator (mixed_v1) =====
+   Self-contained like the Hope Center block. Reuses the shared globals ($,
+   Auth, wireAcct, showProjectPicker, html2canvas) but keeps its own state so
+   Study Zone / Hope Center stay untouched. */
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var CU={project:null,hero:null,init:false};
+  var DEFAULT_HERO="assets/children-university/kids-default.png";
+  function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function emph(t){var p=esc(t).split("**"),o="";for(var i=0;i<p.length;i++){o+=(i%2)?"<b>"+p[i]+"</b>":p[i];}return o;}
+  function nl2br(t){return emph(t).replace(/\n/g,"<br>");}
+  function todayMMDDYYYY(){var d=new Date();function p(n){return(n<10?"0":"")+n;}return p(d.getMonth()+1)+p(d.getDate())+d.getFullYear();}
+  function cuFit(){
+    var st=$("cuStage"); if(!st) return;
+    var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return;
+    var scale=Math.min((pv.clientWidth-60)/1080,(pv.clientHeight-60)/1350,1);
+    st.style.transform="scale("+scale+")";
+  }
+  function cuRender(){
+    if($("cuBodyOut")) $("cuBodyOut").innerHTML=nl2br($("cuBody").value);
+    var h=$("cuHero"); if(h){ h.src=CU.hero||DEFAULT_HERO; }
+    if($("cuSpecsOut")) $("cuSpecsOut").innerHTML=nl2br($("cuSpecs").value);
+    if($("cuNoteOut")) $("cuNoteOut").innerHTML=nl2br($("cuNote").value);
+    var fl=($("cuFooter").value||"").split("\n").filter(function(x){return x.trim()!=="";});
+    if($("cuFooterOut")) $("cuFooterOut").innerHTML=fl.map(function(l){return '<div class="l">'+emph(l)+'</div>';}).join("");
+    cuFit();
+  }
+  window.addEventListener("resize",cuFit);
+  ["cuBody","cuSpecs","cuNote","cuFooter"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cuRender); });
+  if($("cuImgFile")) $("cuImgFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return;
+    var r=new FileReader();
+    r.onload=function(){ CU.hero=r.result; $("cuImgUp").classList.add("has"); $("cuImgUp").childNodes[0].nodeValue="✓ تم رفع الصورة"; cuRender(); };
+    r.readAsDataURL(f);
+  });
+  function cuExport(){
+    var btn=$("cuExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
+    // Wait for the logo + hero images and the fonts before rasterising, so
+    // html2canvas never captures a half-loaded poster.
+    var imgs=[$("cuHero"),document.querySelector(".cu-logo")].filter(Boolean);
+    Promise.all(imgs.map(function(im){ return (im.complete&&im.naturalWidth)?Promise.resolve():new Promise(function(r){ im.onload=im.onerror=r; }); }))
+    .then(function(){ return (document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve(); })
+    .then(function(){
+      var prev=$("cuStage").style.transform;
+      $("cuStage").style.transform="scale(1)";
+      setTimeout(function(){
+        html2canvas($("cuPoster"),{scale:2,backgroundColor:"#ffffff",useCORS:true,width:1080,height:1350,windowWidth:1080,windowHeight:1350}).then(function(canvas){
+          $("cuStage").style.transform=prev;
+          var url=canvas.toDataURL("image/png");
+          var fn="008CU_"+todayMMDDYYYY()+".png";
+          var a=document.createElement("a"); a.download=fn; a.href=url; a.click();
+          btn.disabled=false; btn.textContent="DOWNLOAD";
+        }).catch(function(err){ alert("خطأ بالتصدير: "+err); $("cuStage").style.transform=prev; btn.disabled=false; btn.textContent="DOWNLOAD"; });
+      },80);
+    });
+  }
+  if($("cuExportBtn")) $("cuExportBtn").onclick=cuExport;
+  function cuCollect(){ return {app:"childrenuniversity",v:1,model:1,body:$("cuBody").value,specs:$("cuSpecs").value,note:$("cuNote").value,footer:$("cuFooter").value,image:CU.hero}; }
+  if($("cuSaveBtn")) $("cuSaveBtn").onclick=function(){
+    var blob=new Blob([JSON.stringify(cuCollect(),null,2)],{type:"application/json"});
+    var a=document.createElement("a"); a.download="008CU_"+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
+  };
+  function cuLoad(d){
+    if(!d||typeof d!=="object"){ alert("بنية غير صحيحة"); return; }
+    $("cuBody").value=d.body||""; $("cuSpecs").value=d.specs||""; $("cuNote").value=d.note||""; $("cuFooter").value=d.footer||"";
+    CU.hero=d.image||null;
+    if(CU.hero){ $("cuImgUp").classList.add("has"); $("cuImgUp").childNodes[0].nodeValue="✓ تم رفع الصورة"; }
+    else { $("cuImgUp").childNodes[0].nodeValue="✓ الصورة الافتراضية"; }
+    cuRender();
+  }
+  if($("cuProjFile")) $("cuProjFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ try{ cuLoad(JSON.parse(r.result)); }catch(err){ alert("ملف غير صالح"); } };
+    r.readAsText(f); e.target.value="";
+  });
+  if($("cuBackToProjects")) $("cuBackToProjects").onclick=function(){ $("cuApp").classList.remove("on"); if(typeof showProjectPicker==="function") showProjectPicker(); };
+  function cuShowUserBar(){ try{ var u=Auth.current(); if(!u) return; $("cuWhoami").textContent=u.email; $("cuRoleBadge").textContent=(window.ROLE_LABEL&&ROLE_LABEL[u.role])||u.role; }catch(e){} }
+  try{ if(typeof wireAcct==="function") wireAcct("cuAvatar","cuAcctMenu"); }catch(e){}
+  if($("cuPhotoBtn")) $("cuPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
+  if($("cuLogout")) $("cuLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("cuApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  window.openChildrenUniversity=function(p){
+    CU.project=p||CU.project;
+    $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
+    var um=$("userMgmtPage"); if(um) um.style.display="none";
+    var hc=$("hcApp"); if(hc) hc.classList.remove("on");
+    $("cuApp").classList.add("on");
+    cuShowUserBar();
+    try{ document.title="HC GENERATOR"; }catch(e){}
+    cuRender();
+    if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(function(){ cuRender(); }); }
+  };
 })();
 </script>
 </body></html>
