@@ -799,11 +799,11 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
   transform-origin:center center;}
 .cu-inner{position:absolute;left:0;right:0;top:0;bottom:150px;padding:50px 90px 0;}
 .cu-logo{width:146px;height:185.8731px;margin:0 auto 34px;display:block;}
-.cu-title{font-size:49px;line-height:1.15;margin-bottom:15px;}
+.cu-title{font-size:49px;line-height:1.15;margin-bottom:10px;}
 .cu-title .nv{color:#023c54;font-weight:600;} .cu-title .or{color:#f99d1c;font-weight:700;}
-.cu-subtitle{font-size:30px;font-weight:400;color:#023c54;margin-bottom:16px;}
-.cu-body{font-size:33px;font-weight:500;line-height:1.5;color:#023c54;max-width:910px;margin:0 auto 12px;}
-.cu-body b{font-weight:800;}
+.cu-subtitle{font-size:30px;font-weight:400;color:#023c54;margin-bottom:31px;}
+.cu-body{font-size:31px;font-weight:400;line-height:38px;color:#023c54;max-width:910px;margin:0 auto 12px;}
+.cu-body b{font-weight:700;}
 .cu-hero{max-width:640px;max-height:360px;object-fit:contain;margin:2px auto 12px;display:block;}
 .cu-sec{font-size:40px;font-weight:800;color:#023c54;margin-bottom:6px;}
 .cu-specs{font-size:33px;font-weight:600;line-height:1.45;color:#023c54;max-width:960px;margin:0 auto 12px;}
@@ -829,7 +829,9 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="panel-body">
       <div class="sec-divider">المحتوى</div>
       <div class="field"><label>الفقرة التعريفية <span class="hint">**نص** = عريض</span></label>
-        <textarea id="cuBody" rows="5">برنامجها **التعليمي التفاعلي** للأطفال من عمر **8** أعوام حتى **17** عاماً، والذي يقدّم تجربة تعليمية مبتكرة مستوحاة من الجامعات، تهدف إلى تنمية الإبداع والتفكير، في بيئة آمنة داعمة.</textarea></div>
+        <textarea id="cuBody" rows="5">برنامجها **التعليمي التفاعلي** للأطفال من عمر **8** أعوام حتى **17** عاماً،
+والذي يقدّم تجربة تعليمية مبتكرة مستوحاة من الجامعات،
+تهدف إلى تنمية الإبداع والتفكير، في بيئة آمنة داعمة.</textarea></div>
       <div class="field"><label>الصورة <span class="hint">PNG شفاف أفضل</span></label>
         <label class="upload has" id="cuImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="cuImgFile"></label></div>
       <div class="field"><label>الاختصاصات المتاحة <span class="hint">سطر لكل صف</span></label>
@@ -876,6 +878,19 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 </div>
 </div>
 <script>
+/* Local-dev safety net. This app needs the PHP API, which only exists over the
+   web server; the API path is derived from location.pathname. If the page is
+   opened directly as a file (file://) -- double-clicked, or re-opened by an
+   editor's preview after a save -- that path becomes a bogus file:/ URL and
+   every request fails with "تعذّر الاتصال بالخادم". When that happens, bounce to
+   the same document under the Apache root so the app actually works. Guarded to
+   file:// only, so the real served site is never affected. */
+(function(){
+  if(location.protocol==="file:"){
+    var m=location.href.match(/\/htdocs\/(.*)$/i);
+    if(m){ location.replace("http://localhost/"+m[1].replace(/index\.html?$/i,"")); }
+  }
+})();
 function $(id){return document.getElementById(id);}
 
 /* ============================================================
