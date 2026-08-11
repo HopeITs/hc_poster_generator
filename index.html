@@ -826,7 +826,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 <div class="app">
   <div class="panel">
     <div class="panel-head">
-      <h1><span class="wm" style="direction:ltr">CHILDREN <span class="o">U</span>NIVERSITY</span></h1>
+      <h1><span class="wm" style="direction:ltr">CHILDREN UNIVERSITY</span></h1>
       <p>ادخل المحتوى، التصميم مقفول بمعايير ثابتة</p>
     </div>
     <div class="user-bar">
@@ -886,6 +886,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
   <img class="acct-photo" id="cuAvatarPhoto" alt="">
   <div class="acct-menu" id="cuAcctMenu">
     <button id="cuPhotoBtn">تغيير الصورة الشخصية</button>
+    <button id="cuMgmtToggle" style="display:none">إدارة المستخدمين</button>
     <button id="cuLogout">تسجيل خروج</button>
   </div>
 </div>
@@ -1445,7 +1446,7 @@ wireAcct("hcAvatar","hcAcctMenu");
    follows the user across devices and browsers. */
 var ACCT_PHOTO_PX=256;
 function acctApplyPhoto(src){
-  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"]];
+  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"],["cuAvatarPhoto","cuAvatar"]];
   for(var i=0;i<ids.length;i++){
     var img=$(ids[i][0]), av=$(ids[i][1]);
     if(!img||!av) continue;
@@ -1556,11 +1557,14 @@ var umgmtReturn="app";
 function closeUserMgmt(){
   $("userMgmtPage").style.display="none";
   if(umgmtReturn==="hc"){ $("hcApp").classList.add("on"); }
+  else if(umgmtReturn==="cu"){ if($("cuApp")) $("cuApp").classList.add("on"); }
   else { $("appRoot").style.display="grid"; }
 }
 async function openUserMgmt(){
-  umgmtReturn=$("hcApp").classList.contains("on")?"hc":"app";
+  var cuOn=$("cuApp")&&$("cuApp").classList.contains("on");
+  umgmtReturn=cuOn?"cu":($("hcApp").classList.contains("on")?"hc":"app");
   $("hcApp").classList.remove("on");
+  if($("cuApp")) $("cuApp").classList.remove("on");
   $("appRoot").style.display="none";
   var pg=$("projectGate"); if(pg) pg.style.display="none";
   $("userMgmtPage").style.display="block"; umpMsg("",false);
@@ -1904,9 +1908,10 @@ $("hcExportBtn").onclick=hcExport;
     r.readAsText(f); e.target.value="";
   });
   if($("cuBackToProjects")) $("cuBackToProjects").onclick=function(){ $("cuApp").classList.remove("on"); if(typeof showProjectPicker==="function") showProjectPicker(); };
-  function cuShowUserBar(){ try{ var u=Auth.current(); if(!u) return; $("cuWhoami").textContent=u.email; $("cuRoleBadge").textContent=(window.ROLE_LABEL&&ROLE_LABEL[u.role])||u.role; }catch(e){} }
+  function cuShowUserBar(){ try{ var u=Auth.current(); if(!u) return; $("cuWhoami").textContent=u.email; $("cuRoleBadge").textContent=(window.ROLE_LABEL&&ROLE_LABEL[u.role])||u.role; if(typeof acctLoadPhoto==="function") acctLoadPhoto(); if($("cuMgmtToggle")&&Auth.can) $("cuMgmtToggle").style.display=Auth.can("manage_users")?"":"none"; }catch(e){} }
   try{ if(typeof wireAcct==="function") wireAcct("cuAvatar","cuAcctMenu"); }catch(e){}
   if($("cuPhotoBtn")) $("cuPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
+  if($("cuMgmtToggle")&&typeof openUserMgmt==="function") $("cuMgmtToggle").onclick=openUserMgmt;
   if($("cuLogout")) $("cuLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("cuApp").classList.remove("on"); $("loginGate").style.display="flex"; };
   window.openChildrenUniversity=function(p){
     CU.project=p||CU.project;
