@@ -804,17 +804,24 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
   font-family:'Somar Sans',sans-serif;color:#023c54;direction:rtl;text-align:center;overflow:hidden;
   transform-origin:center center;}
 .cu-inner{position:absolute;left:0;right:0;top:0;bottom:100px;padding:50px 90px 0;}
-.cu-logo{width:146px;height:185.8731px;margin:0 auto 34px;display:block;}
+/* Equal gap between the content blocks, computed by cuDistribute() so the
+   blocks fill the area between the logo and the footer no matter how much
+   content is entered. An empty block is display:none'd by cuRender(), so it is
+   excluded from the distribution and leaves no gap. Block layout (not flexbox)
+   keeps the Arabic text intact in the html2canvas export. The 30px here is only
+   a pre-JS fallback. */
+.cu-block{margin-top:30px;}
+.cu-logo{width:146px;height:185.8731px;margin-left:auto;margin-right:auto;display:block;}
 .cu-title{font-size:49px;line-height:1.15;margin-bottom:6px;}
 .cu-title .nv{color:#023c54;font-weight:600;} .cu-title .or{color:#f99d1c;font-weight:700;}
-.cu-subtitle{font-size:30px;font-weight:400;color:#023c54;margin-bottom:31px;}
-.cu-body{font-size:31px;font-weight:400;line-height:45px;color:#023c54;max-width:910px;margin:0 auto 30px;}
+.cu-subtitle{font-size:30px;font-weight:400;color:#023c54;margin-bottom:0;}
+.cu-body{font-size:31px;font-weight:400;line-height:45px;color:#023c54;max-width:910px;margin-left:auto;margin-right:auto;}
 .cu-body b{font-weight:700;}
-.cu-hero{display:block;max-width:100%;max-height:430px;width:auto;height:auto;margin:0 auto 30px;}
+.cu-hero{display:block;max-width:100%;max-height:430px;width:auto;height:auto;margin-left:auto;margin-right:auto;}
 .cu-sec{font-size:31px;font-weight:700;color:#023c54;margin-bottom:-8px;}
-.cu-specs{font-size:31px;font-weight:400;line-height:1.45;color:#023c54;max-width:960px;margin:0 auto 12px;}
+.cu-specs{font-size:31px;font-weight:400;line-height:1.45;color:#023c54;max-width:960px;margin-left:auto;margin-right:auto;}
 .cu-specs b{font-weight:800;}
-.cu-note{font-size:27px;font-weight:700;color:#023c54;max-width:960px;margin:0 auto;}
+.cu-note{font-size:27px;font-weight:700;color:#023c54;max-width:960px;margin-left:auto;margin-right:auto;}
 .cu-footer{position:absolute;left:0;right:0;bottom:0;height:100px;background:#023c54;color:#fff;
   text-align:center;padding:14px 60px 0;box-sizing:border-box;}
 .cu-footer .l{font-size:19px;font-weight:700;line-height:1.35;}
@@ -869,13 +876,17 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="cu-poster" id="cuPoster">
       <div class="cu-inner">
         <img class="cu-logo" src="assets/children-university/logo.png" alt="Children University">
-        <div class="cu-title"><span class="nv">تُعلن</span> <span class="or">أكاديمية الأطفال</span></div>
-        <div class="cu-subtitle">عن فتح باب التسجيل على:</div>
-        <div class="cu-body" id="cuBodyOut"></div>
-        <img class="cu-hero" id="cuHero" src="assets/children-university/kids-default-v2.png" alt="">
-        <div class="cu-sec">الاختصاصات المتاحة:</div>
-        <div class="cu-specs" id="cuSpecsOut"></div>
-        <div class="cu-note" id="cuNoteOut"></div>
+        <div class="cu-block" id="cuBlock1">
+          <div class="cu-title"><span class="nv">تُعلن</span> <span class="or">أكاديمية الأطفال</span></div>
+          <div class="cu-subtitle">عن فتح باب التسجيل على:</div>
+        </div>
+        <div class="cu-block cu-body" id="cuBodyOut"></div>
+        <img class="cu-block cu-hero" id="cuHero" src="assets/children-university/kids-default-v2.png" alt="">
+        <div class="cu-block" id="cuBlock4">
+          <div class="cu-sec">الاختصاصات المتاحة:</div>
+          <div class="cu-specs" id="cuSpecsOut"></div>
+        </div>
+        <div class="cu-block cu-note" id="cuNoteOut"></div>
       </div>
       <div class="cu-footer" id="cuFooterOut"></div>
     </div>
@@ -1832,6 +1843,21 @@ $("hcExportBtn").onclick=hcExport;
     "حمص":"العنوان: حمص، النزهة - رقم التواصل: ⁦0950 018 440⁩"
   };
   function cuCityCode(){var s=$("cuCity");if(s&&CU_CITY[s.value])return CU_CITY[s.value];var f=$("cuFooter")?($("cuFooter").value||""):"";for(var n in CU_CITY){if(f.indexOf(n)>-1)return CU_CITY[n];}return "";}
+  // Distribute the visible blocks with one equal gap that fills the space
+   // between the logo and the footer. Recomputed on every render, so the gap
+   // grows/shrinks automatically with the content and collapsed blocks drop out.
+  function cuDistribute(){
+    var inner=document.querySelector("#cuPoster .cu-inner"); if(!inner) return;
+    var logo=inner.querySelector(".cu-logo");
+    var blocks=[].slice.call(inner.querySelectorAll(".cu-block")).filter(function(b){ return getComputedStyle(b).display!=="none"; });
+    if(!blocks.length) return;
+    var padTop=parseFloat(getComputedStyle(inner).paddingTop)||0;
+    var avail=inner.clientHeight-padTop;
+    var sum=logo?logo.offsetHeight:0;
+    blocks.forEach(function(b){ sum+=b.offsetHeight; });
+    var gap=Math.max(0,(avail-sum)/(blocks.length+1));
+    blocks.forEach(function(b){ b.style.marginTop=gap+"px"; });
+  }
   function cuFit(){
     var st=$("cuStage"); if(!st) return;
     var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return;
@@ -1840,11 +1866,16 @@ $("hcExportBtn").onclick=hcExport;
   }
   function cuRender(){
     if($("cuBodyOut")) $("cuBodyOut").innerHTML=nl2br($("cuBody").value);
-    var h=$("cuHero"); if(h){ h.src=CU.hero||DEFAULT_HERO; }
+    var h=$("cuHero"); if(h){ h.onload=function(){ cuDistribute(); cuFit(); }; h.src=CU.hero||DEFAULT_HERO; }
     if($("cuSpecsOut")) $("cuSpecsOut").innerHTML=nl2br($("cuSpecs").value);
     if($("cuNoteOut")) $("cuNoteOut").innerHTML=nl2br($("cuNote").value);
     var fl=($("cuFooter").value||"").split("\n").filter(function(x){return x.trim()!=="";});
     if($("cuFooterOut")) $("cuFooterOut").innerHTML=fl.map(function(l){return '<div class="l">'+ltrNums(emph(l))+'</div>';}).join("");
+    // Collapse empty blocks: no content -> no block, no gap.
+    if($("cuBodyOut")) $("cuBodyOut").style.display=$("cuBody").value.trim()?"":"none";
+    if($("cuBlock4")) $("cuBlock4").style.display=$("cuSpecs").value.trim()?"":"none";
+    if($("cuNoteOut")) $("cuNoteOut").style.display=$("cuNote").value.trim()?"":"none";
+    cuDistribute();
     cuFit();
   }
   window.addEventListener("resize",cuFit);
