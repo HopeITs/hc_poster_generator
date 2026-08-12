@@ -422,11 +422,12 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 .pg-sub{font-size:13px;color:#5a7282;margin-bottom:18px;line-height:1.5;}
 .proj-grid{display:flex;flex-direction:column;gap:15px;}
 .proj-msg{font-size:13px;color:#5a7282;padding:14px;}
-.proj-card{display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:14px 16px;border:1.5px solid #d8e0e5;border-radius:12px;background:#fbfdfe;font-family:'Somar Sans';font-size:15px;font-weight:700;color:#be1f24;cursor:pointer;transition:.15s;}
-.proj-card:hover:not(:disabled){border-color:#be1f24;background:#f4f4f5;}
+.proj-card{display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:14px 16px;border:1.5px solid #d8e0e5;border-radius:12px;background:#fbfdfe;font-family:'Somar Sans';font-size:15px;font-weight:700;color:#58595b;cursor:pointer;transition:.15s;}
+.proj-card:hover:not(:disabled){border-color:var(--pc-hover,#003c54);background:var(--pc-hover,#003c54);color:#fff;}
+.proj-card:hover:not(:disabled) .proj-go{color:#fff;}
 .proj-card.soon{cursor:not-allowed;opacity:.6;background:#f4f6f8;color:#8697a3;}
 .proj-name{flex:1;text-align:left;}
-.proj-go{font-size:13px;color:#be1f24;font-weight:700;white-space:nowrap;}
+.proj-go{font-size:13px;color:#58595b;font-weight:700;white-space:nowrap;}
 .proj-badge{font-size:11px;font-weight:700;background:#e6eef2;color:#5a7282;border-radius:6px;padding:3px 9px;white-space:nowrap;}
 .pg-logout{margin-top:39px;background:none;border:none;color:#808285;font-family:'Somar Sans';font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;}
 </style>
@@ -1656,6 +1657,9 @@ function openProject(p){
 // Wired here rather than as an inline onclick: CSP cannot allow inline event
 // handlers by hash, only by 'unsafe-inline', which would defeat the policy.
 if($("backToProjects")) $("backToProjects").onclick=showProjectPicker;
+// Per-project hover colour for the project cards (card fills with the brand
+// colour, text turns white on hover). Falls back to navy for unlisted slugs.
+var PROJ_HOVER={"study-zone":"#003c54","hope-center":"#be1f24","children-university":"#f99d1c"};
 async function showProjectPicker(){
   $("loginGate").style.display="none";
   $("appRoot").style.display="none";
@@ -1670,6 +1674,7 @@ async function showProjectPicker(){
     card.type="button";
     card.className="proj-card"+(ready?"":" soon");
     card.disabled=!ready;
+    if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); }
     var h='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
     h+= ready ? '<span class="proj-go">اختيار ←</span>' : '<span class="proj-badge">قريباً</span>';
     card.innerHTML=h;
