@@ -1201,6 +1201,18 @@ function fileName(name){
   var label=(name==="square")?"Poster":"Story";
   return "006SZ_"+code+"_"+titleForName()+"_"+todayMMDDYYYY()+"_"+label+".png";
 }
+/* iOS Safari sometimes rasterises Arabic as disconnected letters in the
+   html2canvas export when a base64 @font-face isn't fully realised in the canvas
+   yet -- it shows up after editing the text. Force every Somar Sans weight to
+   load (with an Arabic+Latin sample) and await document.fonts before capturing. */
+function ensureFonts(sample){
+  if(!document||!document.fonts) return Promise.resolve();
+  var s=(sample||"")+" أبتث ىة A1";
+  var reqs=["400","500","700","800","900"].map(function(w){
+    try{ return document.fonts.load(w+" 40px 'Somar Sans'", s); }catch(e){ return Promise.resolve(); }
+  });
+  return Promise.all(reqs).then(function(){ return document.fonts.ready; }).catch(function(){ return (document.fonts&&document.fonts.ready)||Promise.resolve(); });
+}
 $("exportBtn").onclick=function(){
   if(model===2){ exportModel2(); return; }
   var btn=this;btn.disabled=true;btn.textContent="جاري التصدير...";
@@ -1223,6 +1235,7 @@ $("exportBtn").onclick=function(){
     $("poster").className="poster "+name;
     setTimeout(function(){
       fitTitle();  // إعادة القياس حسب عرض هذه الصيغة
+      ensureFonts($("poster").textContent).then(function(){
       html2canvas($("poster"),{scale:1,backgroundColor:"#ffffff",useCORS:true,width:W,height:H,windowWidth:W,windowHeight:H}).then(function(canvas){
         var url=canvas.toDataURL("image/png");
         var fn=fileName(name);
@@ -1230,6 +1243,7 @@ $("exportBtn").onclick=function(){
         captured.push({filename:fn, b64:url.split(",")[1]});
         setTimeout(function(){capture(i+1);},600);
       }).catch(function(err){alert("خطأ بالتصدير: "+err);finish();});
+      });
     },80);
   }
   capture(0);
@@ -1256,6 +1270,7 @@ function exportModel2(){
   var prevT=$("stage").style.transform;
   $("stage").style.transform="scale(1)";
   setTimeout(function(){
+    ensureFonts($("poster2").textContent).then(function(){
     html2canvas($("poster2"),{scale:1,backgroundColor:(getComputedStyle(document.documentElement).getPropertyValue('--brand-navy').trim()||'#003c54'),useCORS:true,width:1080,height:1920,windowWidth:1080,windowHeight:1920}).then(function(canvas){
       $("stage").style.transform=prevT;
       var url=canvas.toDataURL("image/png");
@@ -1264,6 +1279,7 @@ function exportModel2(){
       btn.disabled=false;btn.textContent="DOWNLOAD";
       sendNotification2([{filename:fn, b64:url.split(",")[1]}]);
     }).catch(function(err){alert("خطأ بالتصدير: "+err);$("stage").style.transform=prevT;btn.disabled=false;btn.textContent="DOWNLOAD";});
+    });
   },80);
 }
 async function sendNotification2(captured){
