@@ -257,6 +257,16 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
   .app{grid-template-columns:1fr;grid-template-rows:42vh 1fr;}
   .preview{order:-1;border-bottom:1px solid #e2e8ec;}
   .panel{border-left:none;}
+  /* Stacked layout puts the preview on top, so move the floating account button
+     up there too -- at the bottom-left it overlapped the form buttons -- and
+     flip its menu to open downward. */
+  .acct{top:calc(var(--acct-inset) - 0.19736 * var(--acct-box));bottom:auto;}
+  .acct .acct-menu{top:calc(0.87659 * var(--acct-box) + 8px);bottom:auto;}
+}
+/* Phone: the login card is scaled 1.25x, which pushed it past a narrow viewport
+   and clipped both sides. Trim its width so the scaled card fits with a margin. */
+@media (max-width:480px){
+  .login-gate .hc-login{width:min(72vw,420px);}
 }
 
 /* ===== Login gate ===== */
@@ -543,6 +553,13 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 .hc-preview{background:#ededee;height:100vh;display:flex;align-items:center;justify-content:center;padding:30px;box-sizing:border-box;overflow:hidden;}
 .hc-stage{transform-origin:center center;box-shadow:0 10px 40px rgba(0,0,0,.35);}
 #hcStage svg{display:block;}
+/* Phone/tablet: stack Hope Center like the other generators -- the fixed 430px
+   panel + preview overflowed a narrow screen. Preview on top, form below. */
+@media (max-width:820px){
+  .hc-app.on{grid-template-columns:1fr;grid-template-rows:42vh 1fr;}
+  .hc-app.on .hc-preview{order:-1;height:auto;border-bottom:1px solid #bcbec0;}
+  .hc-app.on .hc-panel{height:auto;border-left:none;}
+}
 </style>
 <div class="hc-app" id="hcApp">
   <div class="hc-panel">
