@@ -429,7 +429,7 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
 .proj-card.soon{cursor:not-allowed;opacity:.6;background:#f4f6f8;color:#8697a3;}
 .proj-name{flex:1;text-align:left;}
 .proj-go{font-size:13px;color:#58595b;font-weight:700;white-space:nowrap;}
-.proj-badge{font-size:11px;font-weight:700;background:#e6eef2;color:#5a7282;border-radius:6px;padding:3px 9px;white-space:nowrap;}
+.proj-badge{font-size:11px;font-weight:700;color:#5a7282;white-space:nowrap;}
 .pg-logout{margin-top:19.5px;background:none;border:none;color:#808285;font-family:'Somar Sans';font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;}
 .app-copyright{position:absolute;bottom:24px;left:0;right:0;text-align:center;padding:0 12px;direction:ltr;font-family:'Somar Sans';font-weight:500;font-size:11px;color:#5b5b5b;}
 #projectGate .app-copyright{color:#848484;}
@@ -1682,7 +1682,7 @@ async function showProjectPicker(){
     card.disabled=!ready;
     if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); }
     var h='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
-    h+= ready ? '<span class="proj-go">اختيار ←</span>' : '<span class="proj-badge">قريباً</span>';
+    h+= ready ? '<span class="proj-go">اختيار ←</span>' : '<span class="proj-badge">قريبــــاً</span>';
     card.innerHTML=h;
     if(ready){ card.onclick=function(){ selectProject(p); }; }
     grid.appendChild(card);
