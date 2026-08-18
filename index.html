@@ -171,6 +171,7 @@
 .poster2 .head2 .wm2txt{color:#fff;font-weight:800;line-height:1;letter-spacing:1px;direction:ltr;white-space:nowrap;
   width:475.0421px;height:56.8023px;display:flex;align-items:center;justify-content:center;font-size:74px;}
 .poster2 .head2 .wm2txt .o{color:var(--brand-orange);}
+.poster2 .head2 .wm2txt .wm2svg{display:block;width:100%;height:100%;}
 .poster2 .head2 .city2{color:#fff;font-weight:800;font-size:60px;line-height:1;letter-spacing:2px;direction:ltr;}
 .poster2 .blk2{color:#fff;font-weight:500;line-height:1.32;width:100%;white-space:pre-wrap;flex:0 0 auto;}
 .poster2 .blk2.b1{font-size:var(--fs-b1);}
@@ -788,7 +789,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 <div class="poster2" id="poster2" style="display:none">
   <div class="stack2">
     <div class="head2">
-      <div class="wm2txt"><span class="o">S</span>TUDY <span class="o">Z</span>ONE</div>
+      <div class="wm2txt"><svg class="wm2svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 722.9 85.76" preserveAspectRatio="xMidYMid meet" aria-label="STUDY ZONE"><path fill="#f59a24" d="M66.28,57.47c0,21.91-18.05,28.29-35.67,28.29-9.14,0-30.38-2.97-30.61-29.5h16.95c0,7.49,5.17,11.34,15.74,11.34,8.15,0,14.64-3.19,14.64-7.49,0-5.73-6.94-6.61-21.36-9.36C13.65,48.44,0,44.04,0,26.97S11.67,0,30.83,0c20.48,0,31.38,9.03,31.93,26.64h-18.72c.77-4.62-5.62-8.59-13.32-8.59-6.83,0-11.89,1.54-11.89,6.39,0,5.61,9.91,5.28,25.98,9.47,10.9,2.86,21.47,7.82,21.47,23.56Z"/><path fill="#fff" d="M70.89,21.47l.11-20.15h65.39l-.11,20.15h-22.46l.11,62.42h-21.25l-.11-62.42h-21.69Z"/><path fill="#fff" d="M143.66,1.32h20.92v46.79c0,10.02,1.65,17.17,15.96,17.17,13.87-.11,14.2-7.16,14.2-17.39V1.32h21.14v49.54c0,22.35-12.11,33.91-35.34,33.91s-36.88-12.33-36.88-33.69V1.32Z"/><path fill="#fff" d="M262.01,1.32c22.68,0,38.2,15.52,38.97,39.08v2.09c0,24.88-15.52,41.39-38.97,41.39h-33.14l.11-82.57h33.03ZM280.83,43.6v-1.65c-.33-12.44-7.82-20.59-19.05-20.59h-13.1v42.28h13.1c11.56,0,19.05-7.93,19.05-20.04Z"/><path fill="#fff" d="M304.72,1.32h23.67l16.07,32.26,13.65-32.26h23.56l-28.29,50.09v32.48h-20.92v-32.48L304.72,1.32Z"/><path fill="#f59a24" d="M449.66,20.92h-36V1.32h61.87v19.82l-39.74,42.61h40.95v20.15h-65.06v-20.81l37.98-42.17Z"/><path fill="#fff" d="M485,42.61v-.88c.44-25.98,16.29-41.72,41.83-41.72s41.17,15.52,41.83,41.17v1.43c0,26.64-15.74,42.72-41.72,42.72s-41.95-16.18-41.95-42.72ZM547.86,42.61v-1.43c-.33-13.32-8.37-21.69-21.03-21.69s-20.81,8.15-21.03,21.47v1.65c0,14.42,7.82,23.12,21.03,23.12s21.03-8.7,21.03-23.12Z"/><path fill="#fff" d="M604.56,1.32l28.51,48.55V1.32h19.6v82.57h-19.6l-33.8-56.59v56.59h-19.6V1.32h24.88Z"/><path fill="#fff" d="M722.35,1.32v19.49h-35.56v11.45h29.17v18.72h-29.17v13.43h36.11v19.49h-57.03V1.32h56.48Z"/></svg></div>
       <div class="city2" id="p2City">HOMS</div>
     </div>
     <div class="blk2 b1" id="p2b1"></div>
@@ -1359,18 +1360,13 @@ function m2BuildSVG(){
     var bb=relBox(bar), bg=getComputedStyle(bar).backgroundColor;
     svg+='<rect x="'+bb.x.toFixed(2)+'" y="'+bb.y.toFixed(2)+'" width="'+bb.w.toFixed(2)+'" height="'+bb.h.toFixed(2)+'" fill="'+bg+'"/>';
   });
-  // الترويسة اللاتينية: STUDY ZONE (حروف كبيرة، اتجاه ltr، ألوان مختلطة عبر .o)
-  var wmEl=poster.querySelector('.wm2txt');
-  if(wmEl){
-    var wcs=getComputedStyle(wmEl), wfs=parseFloat(wcs.fontSize), wlh=parseFloat(wcs.lineHeight)||wfs;
-    var wm=relBox(wmEl), wmet=m2Metrics(wfs,'800'), orange=(cssv.getPropertyValue('--brand-orange').trim())||'#f59a24';
-    var wbase=wm.y+(wlh-(wmet.asc+wmet.desc))/2+wmet.asc;
-    var spans="";
-    wmEl.childNodes.forEach(function(n){
-      if(n.nodeType===3){ spans+='<tspan>'+m2Esc(n.nodeValue)+'</tspan>'; }
-      else if(n.nodeType===1){ var col=(n.classList&&n.classList.contains('o'))?orange:'#fff'; spans+='<tspan fill="'+col+'">'+m2Esc(n.textContent)+'</tspan>'; }
-    });
-    svg+='<text x="'+wm.cx.toFixed(2)+'" y="'+wbase.toFixed(2)+'" text-anchor="middle" direction="ltr" font-family="Somar Sans" font-weight="800" font-size="'+wfs+'" letter-spacing="'+(parseFloat(wcs.letterSpacing)||0)+'" fill="#fff">'+spans+'</text>';
+  // الترويسة: شعار STUDY ZONE المتجه (SVG مضمّن) — نُعشّشه بنفس موضعه وأبعاده
+  var wmEl=poster.querySelector('.wm2txt'), wmSvg=wmEl&&wmEl.querySelector('svg');
+  if(wmSvg){
+    var wm=relBox(wmEl);
+    var vb=wmSvg.getAttribute('viewBox')||'0 0 722.9 85.76';
+    var par=wmSvg.getAttribute('preserveAspectRatio')||'xMidYMid meet';
+    svg+='<svg x="'+wm.x.toFixed(2)+'" y="'+wm.y.toFixed(2)+'" width="'+wm.w.toFixed(2)+'" height="'+wm.h.toFixed(2)+'" viewBox="'+vb+'" preserveAspectRatio="'+par+'">'+wmSvg.innerHTML+'</svg>';
   }
   // اسم المدينة (لاتيني، ltr)
   var cityEl=poster.querySelector('.city2');
