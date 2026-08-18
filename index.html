@@ -133,6 +133,9 @@
   font-weight:var(--w-med);line-height:var(--lh-tight);margin-top:0;}
 /* الستوري فقط: تباعد أسطر المدّة/المدرّب = تباعد أسطر المحاور */
 .poster.story .duration{line-height:calc(var(--fs-duration)*1px*var(--k) + var(--bullet-gap));}
+/* الستوري فقط: محاذاة نص المحور لليمين بدل التوسيط، فتنسدل الأسطر الملتفّة
+   تحت بداية السطر الأول (تعليق) بدل توسيط كل سطر. المحور المفرد لا يتغيّر. */
+.poster.story .bullet{text-align:right;}
 .poster .duration .em{color:var(--brand-navy);font-weight:var(--w-bold);}
 .poster .note{font-weight:var(--w-bold);font-size:calc(var(--fs-note)*1px*var(--k));
   color:var(--brand-navy);margin-top:0;line-height:var(--lh-tight);}
