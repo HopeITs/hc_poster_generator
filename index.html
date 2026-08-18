@@ -556,9 +556,12 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 /* Phone/tablet: stack Hope Center like the other generators -- the fixed 430px
    panel + preview overflowed a narrow screen. Preview on top, form below. */
 @media (max-width:820px){
-  .hc-app.on{grid-template-columns:1fr;grid-template-rows:42vh 1fr;}
+  .hc-app.on{grid-template-columns:1fr;grid-template-rows:42vh minmax(0,1fr);}
   .hc-app.on .hc-preview{order:-1;height:auto;border-bottom:1px solid #bcbec0;}
-  .hc-app.on .hc-panel{height:auto;border-left:none;}
+  /* min-height:0 lets the panel shrink to its grid track so .hc-pbody can
+     scroll internally; without it the form overflows and its lower fields are
+     unreachable (the fixed .hc-app doesn't scroll the page). */
+  .hc-app.on .hc-panel{height:auto;min-height:0;border-left:none;}
 }
 </style>
 <div class="hc-app" id="hcApp">
@@ -1282,22 +1285,141 @@ function collectProject2(){
     sz1:$("sz1").value, sz2:$("sz2").value, sz3:$("sz3").value,
     b1:$("b1").value, b2:$("b2").value, b3:$("b3a").value};
 }
+/* التصدير عبر SVG بنصوص أصلية (‎<text>‎) بدل html2canvas: محرّك SVG يُشكّل
+   العربية تشكيلاً صحيحاً على كل الأجهزة بما فيها iOS Safari، حيث كان
+   html2canvas يفصل الحروف ويقلبها عند تعديل النص. النموذج 2 فقط. */
+function m2Esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+// استخراج @font-face لوزني 500 و800 من أوراق الأنماط المضمّنة (HCFONTS خارج النطاق ولا يملكهما)
+function m2FontCSS(){
+  var out="", want={"500":1,"800":1};
+  for(var i=0;i<document.styleSheets.length;i++){
+    var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+    if(!rules) continue;
+    for(var j=0;j<rules.length;j++){
+      var r=rules[j];
+      if(r.type!==5) continue; // CSSRule.FONT_FACE_RULE
+      var fam=(r.style.getPropertyValue("font-family")||"").replace(/['"]/g,"").toLowerCase().trim();
+      var w=(r.style.getPropertyValue("font-weight")||"400").trim();
+      if(fam==="somar sans" && want[w]){ out+=r.cssText; want[w]=0; }
+    }
+  }
+  return out;
+}
+var _m2mctx=document.createElement("canvas").getContext("2d");
+function m2Metrics(fs,fw){
+  _m2mctx.font=fw+" "+fs+"px 'Somar Sans'";
+  var m=_m2mctx.measureText("مجابEg");
+  var asc=m.fontBoundingBoxAscent, desc=m.fontBoundingBoxDescent;
+  if(!asc){ asc=fs*0.82; desc=fs*0.22; }
+  return {asc:asc,desc:desc};
+}
+// امشِ على العُقد النصّية لاسترجاع كل سطر مرئي (كما لفّه المتصفّح) مع مقاطع الغامق
+function m2VisualLines(el,prTop,prLeft){
+  var lines=[], cur=null;
+  function push(ch,bold){
+    var last=cur.segs[cur.segs.length-1];
+    if(last && last.bold===bold){ last.t+=ch; } else { cur.segs.push({t:ch,bold:bold}); }
+  }
+  function walk(node,bold){
+    for(var i=0;i<node.childNodes.length;i++){
+      var c=node.childNodes[i];
+      if(c.nodeType===3){
+        var txt=c.nodeValue;
+        for(var j=0;j<txt.length;j++){
+          var rg=document.createRange(); rg.setStart(c,j); rg.setEnd(c,j+1);
+          var rc=rg.getBoundingClientRect();
+          if(rc.width===0 && rc.height===0){ if(cur) push(txt[j],bold); continue; }
+          var top=rc.top-prTop;
+          if(!cur || Math.abs(top-cur.top)>20){ cur={top:top,segs:[]}; lines.push(cur); }
+          push(txt[j],bold);
+        }
+      } else if(c.nodeType===1){
+        if(c.tagName==="BR"){ cur=null; continue; }
+        walk(c, bold || c.tagName==="B" || (+getComputedStyle(c).fontWeight)>=700);
+      }
+    }
+  }
+  walk(el,(+getComputedStyle(el).fontWeight)>=700);
+  lines.forEach(function(L){
+    if(L.segs.length){ L.segs[0].t=L.segs[0].t.replace(/^\s+/,""); L.segs[L.segs.length-1].t=L.segs[L.segs.length-1].t.replace(/\s+$/,""); }
+  });
+  return lines.filter(function(L){ return L.segs.some(function(s){return s.t.length;}); });
+}
+function m2BuildSVG(){
+  var poster=$("poster2");
+  var pr=poster.getBoundingClientRect();
+  var cssv=getComputedStyle(document.documentElement);
+  var navy=(cssv.getPropertyValue('--brand-navy').trim())||'#003c54';
+  function relBox(el){ var b=el.getBoundingClientRect(); return {x:b.left-pr.left,y:b.top-pr.top,w:b.width,h:b.height,cx:(b.left+b.right)/2-pr.left,bot:b.bottom-pr.top}; }
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1080 1920" width="1080" height="1920">';
+  svg+='<defs><style>'+m2FontCSS()+'</style></defs>';
+  svg+='<rect width="1080" height="1920" fill="'+navy+'"/>';
+  // الأشرطة الملوّنة (البرتقالي السفلي وأي شريط آخر)
+  poster.querySelectorAll('.bar2').forEach(function(bar){
+    var bb=relBox(bar), bg=getComputedStyle(bar).backgroundColor;
+    svg+='<rect x="'+bb.x.toFixed(2)+'" y="'+bb.y.toFixed(2)+'" width="'+bb.w.toFixed(2)+'" height="'+bb.h.toFixed(2)+'" fill="'+bg+'"/>';
+  });
+  // الترويسة اللاتينية: STUDY ZONE (حروف كبيرة، اتجاه ltr، ألوان مختلطة عبر .o)
+  var wmEl=poster.querySelector('.wm2txt');
+  if(wmEl){
+    var wcs=getComputedStyle(wmEl), wfs=parseFloat(wcs.fontSize), wlh=parseFloat(wcs.lineHeight)||wfs;
+    var wm=relBox(wmEl), wmet=m2Metrics(wfs,'800'), orange=(cssv.getPropertyValue('--brand-orange').trim())||'#f59a24';
+    var wbase=wm.y+(wlh-(wmet.asc+wmet.desc))/2+wmet.asc;
+    var spans="";
+    wmEl.childNodes.forEach(function(n){
+      if(n.nodeType===3){ spans+='<tspan>'+m2Esc(n.nodeValue)+'</tspan>'; }
+      else if(n.nodeType===1){ var col=(n.classList&&n.classList.contains('o'))?orange:'#fff'; spans+='<tspan fill="'+col+'">'+m2Esc(n.textContent)+'</tspan>'; }
+    });
+    svg+='<text x="'+wm.cx.toFixed(2)+'" y="'+wbase.toFixed(2)+'" text-anchor="middle" direction="ltr" font-family="Somar Sans" font-weight="800" font-size="'+wfs+'" letter-spacing="'+(parseFloat(wcs.letterSpacing)||0)+'" fill="#fff">'+spans+'</text>';
+  }
+  // اسم المدينة (لاتيني، ltr)
+  var cityEl=poster.querySelector('.city2');
+  if(cityEl){
+    var ccs=getComputedStyle(cityEl), cfs=parseFloat(ccs.fontSize), clh=parseFloat(ccs.lineHeight)||cfs;
+    var cb=relBox(cityEl), cmet=m2Metrics(cfs,'800'), cbase=cb.y+(clh-(cmet.asc+cmet.desc))/2+cmet.asc;
+    svg+='<text x="'+cb.cx.toFixed(2)+'" y="'+cbase.toFixed(2)+'" text-anchor="middle" direction="ltr" font-family="Somar Sans" font-weight="800" font-size="'+cfs+'" letter-spacing="'+(parseFloat(ccs.letterSpacing)||0)+'" fill="#fff">'+m2Esc(cityEl.textContent)+'</text>';
+  }
+  // الكتل العربية الثلاث: كل سطر مرئي = عنصر <text> اتّجاهه rtl مع tspan للغامق
+  ["p2b1","p2b2","p2b3"].forEach(function(id){
+    var el=$(id); if(!el || !el.textContent.trim()) return;
+    var cs=getComputedStyle(el), fs=parseFloat(cs.fontSize), lh=parseFloat(cs.lineHeight)||fs*1.32;
+    var bx=relBox(el), met=m2Metrics(fs,'500'), off=(lh-(met.asc+met.desc))/2+met.asc;
+    var lines=m2VisualLines(el,pr.top,pr.left);
+    lines.forEach(function(L){
+      var y=L.top+off, tsp="";
+      L.segs.forEach(function(s){ if(!s.t.length) return; tsp+='<tspan font-weight="'+(s.bold?'800':'500')+'">'+m2Esc(s.t)+'</tspan>'; });
+      svg+='<text x="'+bx.cx.toFixed(2)+'" y="'+y.toFixed(2)+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="500" font-size="'+fs+'" fill="#fff">'+tsp+'</text>';
+    });
+  });
+  // اللوغو
+  var logoImg=poster.querySelector('.logo2 img');
+  if(logoImg){ var lb=relBox(logoImg); var lh2='x="'+lb.x.toFixed(2)+'" y="'+lb.y.toFixed(2)+'" width="'+lb.w.toFixed(2)+'" height="'+lb.h.toFixed(2)+'"'; svg+='<image href="'+logoImg.src+'" xlink:href="'+logoImg.src+'" '+lh2+'/>'; }
+  svg+='</svg>';
+  return svg;
+}
+function m2PNG(){ return new Promise(function(res,rej){
+  var svg=m2BuildSVG();
+  var url=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml;charset=utf-8"}));
+  var img=new Image();
+  img.onload=function(){ var c=document.createElement("canvas"); c.width=1080;c.height=1920; c.getContext("2d").drawImage(img,0,0,1080,1920); URL.revokeObjectURL(url); res(c.toDataURL("image/png")); };
+  img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error("svg render failed")); };
+  img.src=url;
+}); }
 function exportModel2(){
   var btn=$("exportBtn");btn.disabled=true;btn.textContent="جاري التصدير...";
   var prevT=$("stage").style.transform;
   $("stage").style.transform="scale(1)";
-  setTimeout(function(){
-    ensureFonts($("poster2").textContent).then(function(){
-    html2canvas($("poster2"),{scale:1,backgroundColor:(getComputedStyle(document.documentElement).getPropertyValue('--brand-navy').trim()||'#003c54'),useCORS:true,width:1080,height:1920,windowWidth:1080,windowHeight:1920}).then(function(canvas){
-      $("stage").style.transform=prevT;
-      var url=canvas.toDataURL("image/png");
-      var fn=fileName2();
-      var a=document.createElement("a");a.download=fn;a.href=url;a.click();
-      btn.disabled=false;btn.textContent="DOWNLOAD";
-      sendNotification2([{filename:fn, b64:url.split(",")[1]}]);
-    }).catch(function(err){alert("خطأ بالتصدير: "+err);$("stage").style.transform=prevT;btn.disabled=false;btn.textContent="DOWNLOAD";});
-    });
-  },80);
+  ensureFonts($("poster2").textContent).then(function(){
+    return new Promise(function(r){ setTimeout(r,60); }); // فرصة لإعادة التخطيط عند scale(1)
+  }).then(function(){
+    return m2PNG();
+  }).then(function(url){
+    $("stage").style.transform=prevT;
+    var fn=fileName2();
+    var a=document.createElement("a");a.download=fn;a.href=url;a.click();
+    btn.disabled=false;btn.textContent="DOWNLOAD";
+    sendNotification2([{filename:fn, b64:url.split(",")[1]}]);
+  }).catch(function(err){ alert("خطأ بالتصدير: "+(err&&err.message||err)); $("stage").style.transform=prevT; btn.disabled=false;btn.textContent="DOWNLOAD"; });
 }
 async function sendNotification2(captured){
   try{
