@@ -1079,6 +1079,38 @@ var Auth = (function(){
 })();
 
 var heroIMG=null, origIMG=null, fmt="square";
+
+/* ---------- قاعدة عامة لكامل الموقع: الأرقام في المخرجات غربية ----------
+   أي رقم عربي-هندي (٠-٩) أو فارسي (۰-۹) يُكتب في أي خانة، في أي مشروع
+   حالي أو مستقبلي، يتحوّل فورًا إلى رقم غربي (0-9). التحويل يتم على مستوى
+   الإدخال في مرحلة الالتقاط (capture) قبل مستمعي الحقول، فيقرأ الرندر
+   القيمة بعد التحويل مباشرةً وتخرج كل التصاميم بأرقام غربية. لأنه مربوط
+   بـ document عبر تفويض الأحداث، فهو يشمل تلقائيًا أي حقل جديد يُضاف لاحقًا.
+   الاستبدال حرف-بحرف بنفس الطول، لذا يُحفظ موضع المؤشر أثناء الكتابة. */
+function toWesternDigits(s){
+  return String(s==null?"":s)
+    .replace(/[٠-٩]/g,function(d){return String.fromCharCode(d.charCodeAt(0)-0x0660+48);})
+    .replace(/[۰-۹]/g,function(d){return String.fromCharCode(d.charCodeAt(0)-0x06F0+48);});
+}
+(function(){
+  function normalizeField(el){
+    if(!el||typeof el.value!=="string") return false;
+    if(!/[٠-٩۰-۹]/.test(el.value)) return false;
+    var w=toWesternDigits(el.value); if(w===el.value) return false;
+    var s=null,e=null; try{s=el.selectionStart;e=el.selectionEnd;}catch(_){}
+    el.value=w;
+    if(s!=null){ try{el.setSelectionRange(s,e);}catch(_){ } }
+    return true;
+  }
+  /* Capture phase: يسبق مستمعي الحقول فيقرؤون القيمة المحوّلة مباشرةً. */
+  document.addEventListener("input",function(e){ normalizeField(e.target); },true);
+  /* كنس أوّلي للقيم الافتراضية/المحمّلة، مع إعادة رندر لأي حقل تغيّر. */
+  window.addEventListener("load",function(){
+    var f=document.querySelectorAll("input,textarea");
+    for(var i=0;i<f.length;i++){ if(normalizeField(f[i])) f[i].dispatchEvent(new Event("input",{bubbles:true})); }
+  });
+})();
+
 function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function emph(t){var p=esc(t).split("**"),o="";for(var i=0;i<p.length;i++){o+=(i%2)?'<b class="em">'+p[i]+'</b>':p[i];}return o;}
 function render(){
