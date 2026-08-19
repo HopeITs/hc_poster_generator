@@ -774,7 +774,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="note" id="pNote" style="display:none"></div>
     <div class="s5"></div>
     <div class="contact" id="pContact"></div>
-    <div class="address"><span class="pin"><svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36.13 48.15">
+    <div class="address" id="pAddressBox"><span class="pin"><svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36.13 48.15">
   <defs>
     <style>
       .szpin-fill {
@@ -1090,7 +1090,8 @@ function render(){
   var nv=$("note").value.trim();
   if(nv){$("pNote").style.display="";$("pNote").innerHTML=emph(nv);$("pS4").style.display="";}else{$("pNote").style.display="none";$("pS4").style.display="none";}
   $("pContact").innerHTML=emph($("contact").value);
-  $("pAddress").innerHTML=emph($("address").value);
+  var av=$("address").value.trim();
+  if(av){$("pAddressBox").style.display="";$("pAddress").innerHTML=emph($("address").value);}else{$("pAddressBox").style.display="none";$("pAddress").innerHTML="";}
   var rows=document.querySelectorAll("#bullets .brow input"),bh="";
   rows.forEach(function(inp){if(inp.value.trim()){bh+='<div class="bullet"><span class="dot">&#8226;</span><span>'+emph(inp.value)+'</span></div>';}});
   $("pBullets").innerHTML=bh;
