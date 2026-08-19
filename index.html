@@ -926,6 +926,8 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
         <div class="field"><label>القاعة <span class="hint">عريض</span></label><input type="text" id="cu2Venue" value="كنيسة الأرمن الأرثوذكس"></div>
         <div class="field"><label>العنوان الفرعي</label><input type="text" id="cu2VenueSub" value="كنيسة السيدة العذراء - الفيلات"></div>
         <div class="field" id="cu2CardsField"><label>عدد أشخاص البطاقة <span class="hint">Story فقط</span></label><input type="text" id="cu2Cards" value="3"></div>
+        <div class="field"><label>صورة التخرّج <span class="hint">PNG شفاف أفضل</span></label>
+          <label class="upload has" id="cu2ImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="cu2ImgFile"></label></div>
       </div>
     </div>
     <div class="export-bar">
@@ -2161,7 +2163,7 @@ $("hcExportBtn").onclick=hcExport;
   /* ===== النموذج 2: دعوة تخرّج (Story 1080×1920 / Mail 1920×1080) =====
      مبني كـ SVG بنصوص أصلية (<text>) مثل Hope Center: العربية تُشكَّل صحيحاً على
      كل الأجهزة بما فيها iOS، والتصدير يُنقّط الـ SVG (لا html2canvas). */
-  var CU2={model:"1",fmt:"story",ready:false,logoB64:"",heroB64:"",logoRatio:1.271};
+  var CU2={model:"1",fmt:"story",ready:false,logoB64:"",heroB64:"",heroUser:null,logoRatio:1.271};
   var CU2COL={navy:"#023c54",orange:"#f99d1c"};
   var CU2LAY={
     story:{W:1080,H:1920,
@@ -2211,7 +2213,7 @@ $("hcExportBtn").onclick=hcExport;
   function cu2SVG(fmt,withFonts){
     var L=CU2LAY[fmt]||CU2LAY.story, C=CU2COL;
     var logoSrc=CU2.logoB64||"assets/children-university/logo.png";
-    var heroSrc=CU2.heroB64||"assets/children-university/graduation-kids.png";
+    var heroSrc=CU2.heroUser||CU2.heroB64||"assets/children-university/graduation-kids.png";
     var lw=L.logo.w, lh=lw*(CU2.logoRatio||1.271), lx=L.logo.cx-lw/2;
     function img(src,x,y,w,h){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'"/>'; }
     function TR(o,weight,fill,inner){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+inner+'</text>'; }
@@ -2251,6 +2253,12 @@ $("hcExportBtn").onclick=hcExport;
   if($("cu2Story")) $("cu2Story").onclick=function(){ cu2SetFmt("story"); };
   if($("cu2Mail")) $("cu2Mail").onclick=function(){ cu2SetFmt("mail"); };
   ["cu2Invite","cu2Batch","cu2Day","cu2Month","cu2Year","cu2Weekday","cu2Time","cu2Venue","cu2VenueSub","cu2Cards"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cu2Render); });
+  if($("cu2ImgFile")) $("cu2ImgFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return;
+    var r=new FileReader();
+    r.onload=function(){ CU2.heroUser=r.result; var up=$("cu2ImgUp"); if(up){ up.classList.add("has"); up.childNodes[0].nodeValue="✓ تم رفع الصورة"; } cu2Render(); };
+    r.readAsDataURL(f);
+  });
   window.addEventListener("resize",function(){ if(CU2.model==="2") cu2Fit(); });
   function cu2Export(){
     var btn=$("cuExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
@@ -2270,8 +2278,9 @@ $("hcExportBtn").onclick=hcExport;
       });
     });
   }
-  function cu2Collect(){ return {app:"childrenuniversity",v:1,model:2,fmt:CU2.fmt,city:$("cuCity")?$("cuCity").value:"",invite:cu2V("cu2Invite",""),batch:cu2V("cu2Batch",""),day:cu2V("cu2Day",""),month:cu2V("cu2Month",""),year:cu2V("cu2Year",""),weekday:cu2V("cu2Weekday",""),time:cu2V("cu2Time",""),venue:cu2V("cu2Venue",""),venueSub:cu2V("cu2VenueSub",""),cards:cu2V("cu2Cards","")}; }
-  function cu2Load(d){ if($("cuModelSel")) $("cuModelSel").value="2"; cuSetModel("2"); function set(id,v){ var e=$(id); if(e&&v!=null) e.value=v; } if(d.city&&$("cuCity")) $("cuCity").value=d.city; set("cu2Invite",d.invite);set("cu2Batch",d.batch);set("cu2Day",d.day);set("cu2Month",d.month);set("cu2Year",d.year);set("cu2Weekday",d.weekday);set("cu2Time",d.time);set("cu2Venue",d.venue);set("cu2VenueSub",d.venueSub);set("cu2Cards",d.cards); if(d.fmt) cu2SetFmt(d.fmt); else cu2Render(); }
+  function cu2Collect(){ return {app:"childrenuniversity",v:1,model:2,fmt:CU2.fmt,city:$("cuCity")?$("cuCity").value:"",invite:cu2V("cu2Invite",""),batch:cu2V("cu2Batch",""),day:cu2V("cu2Day",""),month:cu2V("cu2Month",""),year:cu2V("cu2Year",""),weekday:cu2V("cu2Weekday",""),time:cu2V("cu2Time",""),venue:cu2V("cu2Venue",""),venueSub:cu2V("cu2VenueSub",""),cards:cu2V("cu2Cards",""),image:CU2.heroUser||null}; }
+  function cu2Load(d){ if($("cuModelSel")) $("cuModelSel").value="2"; cuSetModel("2"); function set(id,v){ var e=$(id); if(e&&v!=null) e.value=v; } if(d.city&&$("cuCity")) $("cuCity").value=d.city;
+    CU2.heroUser=d.image||null; var up=$("cu2ImgUp"); if(up) up.childNodes[0].nodeValue=CU2.heroUser?"✓ تم رفع الصورة":"✓ الصورة الافتراضية"; set("cu2Invite",d.invite);set("cu2Batch",d.batch);set("cu2Day",d.day);set("cu2Month",d.month);set("cu2Year",d.year);set("cu2Weekday",d.weekday);set("cu2Time",d.time);set("cu2Venue",d.venue);set("cu2VenueSub",d.venueSub);set("cu2Cards",d.cards); if(d.fmt) cu2SetFmt(d.fmt); else cu2Render(); }
   window.cuExportRouter=function(){ if(CU2.model==="2") cu2Export(); else cuExport(); };
   if($("cuExportBtn")) $("cuExportBtn").onclick=window.cuExportRouter;
   cuSetModel($("cuModelSel")?$("cuModelSel").value:"1");
