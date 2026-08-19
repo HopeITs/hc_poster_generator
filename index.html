@@ -823,6 +823,13 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 <style>
 .cu-app{display:none;}
 .cu-app.on{display:block;}
+.cu-svg svg{display:block;}
+.cu2-fmt{display:flex;gap:8px;margin:2px 0 14px;}
+.cu2-fmt button{flex:1;padding:9px;border:1.5px solid var(--brand-navy);background:#fff;color:var(--brand-navy);border-radius:8px;font-family:'Somar Sans';font-weight:700;font-size:13px;cursor:pointer;transition:.15s;}
+.cu2-fmt button.active{background:var(--brand-navy);color:#fff;}
+.cu2-fmt button:hover{border-color:var(--brand-orange);}
+.cu2-row{display:flex;gap:6px;}
+.cu2-row .field{flex:1;min-width:0;}
 /* Pin the save / open / download bar to the bottom of the panel like the other
    generators. Study Zone's sticky bar only reaches the bottom because its long
    form scrolls; CU's short form does not, so lay the panel out as a flex column
@@ -871,11 +878,17 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <span class="role-badge" id="cuRoleBadge"></span>
     </div>
     <div class="panel-body">
+      <div class="field"><label>النموذج</label>
+        <select id="cuModelSel">
+          <option value="1">نموذج 1 — تسجيل</option>
+          <option value="2">نموذج 2 — دعوة تخرّج</option>
+        </select></div>
       <div class="field"><label>المحافظة</label>
         <select id="cuCity">
           <option value="حلب">حلب</option>
           <option value="حمص">حمص</option>
         </select></div>
+      <div id="cuM1Fields">
       <div class="sec-divider">المحتوى</div>
       <div class="field"><label>الفقرة التعريفية <span class="hint">**نص** = عريض</span></label>
         <textarea id="cuBody" rows="5">برنامجها **التعليمي التفاعلي** للأطفال من عمر **8** أعوام حتى **17** عاماً،
@@ -892,6 +905,28 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <div class="field"><label>نص التسجيل والتواصل <span class="hint">سطر لكل معلومة</span></label>
         <textarea id="cuFooter" rows="3">للتسجيل الكترونياً او مراجعة المركز يومياً من الساعة 2:00 حتى الساعة 5:00 مع إحضار دفتر العائلة، عدا السبت والأحد
 العنوان: حلب، الفيلات الشرقية - رقم التواصل: &#8294;0993 341 399&#8297;</textarea></div>
+      </div>
+      <div id="cuM2Fields" style="display:none">
+        <div class="cu2-fmt">
+          <button type="button" id="cu2Story" class="active">Story</button>
+          <button type="button" id="cu2Mail">Mail</button>
+        </div>
+        <div class="sec-divider">محتوى الدعوة</div>
+        <div class="field"><label>سطر الدعوة</label><input type="text" id="cu2Invite" value="بدعوتكم لحضور حفل تخرج"></div>
+        <div class="field"><label>الدفعة <span class="hint">عريض</span></label><input type="text" id="cu2Batch" value="الدفعة العاشرة"></div>
+        <div class="cu2-row">
+          <div class="field"><label>اليوم</label><input type="text" id="cu2Day" value="22"></div>
+          <div class="field"><label>الشهر</label><input type="text" id="cu2Month" value="DEC"></div>
+          <div class="field"><label>السنة</label><input type="text" id="cu2Year" value="2025"></div>
+        </div>
+        <div class="cu2-row">
+          <div class="field"><label>اليوم (نص)</label><input type="text" id="cu2Weekday" value="MONDAY"></div>
+          <div class="field"><label>الوقت</label><input type="text" id="cu2Time" value="3:30 PM"></div>
+        </div>
+        <div class="field"><label>القاعة <span class="hint">عريض</span></label><input type="text" id="cu2Venue" value="كنيسة الأرمن الأرثوذكس"></div>
+        <div class="field"><label>العنوان الفرعي</label><input type="text" id="cu2VenueSub" value="كنيسة السيدة العذراء - الفيلات"></div>
+        <div class="field" id="cu2CardsField"><label>عدد أشخاص البطاقة <span class="hint">Story فقط</span></label><input type="text" id="cu2Cards" value="3"></div>
+      </div>
     </div>
     <div class="export-bar">
       <div class="proj-row">
@@ -919,6 +954,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       </div>
       <div class="cu-footer" id="cuFooterOut"></div>
     </div>
+    <div class="cu-svg" id="cuSvg" style="display:none"></div>
   </div></div>
 </div>
 <div class="acct">
@@ -2084,13 +2120,15 @@ $("hcExportBtn").onclick=hcExport;
     });
   }
   if($("cuExportBtn")) $("cuExportBtn").onclick=cuExport;
-  function cuCollect(){ return {app:"childrenuniversity",v:1,model:1,body:$("cuBody").value,specs:$("cuSpecs").value,note:$("cuNote").value,footer:$("cuFooter").value,image:CU.hero}; }
+  function cuCollect(){ if(typeof CU2!=="undefined"&&CU2.model==="2") return cu2Collect(); return {app:"childrenuniversity",v:1,model:1,body:$("cuBody").value,specs:$("cuSpecs").value,note:$("cuNote").value,footer:$("cuFooter").value,image:CU.hero}; }
   if($("cuSaveBtn")) $("cuSaveBtn").onclick=function(){
     var blob=new Blob([JSON.stringify(cuCollect(),null,2)],{type:"application/json"});
     var a=document.createElement("a"); a.download="008CU_"+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
   };
   function cuLoad(d){
     if(!d||typeof d!=="object"){ alert("بنية غير صحيحة"); return; }
+    if(d.model===2){ cu2Load(d); return; }
+    if($("cuModelSel")){ $("cuModelSel").value="1"; } if(typeof cuSetModel==="function") cuSetModel("1");
     $("cuBody").value=d.body||""; $("cuSpecs").value=d.specs||""; $("cuNote").value=d.note||""; $("cuFooter").value=d.footer||"";
     CU.hero=d.image||null;
     if(CU.hero){ $("cuImgUp").classList.add("has"); $("cuImgUp").childNodes[0].nodeValue="✓ تم رفع الصورة"; }
@@ -2119,6 +2157,124 @@ $("hcExportBtn").onclick=hcExport;
     cuRender();
     if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(function(){ cuRender(); }); }
   };
+
+  /* ===== النموذج 2: دعوة تخرّج (Story 1080×1920 / Mail 1920×1080) =====
+     مبني كـ SVG بنصوص أصلية (<text>) مثل Hope Center: العربية تُشكَّل صحيحاً على
+     كل الأجهزة بما فيها iOS، والتصدير يُنقّط الـ SVG (لا html2canvas). */
+  var CU2={model:"1",fmt:"story",ready:false,logoB64:"",heroB64:"",logoRatio:1.271};
+  var CU2COL={navy:"#023c54",orange:"#f99d1c"};
+  var CU2LAY={
+    story:{W:1080,H:1920,
+      blob:{cx:544.7,cy:2024.35,rx:588.2,ry:492.15},
+      hero:{x:155.1,y:1136.3,w:785.2,h:785.2},
+      logo:{cx:540,top:87,w:207},
+      yat:{cx:542.1,by:450.4,sz:45.7}, title:{cx:539.9,by:543.5,sz:74.9},
+      invite:{cx:534.9,by:646.3,sz:45.7}, batch:{cx:534.85,by:713.6,sz:45.7},
+      day:{cx:324.9,by:879.3,sz:130.7}, month:{cx:478.0,by:827.9,sz:59.0}, year:{cx:478.6,by:879.3,sz:55.9},
+      div:{x:575,y1:782,y2:879}, wday:{cx:715.8,by:819.4,sz:47.0}, time:{cx:715.2,by:880.2,sz:57.0},
+      venue:{cx:535.5,by:967.6,sz:45.7}, vsub:{cx:535.7,by:1034.9,sz:45.7}, cards:{cx:540.2,by:1121.6,sz:35.9}},
+    mail:{W:1920,H:1080,
+      blob:{cx:21.3,cy:540,rx:742.6,ry:588.2},
+      hero:{x:3.2,y:37.8,w:1009.3,h:1018.1},
+      logo:{cx:1365,top:95,w:184},
+      yat:{cx:1362.8,by:411.7,sz:38.8}, title:{cx:1364.9,by:498.1,sz:69.2},
+      invite:{cx:1360.2,by:574.7,sz:42.2}, batch:{cx:1360.2,by:637.1,sz:42.2},
+      day:{cx:1146.9,by:802.3,sz:130.7}, month:{cx:1299.9,by:750.9,sz:59.0}, year:{cx:1300.6,by:802.3,sz:55.9},
+      div:{x:1397,y1:705,y2:802}, wday:{cx:1537.7,by:742.4,sz:47.0}, time:{cx:1537.1,by:803.2,sz:57.0},
+      venue:{cx:1365.2,by:903.6,sz:42.2}, vsub:{cx:1365.2,by:964.3,sz:42.2}, cards:null}
+  };
+  function cu2Esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function cu2V(id,d){ var e=$(id); var v=e?e.value:d; return (v==null||v==="")?"":v; }
+  var _cu2Fonts=null;
+  function cu2FontCSS(){
+    if(_cu2Fonts!=null) return _cu2Fonts;
+    var out="",want={"400":1,"600":1,"700":1,"800":1};
+    for(var i=0;i<document.styleSheets.length;i++){
+      var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+      if(!rules) continue;
+      for(var j=0;j<rules.length;j++){
+        var r=rules[j]; if(r.type!==5) continue;
+        var fam=(r.style.getPropertyValue("font-family")||"").replace(/['"]/g,"").toLowerCase().trim();
+        var w=(r.style.getPropertyValue("font-weight")||"400").trim();
+        if(fam==="somar sans"&&want[w]){ out+=r.cssText; want[w]=0; }
+      }
+    }
+    _cu2Fonts=out; return out;
+  }
+  function cu2LoadAssets(cb){
+    if(CU2.ready){ cb&&cb(); return; }
+    var todo=2, fin=function(){ if(--todo===0){ CU2.ready=true; cb&&cb(); } };
+    function grab(url,set,onImg){ var im=new Image(); im.onload=function(){ try{ var c=document.createElement("canvas"); c.width=im.naturalWidth;c.height=im.naturalHeight; c.getContext("2d").drawImage(im,0,0); set(c.toDataURL("image/png")); }catch(e){ set(url); } if(onImg)onImg(im); fin(); }; im.onerror=function(){ set(url); fin(); }; im.src=url; }
+    grab("assets/children-university/logo.png",function(v){CU2.logoB64=v;},function(im){ if(im.naturalWidth) CU2.logoRatio=im.naturalHeight/im.naturalWidth; });
+    grab("assets/children-university/graduation-kids.png",function(v){CU2.heroB64=v;});
+  }
+  function cu2SVG(fmt,withFonts){
+    var L=CU2LAY[fmt]||CU2LAY.story, C=CU2COL;
+    var logoSrc=CU2.logoB64||"assets/children-university/logo.png";
+    var heroSrc=CU2.heroB64||"assets/children-university/graduation-kids.png";
+    var lw=L.logo.w, lh=lw*(CU2.logoRatio||1.271), lx=L.logo.cx-lw/2;
+    function img(src,x,y,w,h){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'"/>'; }
+    function TR(o,weight,fill,inner){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+inner+'</text>'; }
+    function TL(o,weight,fill,txt){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="ltr" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+cu2Esc(txt)+'</text>'; }
+    var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+L.W+' '+L.H+'" width="'+L.W+'" height="'+L.H+'">';
+    if(withFonts) s+='<defs><style>'+cu2FontCSS()+'</style></defs>';
+    s+='<rect width="'+L.W+'" height="'+L.H+'" fill="#ffffff"/>';
+    s+='<ellipse cx="'+L.blob.cx+'" cy="'+L.blob.cy+'" rx="'+L.blob.rx+'" ry="'+L.blob.ry+'" fill="'+C.orange+'"/>';
+    s+=img(heroSrc,L.hero.x,L.hero.y,L.hero.w,L.hero.h);
+    s+=img(logoSrc,lx,L.logo.top,lw,lh);
+    s+=TR(L.yat,400,C.navy,cu2Esc("يتشرف مركز"));
+    s+=TR(L.title,700,C.orange,cu2Esc("أكاديمية الأطفال"));
+    s+=TR(L.invite,400,C.navy,cu2Esc(cu2V("cu2Invite","بدعوتكم لحضور حفل تخرج")));
+    s+=TR(L.batch,400,C.navy,'<tspan font-weight="700">'+cu2Esc(cu2V("cu2Batch","الدفعة العاشرة"))+'</tspan>'+cu2Esc(" من الأطفال وذلك في:"));
+    s+=TL(L.day,600,C.navy,cu2V("cu2Day","22"));
+    s+=TL(L.month,700,C.navy,cu2V("cu2Month","DEC"));
+    s+=TL(L.year,700,C.navy,cu2V("cu2Year","2025"));
+    s+='<line x1="'+L.div.x+'" y1="'+L.div.y1+'" x2="'+L.div.x+'" y2="'+L.div.y2+'" stroke="'+C.navy+'" stroke-width="4"/>';
+    s+=TL(L.wday,700,C.navy,cu2V("cu2Weekday","MONDAY"));
+    s+=TL(L.time,700,C.navy,cu2V("cu2Time","3:30 PM"));
+    s+=TR(L.venue,400,C.navy,cu2Esc("في صالة ")+'<tspan font-weight="700">'+cu2Esc(cu2V("cu2Venue","كنيسة الأرمن الأرثوذكس"))+'</tspan>');
+    s+=TR(L.vsub,400,C.navy,cu2Esc(cu2V("cu2VenueSub","كنيسة السيدة العذراء - الفيلات")));
+    if(L.cards){ s+=TR(L.cards,400,C.navy, cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cu2V("cu2Cards","3"))+'</tspan>'+cu2Esc(") أشخاص")); }
+    s+='</svg>';
+    return s;
+  }
+  function cu2Fit(){ var st=$("cuStage"); if(!st) return; var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return; var L=CU2LAY[CU2.fmt]||CU2LAY.story; var sc=Math.min((pv.clientWidth-60)/L.W,(pv.clientHeight-60)/L.H,1); st.style.transform="scale("+sc+")"; }
+  function cu2Render(){ var w=$("cuSvg"); if(!w) return; w.innerHTML=cu2SVG(CU2.fmt,false); cu2Fit(); }
+  function cuSetModel(m){
+    CU2.model=String(m);
+    var m1=$("cuM1Fields"),m2=$("cuM2Fields"),poster=$("cuPoster"),svg=$("cuSvg");
+    if(CU2.model==="2"){ if(m1)m1.style.display="none"; if(m2)m2.style.display=""; if(poster)poster.style.display="none"; if(svg)svg.style.display=""; cu2LoadAssets(cu2Render); cu2Render(); }
+    else { if(m1)m1.style.display=""; if(m2)m2.style.display="none"; if(poster)poster.style.display=""; if(svg)svg.style.display="none"; cuRender(); }
+  }
+  function cu2SetFmt(f){ CU2.fmt=f; var bs=$("cu2Story"),bm=$("cu2Mail"),cf=$("cu2CardsField"); if(bs)bs.classList.toggle("active",f==="story"); if(bm)bm.classList.toggle("active",f==="mail"); if(cf)cf.style.display=(f==="story")?"":"none"; cu2Render(); }
+  if($("cuModelSel")) $("cuModelSel").addEventListener("change",function(){ cuSetModel(this.value); });
+  if($("cu2Story")) $("cu2Story").onclick=function(){ cu2SetFmt("story"); };
+  if($("cu2Mail")) $("cu2Mail").onclick=function(){ cu2SetFmt("mail"); };
+  ["cu2Invite","cu2Batch","cu2Day","cu2Month","cu2Year","cu2Weekday","cu2Time","cu2Venue","cu2VenueSub","cu2Cards"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cu2Render); });
+  window.addEventListener("resize",function(){ if(CU2.model==="2") cu2Fit(); });
+  function cu2Export(){
+    var btn=$("cuExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
+    cu2LoadAssets(function(){
+      (document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(function(){
+        var fmt=CU2.fmt, L=CU2LAY[fmt]||CU2LAY.story, sc=2, W=L.W*sc, H=L.H*sc;
+        var url=URL.createObjectURL(new Blob([cu2SVG(fmt,true)],{type:"image/svg+xml;charset=utf-8"}));
+        var im=new Image();
+        im.onload=function(){ var c=document.createElement("canvas"); c.width=W;c.height=H; c.getContext("2d").drawImage(im,0,0,W,H); URL.revokeObjectURL(url);
+          var out=c.toDataURL("image/png"); var code=(typeof cuCityCode==="function")?cuCityCode():"";
+          var fn="008CU_"+(code?code+"_":"")+"Graduation Invitation_"+(fmt==="story"?"Story":"Mail")+"_"+todayMMDDYYYY()+".png";
+          var a=document.createElement("a"); a.download=fn; a.href=out; a.click();
+          btn.disabled=false; btn.textContent="DOWNLOAD";
+        };
+        im.onerror=function(){ URL.revokeObjectURL(url); alert("خطأ بالتصدير (SVG)"); btn.disabled=false; btn.textContent="DOWNLOAD"; };
+        im.src=url;
+      });
+    });
+  }
+  function cu2Collect(){ return {app:"childrenuniversity",v:1,model:2,fmt:CU2.fmt,city:$("cuCity")?$("cuCity").value:"",invite:cu2V("cu2Invite",""),batch:cu2V("cu2Batch",""),day:cu2V("cu2Day",""),month:cu2V("cu2Month",""),year:cu2V("cu2Year",""),weekday:cu2V("cu2Weekday",""),time:cu2V("cu2Time",""),venue:cu2V("cu2Venue",""),venueSub:cu2V("cu2VenueSub",""),cards:cu2V("cu2Cards","")}; }
+  function cu2Load(d){ if($("cuModelSel")) $("cuModelSel").value="2"; cuSetModel("2"); function set(id,v){ var e=$(id); if(e&&v!=null) e.value=v; } if(d.city&&$("cuCity")) $("cuCity").value=d.city; set("cu2Invite",d.invite);set("cu2Batch",d.batch);set("cu2Day",d.day);set("cu2Month",d.month);set("cu2Year",d.year);set("cu2Weekday",d.weekday);set("cu2Time",d.time);set("cu2Venue",d.venue);set("cu2VenueSub",d.venueSub);set("cu2Cards",d.cards); if(d.fmt) cu2SetFmt(d.fmt); else cu2Render(); }
+  window.cuExportRouter=function(){ if(CU2.model==="2") cu2Export(); else cuExport(); };
+  if($("cuExportBtn")) $("cuExportBtn").onclick=window.cuExportRouter;
+  cuSetModel($("cuModelSel")?$("cuModelSel").value:"1");
 })();
 </script>
 </body></html>
