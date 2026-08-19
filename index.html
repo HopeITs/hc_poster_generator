@@ -655,6 +655,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <option value="Tartus">Tartus</option>
       <option value="Syria">Syria</option>
     </select></div>
+    <div class="field" id="szBranchField" style="display:none"><label>الفرع</label><select id="szBranch"></select></div>
     <div class="sec-divider">المحتوى</div>
     <div class="field"><label>سطر التعريف <span class="hint">**نص** = كحلي</span></label>
       <textarea id="intro">يعلن مركز **STUDY ZONE** حمص عن إقامة دورة بعنوان:</textarea></div>
@@ -682,7 +683,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="field"><label>ملاحظة (اختياري)</label><input type="text" id="note" value="" placeholder="مثال: يتوجب إحضار اللابتوب"></div>
     <div class="field"><label>سطر التواصل <span class="hint">**نص** = كحلي عريض</span></label>
       <textarea id="contact">تبدأ الدورة عند اكتمال العدد - للاستفسار والتواصل: **0950018459**</textarea></div>
-    <div class="field"><label>عنوان المركز</label><input type="text" id="address" value="science zone قرب حديقة العدوية"></div>
+    <div class="field"><label>عنوان المركز</label><input type="text" id="address" value="Science Zone العدوية قرب حديقة العدوية"></div>
     </div>
     <div id="model2Fields" style="display:none">
       <div class="field"><label>المحافظة</label><select id="city2">
@@ -1213,8 +1214,9 @@ function fillSlider(el){
 
 $("imgFile").onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();
   r.onload=function(){heroIMG=r.result;origIMG=r.result;$("imgUp").classList.add("has");$("imgUp").childNodes[0].nodeValue="\u2713 تم رفع الصورة";render();};r.readAsDataURL(f);};
-["city","intro","title","section","duration","note","contact","address"].forEach(function(id){$(id).addEventListener("input",render);});
-$("city").addEventListener("change",render);
+["intro","title","section","duration","note","contact","address"].forEach(function(id){$(id).addEventListener("input",render);});
+$("city").addEventListener("change",szApplyCity);
+if($("szBranch")) $("szBranch").addEventListener("change",szApplyBranch);
 $("duration").addEventListener("keydown",function(e){
   if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();}
 });
@@ -1224,6 +1226,46 @@ $("title").addEventListener("keydown",function(e){
 function growTitle(){var t=$("title");t.style.height="auto";t.style.height=t.scrollHeight+"px";}
 $("title").addEventListener("input",growTitle);
 var CITY_CODE={Aleppo:"ALP",Homs:"HMS",Damascus:"DMS",Latakia:"LAT",Tartus:"TAR",Syria:"SYR"};
+/* عناوين فروع Study Zone لكل محافظة. عند تغيير المحافظة يُملأ حقل العنوان تلقائياً،
+   وإن كان للمحافظة أكثر من فرع تظهر قائمة "الفرع" للاختيار بينها. */
+var SZ_ADDR={
+  Aleppo:[{label:"شارع الفيلات",addr:"شارع الفيلات – أمام المدخل الرئيسي لملعب رعاية الشباب"}],
+  Homs:[
+    {label:"العدوية",addr:"Science Zone العدوية قرب حديقة العدوية"},
+    {label:"الأرمن الجنوبي",addr:"الارمن الجنوبي جانب حلويات سارة"},
+    {label:"الإنشاءات",addr:"الانشاءات - إشارة السفير - مقابل مدخل فودو"}
+  ],
+  Damascus:[{label:"باب شرقي",addr:"باب شرقي – مدخل كنيسة الزيتون – جانب مطعم أورينتال"}],
+  Latakia:[
+    {label:"الزراعة (1)",addr:"الزراعة (1) - جانب مكتبة العلوم"},
+    {label:"الزراعة (2)",addr:"الزراعة (2) - نهاية أوتوستراد الزراعة"},
+    {label:"شارع 8 آذار",addr:"شارع ٨ آذار - مدخل شركة الهرم"}
+  ],
+  Tartus:[{label:"خراب المسيحية",addr:"خراب المسيحية – مقابل كنيسة السيدة للروم الأرثوذكس"}]
+};
+function szBuildBranch(city){
+  var sel=$("szBranch"),fld=$("szBranchField"),list=SZ_ADDR[city]||[];
+  if(!sel||!fld) return list;
+  sel.innerHTML="";
+  list.forEach(function(o,i){ var op=document.createElement("option"); op.value=String(i); op.textContent=o.label; sel.appendChild(op); });
+  fld.style.display=(list.length>1)?"":"none";
+  return list;
+}
+function szApplyCity(){
+  var city=$("city").value,list=szBuildBranch(city);
+  if(list.length){ $("szBranch").value="0"; $("address").value=list[0].addr; }
+  render();
+}
+function szApplyBranch(){
+  var list=SZ_ADDR[$("city").value]||[],i=parseInt($("szBranch").value,10)||0;
+  if(list[i]) $("address").value=list[i].addr;
+  render();
+}
+function szSyncBranch(){
+  var list=szBuildBranch($("city").value),cur=($("address").value||"").trim();
+  for(var i=0;i<list.length;i++){ if(list[i].addr.trim()===cur){ $("szBranch").value=String(i); break; } }
+}
+szSyncBranch();  // إظهار قائمة الفرع للمحافظة الافتراضية عند الإقلاع
 function todayMMDDYYYY(){
   var d=new Date();
   var mm=("0"+(d.getMonth()+1)).slice(-2);
@@ -1518,6 +1560,7 @@ function loadProject(d){
   heroIMG=d.image||null;
   if(heroIMG){$("imgUp").classList.add("has");$("imgUp").childNodes[0].nodeValue="\u2713 تم رفع الصورة";}
   else{$("imgUp").classList.remove("has");$("imgUp").childNodes[0].nodeValue="اضغط لرفع الصورة";}
+  szSyncBranch();
   render();
 }
 function loadProject2(d){
