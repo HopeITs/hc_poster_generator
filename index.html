@@ -2231,6 +2231,8 @@ $("hcExportBtn").onclick=hcExport;
   };
   function cu2Esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function cu2V(id,d){ var e=$(id); var v=e?e.value:d; return (v==null||v==="")?"":v; }
+  /* التمييز الصحيح لكلمة "شخص" حسب العدد: 1 شخص، 2 شخصين، 3–10 أشخاص، 11 فأكثر شخص. */
+  function cu2PersonWord(v){ var n=parseInt(v,10); if(isNaN(n)||n<1) return "أشخاص"; if(n===1) return "شخص"; if(n===2) return "شخصين"; if(n<=10) return "أشخاص"; return "شخص"; }
   var _cu2Fonts=null;
   function cu2FontCSS(){
     if(_cu2Fonts!=null) return _cu2Fonts;
@@ -2280,7 +2282,7 @@ $("hcExportBtn").onclick=hcExport;
     s+=TL(L.time,700,C.navy,cu2V("cu2Time","3:30 PM"));
     s+=TR(L.venue,400,C.navy,cu2Esc("في صالة ")+'<tspan font-weight="700">'+cu2Esc(cu2V("cu2Venue","كنيسة الأرمن الأرثوذكس"))+'</tspan>');
     s+=TR(L.vsub,400,C.navy,cu2Esc(cu2V("cu2VenueSub","كنيسة السيدة العذراء - الفيلات")));
-    if(L.cards){ s+=TR(L.cards,400,C.navy, cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cu2V("cu2Cards","3"))+'</tspan>'+cu2Esc(") أشخاص")); }
+    if(L.cards){ var cardsN=cu2V("cu2Cards","3"); s+=TR(L.cards,400,C.navy, cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cardsN)+'</tspan>'+cu2Esc(") "+cu2PersonWord(cardsN))); }
     s+='</svg>';
     return s;
   }
