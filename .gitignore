@@ -1,0 +1,6 @@
+# Wrangler local state (account cache, build artifacts) -- machine-specific.
+.wrangler/
+
+# Hold secrets (DB credentials, shared secrets). Use the .example.php templates.
+mailer/config.php
+api/config.php
