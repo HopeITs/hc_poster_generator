@@ -133,6 +133,9 @@
   font-weight:var(--w-med);line-height:var(--lh-tight);margin-top:0;}
 /* الستوري فقط: تباعد أسطر المدّة/المدرّب = تباعد أسطر المحاور */
 .poster.story .duration{line-height:calc(var(--fs-duration)*1px*var(--k) + var(--bullet-gap));}
+/* الستوري فقط: محاذاة نص المحور لليمين بدل التوسيط، فتنسدل الأسطر الملتفّة
+   تحت بداية السطر الأول (تعليق) بدل توسيط كل سطر. المحور المفرد لا يتغيّر. */
+.poster.story .bullet{text-align:right;}
 .poster .duration .em{color:var(--brand-navy);font-weight:var(--w-bold);}
 .poster .note{font-weight:var(--w-bold);font-size:calc(var(--fs-note)*1px*var(--k));
   color:var(--brand-navy);margin-top:0;line-height:var(--lh-tight);}
@@ -171,6 +174,7 @@
 .poster2 .head2 .wm2txt{color:#fff;font-weight:800;line-height:1;letter-spacing:1px;direction:ltr;white-space:nowrap;
   width:475.0421px;height:56.8023px;display:flex;align-items:center;justify-content:center;font-size:74px;}
 .poster2 .head2 .wm2txt .o{color:var(--brand-orange);}
+.poster2 .head2 .wm2txt .wm2svg{display:block;width:100%;height:100%;}
 .poster2 .head2 .city2{color:#fff;font-weight:800;font-size:60px;line-height:1;letter-spacing:2px;direction:ltr;}
 .poster2 .blk2{color:#fff;font-weight:500;line-height:1.32;width:100%;white-space:pre-wrap;flex:0 0 auto;}
 .poster2 .blk2.b1{font-size:var(--fs-b1);}
@@ -556,9 +560,12 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 /* Phone/tablet: stack Hope Center like the other generators -- the fixed 430px
    panel + preview overflowed a narrow screen. Preview on top, form below. */
 @media (max-width:820px){
-  .hc-app.on{grid-template-columns:1fr;grid-template-rows:42vh 1fr;}
+  .hc-app.on{grid-template-columns:1fr;grid-template-rows:42vh minmax(0,1fr);}
   .hc-app.on .hc-preview{order:-1;height:auto;border-bottom:1px solid #bcbec0;}
-  .hc-app.on .hc-panel{height:auto;border-left:none;}
+  /* min-height:0 lets the panel shrink to its grid track so .hc-pbody can
+     scroll internally; without it the form overflows and its lower fields are
+     unreachable (the fixed .hc-app doesn't scroll the page). */
+  .hc-app.on .hc-panel{height:auto;min-height:0;border-left:none;}
 }
 </style>
 <div class="hc-app" id="hcApp">
@@ -648,6 +655,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <option value="Tartus">Tartus</option>
       <option value="Syria">Syria</option>
     </select></div>
+    <div class="field" id="szBranchField" style="display:none"><label>الفرع</label><select id="szBranch"></select></div>
     <div class="sec-divider">المحتوى</div>
     <div class="field"><label>سطر التعريف <span class="hint">**نص** = كحلي</span></label>
       <textarea id="intro">يعلن مركز **STUDY ZONE** حمص عن إقامة دورة بعنوان:</textarea></div>
@@ -675,7 +683,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="field"><label>ملاحظة (اختياري)</label><input type="text" id="note" value="" placeholder="مثال: يتوجب إحضار اللابتوب"></div>
     <div class="field"><label>سطر التواصل <span class="hint">**نص** = كحلي عريض</span></label>
       <textarea id="contact">تبدأ الدورة عند اكتمال العدد - للاستفسار والتواصل: **0950018459**</textarea></div>
-    <div class="field"><label>عنوان المركز</label><input type="text" id="address" value="science zone قرب حديقة العدوية"></div>
+    <div class="field"><label>عنوان المركز</label><input type="text" id="address" value="Science Zone العدوية قرب حديقة العدوية"></div>
     </div>
     <div id="model2Fields" style="display:none">
       <div class="field"><label>المحافظة</label><select id="city2">
@@ -785,7 +793,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 <div class="poster2" id="poster2" style="display:none">
   <div class="stack2">
     <div class="head2">
-      <div class="wm2txt"><span class="o">S</span>TUDY <span class="o">Z</span>ONE</div>
+      <div class="wm2txt"><svg class="wm2svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 722.9 85.76" preserveAspectRatio="xMidYMid meet" aria-label="STUDY ZONE"><path fill="#f59a24" d="M66.28,57.47c0,21.91-18.05,28.29-35.67,28.29-9.14,0-30.38-2.97-30.61-29.5h16.95c0,7.49,5.17,11.34,15.74,11.34,8.15,0,14.64-3.19,14.64-7.49,0-5.73-6.94-6.61-21.36-9.36C13.65,48.44,0,44.04,0,26.97S11.67,0,30.83,0c20.48,0,31.38,9.03,31.93,26.64h-18.72c.77-4.62-5.62-8.59-13.32-8.59-6.83,0-11.89,1.54-11.89,6.39,0,5.61,9.91,5.28,25.98,9.47,10.9,2.86,21.47,7.82,21.47,23.56Z"/><path fill="#fff" d="M70.89,21.47l.11-20.15h65.39l-.11,20.15h-22.46l.11,62.42h-21.25l-.11-62.42h-21.69Z"/><path fill="#fff" d="M143.66,1.32h20.92v46.79c0,10.02,1.65,17.17,15.96,17.17,13.87-.11,14.2-7.16,14.2-17.39V1.32h21.14v49.54c0,22.35-12.11,33.91-35.34,33.91s-36.88-12.33-36.88-33.69V1.32Z"/><path fill="#fff" d="M262.01,1.32c22.68,0,38.2,15.52,38.97,39.08v2.09c0,24.88-15.52,41.39-38.97,41.39h-33.14l.11-82.57h33.03ZM280.83,43.6v-1.65c-.33-12.44-7.82-20.59-19.05-20.59h-13.1v42.28h13.1c11.56,0,19.05-7.93,19.05-20.04Z"/><path fill="#fff" d="M304.72,1.32h23.67l16.07,32.26,13.65-32.26h23.56l-28.29,50.09v32.48h-20.92v-32.48L304.72,1.32Z"/><path fill="#f59a24" d="M449.66,20.92h-36V1.32h61.87v19.82l-39.74,42.61h40.95v20.15h-65.06v-20.81l37.98-42.17Z"/><path fill="#fff" d="M485,42.61v-.88c.44-25.98,16.29-41.72,41.83-41.72s41.17,15.52,41.83,41.17v1.43c0,26.64-15.74,42.72-41.72,42.72s-41.95-16.18-41.95-42.72ZM547.86,42.61v-1.43c-.33-13.32-8.37-21.69-21.03-21.69s-20.81,8.15-21.03,21.47v1.65c0,14.42,7.82,23.12,21.03,23.12s21.03-8.7,21.03-23.12Z"/><path fill="#fff" d="M604.56,1.32l28.51,48.55V1.32h19.6v82.57h-19.6l-33.8-56.59v56.59h-19.6V1.32h24.88Z"/><path fill="#fff" d="M722.35,1.32v19.49h-35.56v11.45h29.17v18.72h-29.17v13.43h36.11v19.49h-57.03V1.32h56.48Z"/></svg></div>
       <div class="city2" id="p2City">HOMS</div>
     </div>
     <div class="blk2 b1" id="p2b1"></div>
@@ -816,6 +824,13 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 <style>
 .cu-app{display:none;}
 .cu-app.on{display:block;}
+.cu-svg svg{display:block;}
+.cu2-fmt{display:flex;gap:8px;margin:2px 0 14px;}
+.cu2-fmt button{flex:1;padding:9px;border:1.5px solid var(--brand-navy);background:#fff;color:var(--brand-navy);border-radius:8px;font-family:'Somar Sans';font-weight:700;font-size:13px;cursor:pointer;transition:.15s;}
+.cu2-fmt button.active{background:var(--brand-navy);color:#fff;}
+.cu2-fmt button:hover{border-color:var(--brand-orange);}
+.cu2-row{display:flex;gap:6px;}
+.cu2-row .field{flex:1;min-width:0;}
 /* Pin the save / open / download bar to the bottom of the panel like the other
    generators. Study Zone's sticky bar only reaches the bottom because its long
    form scrolls; CU's short form does not, so lay the panel out as a flex column
@@ -864,11 +879,17 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <span class="role-badge" id="cuRoleBadge"></span>
     </div>
     <div class="panel-body">
+      <div class="field"><label>النموذج</label>
+        <select id="cuModelSel">
+          <option value="1">نموذج 1 — تسجيل</option>
+          <option value="2">نموذج 2 — دعوة تخرّج</option>
+        </select></div>
       <div class="field"><label>المحافظة</label>
         <select id="cuCity">
           <option value="حلب">حلب</option>
           <option value="حمص">حمص</option>
         </select></div>
+      <div id="cuM1Fields">
       <div class="sec-divider">المحتوى</div>
       <div class="field"><label>الفقرة التعريفية <span class="hint">**نص** = عريض</span></label>
         <textarea id="cuBody" rows="5">برنامجها **التعليمي التفاعلي** للأطفال من عمر **8** أعوام حتى **17** عاماً،
@@ -885,6 +906,30 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <div class="field"><label>نص التسجيل والتواصل <span class="hint">سطر لكل معلومة</span></label>
         <textarea id="cuFooter" rows="3">للتسجيل الكترونياً او مراجعة المركز يومياً من الساعة 2:00 حتى الساعة 5:00 مع إحضار دفتر العائلة، عدا السبت والأحد
 العنوان: حلب، الفيلات الشرقية - رقم التواصل: &#8294;0993 341 399&#8297;</textarea></div>
+      </div>
+      <div id="cuM2Fields" style="display:none">
+        <div class="cu2-fmt">
+          <button type="button" id="cu2Story" class="active">Story</button>
+          <button type="button" id="cu2Mail">Mail</button>
+        </div>
+        <div class="sec-divider">محتوى الدعوة</div>
+        <div class="field"><label>سطر الدعوة</label><input type="text" id="cu2Invite" value="بدعوتكم لحضور حفل تخرج"></div>
+        <div class="field"><label>الدفعة <span class="hint">عريض</span></label><input type="text" id="cu2Batch" value="الدفعة العاشرة"></div>
+        <div class="cu2-row">
+          <div class="field"><label>اليوم</label><input type="text" id="cu2Day" value="22"></div>
+          <div class="field"><label>الشهر</label><input type="text" id="cu2Month" value="DEC"></div>
+          <div class="field"><label>السنة</label><input type="text" id="cu2Year" value="2025"></div>
+        </div>
+        <div class="cu2-row">
+          <div class="field"><label>اليوم (نص)</label><input type="text" id="cu2Weekday" value="MONDAY"></div>
+          <div class="field"><label>الوقت</label><input type="text" id="cu2Time" value="3:30 PM"></div>
+        </div>
+        <div class="field"><label>القاعة <span class="hint">عريض</span></label><input type="text" id="cu2Venue" value="كنيسة الأرمن الأرثوذكس"></div>
+        <div class="field"><label>العنوان الفرعي</label><input type="text" id="cu2VenueSub" value="كنيسة السيدة العذراء - الفيلات"></div>
+        <div class="field" id="cu2CardsField"><label>عدد أشخاص البطاقة <span class="hint">Story فقط</span></label><input type="text" id="cu2Cards" value="3"></div>
+        <div class="field"><label>صورة التخرّج <span class="hint">PNG شفاف أفضل</span></label>
+          <label class="upload has" id="cu2ImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="cu2ImgFile"></label></div>
+      </div>
     </div>
     <div class="export-bar">
       <div class="proj-row">
@@ -912,6 +957,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       </div>
       <div class="cu-footer" id="cuFooterOut"></div>
     </div>
+    <div class="cu-svg" id="cuSvg" style="display:none"></div>
   </div></div>
 </div>
 <div class="acct">
@@ -1168,8 +1214,9 @@ function fillSlider(el){
 
 $("imgFile").onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();
   r.onload=function(){heroIMG=r.result;origIMG=r.result;$("imgUp").classList.add("has");$("imgUp").childNodes[0].nodeValue="\u2713 تم رفع الصورة";render();};r.readAsDataURL(f);};
-["city","intro","title","section","duration","note","contact","address"].forEach(function(id){$(id).addEventListener("input",render);});
-$("city").addEventListener("change",render);
+["intro","title","section","duration","note","contact","address"].forEach(function(id){$(id).addEventListener("input",render);});
+$("city").addEventListener("change",szApplyCity);
+if($("szBranch")) $("szBranch").addEventListener("change",szApplyBranch);
 $("duration").addEventListener("keydown",function(e){
   if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();}
 });
@@ -1179,6 +1226,46 @@ $("title").addEventListener("keydown",function(e){
 function growTitle(){var t=$("title");t.style.height="auto";t.style.height=t.scrollHeight+"px";}
 $("title").addEventListener("input",growTitle);
 var CITY_CODE={Aleppo:"ALP",Homs:"HMS",Damascus:"DMS",Latakia:"LAT",Tartus:"TAR",Syria:"SYR"};
+/* عناوين فروع Study Zone لكل محافظة. عند تغيير المحافظة يُملأ حقل العنوان تلقائياً،
+   وإن كان للمحافظة أكثر من فرع تظهر قائمة "الفرع" للاختيار بينها. */
+var SZ_ADDR={
+  Aleppo:[{label:"شارع الفيلات",addr:"شارع الفيلات – أمام المدخل الرئيسي لملعب رعاية الشباب"}],
+  Homs:[
+    {label:"العدوية",addr:"Science Zone العدوية قرب حديقة العدوية"},
+    {label:"الأرمن الجنوبي",addr:"الأرمن الجنوبي جانب حلويات سارة"},
+    {label:"الإنشاءات",addr:"الإنشاءات - إشارة السفير - مقابل مدخل فودو"}
+  ],
+  Damascus:[{label:"باب شرقي",addr:"باب شرقي – مدخل كنيسة الزيتون – جانب مطعم أورينتال"}],
+  Latakia:[
+    {label:"الزراعة (1)",addr:"الزراعة (1) - جانب مكتبة العلوم"},
+    {label:"الزراعة (2)",addr:"الزراعة (2) - نهاية أوتوستراد الزراعة"},
+    {label:"شارع 8 آذار",addr:"شارع ٨ آذار - مدخل شركة الهرم"}
+  ],
+  Tartus:[{label:"خراب المسيحية",addr:"خراب المسيحية – مقابل كنيسة السيدة للروم الأرثوذكس"}]
+};
+function szBuildBranch(city){
+  var sel=$("szBranch"),fld=$("szBranchField"),list=SZ_ADDR[city]||[];
+  if(!sel||!fld) return list;
+  sel.innerHTML="";
+  list.forEach(function(o,i){ var op=document.createElement("option"); op.value=String(i); op.textContent=o.label; sel.appendChild(op); });
+  fld.style.display=(list.length>1)?"":"none";
+  return list;
+}
+function szApplyCity(){
+  var city=$("city").value,list=szBuildBranch(city);
+  if(list.length){ $("szBranch").value="0"; $("address").value=list[0].addr; }
+  render();
+}
+function szApplyBranch(){
+  var list=SZ_ADDR[$("city").value]||[],i=parseInt($("szBranch").value,10)||0;
+  if(list[i]) $("address").value=list[i].addr;
+  render();
+}
+function szSyncBranch(){
+  var list=szBuildBranch($("city").value),cur=($("address").value||"").trim();
+  for(var i=0;i<list.length;i++){ if(list[i].addr.trim()===cur){ $("szBranch").value=String(i); break; } }
+}
+szSyncBranch();  // إظهار قائمة الفرع للمحافظة الافتراضية عند الإقلاع
 function todayMMDDYYYY(){
   var d=new Date();
   var mm=("0"+(d.getMonth()+1)).slice(-2);
@@ -1282,22 +1369,136 @@ function collectProject2(){
     sz1:$("sz1").value, sz2:$("sz2").value, sz3:$("sz3").value,
     b1:$("b1").value, b2:$("b2").value, b3:$("b3a").value};
 }
+/* التصدير عبر SVG بنصوص أصلية (‎<text>‎) بدل html2canvas: محرّك SVG يُشكّل
+   العربية تشكيلاً صحيحاً على كل الأجهزة بما فيها iOS Safari، حيث كان
+   html2canvas يفصل الحروف ويقلبها عند تعديل النص. النموذج 2 فقط. */
+function m2Esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+// استخراج @font-face لوزني 500 و800 من أوراق الأنماط المضمّنة (HCFONTS خارج النطاق ولا يملكهما)
+function m2FontCSS(){
+  var out="", want={"500":1,"800":1};
+  for(var i=0;i<document.styleSheets.length;i++){
+    var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+    if(!rules) continue;
+    for(var j=0;j<rules.length;j++){
+      var r=rules[j];
+      if(r.type!==5) continue; // CSSRule.FONT_FACE_RULE
+      var fam=(r.style.getPropertyValue("font-family")||"").replace(/['"]/g,"").toLowerCase().trim();
+      var w=(r.style.getPropertyValue("font-weight")||"400").trim();
+      if(fam==="somar sans" && want[w]){ out+=r.cssText; want[w]=0; }
+    }
+  }
+  return out;
+}
+var _m2mctx=document.createElement("canvas").getContext("2d");
+function m2Metrics(fs,fw){
+  _m2mctx.font=fw+" "+fs+"px 'Somar Sans'";
+  var m=_m2mctx.measureText("مجابEg");
+  var asc=m.fontBoundingBoxAscent, desc=m.fontBoundingBoxDescent;
+  if(!asc){ asc=fs*0.82; desc=fs*0.22; }
+  return {asc:asc,desc:desc};
+}
+// امشِ على العُقد النصّية لاسترجاع كل سطر مرئي (كما لفّه المتصفّح) مع مقاطع الغامق
+function m2VisualLines(el,prTop,prLeft){
+  var lines=[], cur=null;
+  function push(ch,bold){
+    var last=cur.segs[cur.segs.length-1];
+    if(last && last.bold===bold){ last.t+=ch; } else { cur.segs.push({t:ch,bold:bold}); }
+  }
+  function walk(node,bold){
+    for(var i=0;i<node.childNodes.length;i++){
+      var c=node.childNodes[i];
+      if(c.nodeType===3){
+        var txt=c.nodeValue;
+        for(var j=0;j<txt.length;j++){
+          var rg=document.createRange(); rg.setStart(c,j); rg.setEnd(c,j+1);
+          var rc=rg.getBoundingClientRect();
+          if(rc.width===0 && rc.height===0){ if(cur) push(txt[j],bold); continue; }
+          var top=rc.top-prTop;
+          if(!cur || Math.abs(top-cur.top)>20){ cur={top:top,segs:[]}; lines.push(cur); }
+          push(txt[j],bold);
+        }
+      } else if(c.nodeType===1){
+        if(c.tagName==="BR"){ cur=null; continue; }
+        walk(c, bold || c.tagName==="B" || (+getComputedStyle(c).fontWeight)>=700);
+      }
+    }
+  }
+  walk(el,(+getComputedStyle(el).fontWeight)>=700);
+  lines.forEach(function(L){
+    if(L.segs.length){ L.segs[0].t=L.segs[0].t.replace(/^\s+/,""); L.segs[L.segs.length-1].t=L.segs[L.segs.length-1].t.replace(/\s+$/,""); }
+  });
+  return lines.filter(function(L){ return L.segs.some(function(s){return s.t.length;}); });
+}
+function m2BuildSVG(){
+  var poster=$("poster2");
+  var pr=poster.getBoundingClientRect();
+  var cssv=getComputedStyle(document.documentElement);
+  var navy=(cssv.getPropertyValue('--brand-navy').trim())||'#003c54';
+  function relBox(el){ var b=el.getBoundingClientRect(); return {x:b.left-pr.left,y:b.top-pr.top,w:b.width,h:b.height,cx:(b.left+b.right)/2-pr.left,bot:b.bottom-pr.top}; }
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1080 1920" width="1080" height="1920">';
+  svg+='<defs><style>'+m2FontCSS()+'</style></defs>';
+  svg+='<rect width="1080" height="1920" fill="'+navy+'"/>';
+  // الأشرطة الملوّنة (البرتقالي السفلي وأي شريط آخر)
+  poster.querySelectorAll('.bar2').forEach(function(bar){
+    var bb=relBox(bar), bg=getComputedStyle(bar).backgroundColor;
+    svg+='<rect x="'+bb.x.toFixed(2)+'" y="'+bb.y.toFixed(2)+'" width="'+bb.w.toFixed(2)+'" height="'+bb.h.toFixed(2)+'" fill="'+bg+'"/>';
+  });
+  // الترويسة: شعار STUDY ZONE المتجه (SVG مضمّن) — نُعشّشه بنفس موضعه وأبعاده
+  var wmEl=poster.querySelector('.wm2txt'), wmSvg=wmEl&&wmEl.querySelector('svg');
+  if(wmSvg){
+    var wm=relBox(wmEl);
+    var vb=wmSvg.getAttribute('viewBox')||'0 0 722.9 85.76';
+    var par=wmSvg.getAttribute('preserveAspectRatio')||'xMidYMid meet';
+    svg+='<svg x="'+wm.x.toFixed(2)+'" y="'+wm.y.toFixed(2)+'" width="'+wm.w.toFixed(2)+'" height="'+wm.h.toFixed(2)+'" viewBox="'+vb+'" preserveAspectRatio="'+par+'">'+wmSvg.innerHTML+'</svg>';
+  }
+  // اسم المدينة (لاتيني، ltr)
+  var cityEl=poster.querySelector('.city2');
+  if(cityEl){
+    var ccs=getComputedStyle(cityEl), cfs=parseFloat(ccs.fontSize), clh=parseFloat(ccs.lineHeight)||cfs;
+    var cb=relBox(cityEl), cmet=m2Metrics(cfs,'800'), cbase=cb.y+(clh-(cmet.asc+cmet.desc))/2+cmet.asc;
+    svg+='<text x="'+cb.cx.toFixed(2)+'" y="'+cbase.toFixed(2)+'" text-anchor="middle" direction="ltr" font-family="Somar Sans" font-weight="800" font-size="'+cfs+'" letter-spacing="'+(parseFloat(ccs.letterSpacing)||0)+'" fill="#fff">'+m2Esc(cityEl.textContent)+'</text>';
+  }
+  // الكتل العربية الثلاث: كل سطر مرئي = عنصر <text> اتّجاهه rtl مع tspan للغامق
+  ["p2b1","p2b2","p2b3"].forEach(function(id){
+    var el=$(id); if(!el || !el.textContent.trim()) return;
+    var cs=getComputedStyle(el), fs=parseFloat(cs.fontSize), lh=parseFloat(cs.lineHeight)||fs*1.32;
+    var bx=relBox(el), met=m2Metrics(fs,'500'), off=(lh-(met.asc+met.desc))/2+met.asc;
+    var lines=m2VisualLines(el,pr.top,pr.left);
+    lines.forEach(function(L){
+      var y=L.top+off, tsp="";
+      L.segs.forEach(function(s){ if(!s.t.length) return; tsp+='<tspan font-weight="'+(s.bold?'800':'500')+'">'+m2Esc(s.t)+'</tspan>'; });
+      svg+='<text x="'+bx.cx.toFixed(2)+'" y="'+y.toFixed(2)+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="500" font-size="'+fs+'" fill="#fff">'+tsp+'</text>';
+    });
+  });
+  // اللوغو
+  var logoImg=poster.querySelector('.logo2 img');
+  if(logoImg){ var lb=relBox(logoImg); var lh2='x="'+lb.x.toFixed(2)+'" y="'+lb.y.toFixed(2)+'" width="'+lb.w.toFixed(2)+'" height="'+lb.h.toFixed(2)+'"'; svg+='<image href="'+logoImg.src+'" xlink:href="'+logoImg.src+'" '+lh2+'/>'; }
+  svg+='</svg>';
+  return svg;
+}
+function m2PNG(){ return new Promise(function(res,rej){
+  var svg=m2BuildSVG();
+  var url=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml;charset=utf-8"}));
+  var img=new Image();
+  img.onload=function(){ var c=document.createElement("canvas"); c.width=1080;c.height=1920; c.getContext("2d").drawImage(img,0,0,1080,1920); URL.revokeObjectURL(url); res(c.toDataURL("image/png")); };
+  img.onerror=function(){ URL.revokeObjectURL(url); rej(new Error("svg render failed")); };
+  img.src=url;
+}); }
 function exportModel2(){
   var btn=$("exportBtn");btn.disabled=true;btn.textContent="جاري التصدير...";
   var prevT=$("stage").style.transform;
   $("stage").style.transform="scale(1)";
-  setTimeout(function(){
-    ensureFonts($("poster2").textContent).then(function(){
-    html2canvas($("poster2"),{scale:1,backgroundColor:(getComputedStyle(document.documentElement).getPropertyValue('--brand-navy').trim()||'#003c54'),useCORS:true,width:1080,height:1920,windowWidth:1080,windowHeight:1920}).then(function(canvas){
-      $("stage").style.transform=prevT;
-      var url=canvas.toDataURL("image/png");
-      var fn=fileName2();
-      var a=document.createElement("a");a.download=fn;a.href=url;a.click();
-      btn.disabled=false;btn.textContent="DOWNLOAD";
-      sendNotification2([{filename:fn, b64:url.split(",")[1]}]);
-    }).catch(function(err){alert("خطأ بالتصدير: "+err);$("stage").style.transform=prevT;btn.disabled=false;btn.textContent="DOWNLOAD";});
-    });
-  },80);
+  ensureFonts($("poster2").textContent).then(function(){
+    return new Promise(function(r){ setTimeout(r,60); }); // فرصة لإعادة التخطيط عند scale(1)
+  }).then(function(){
+    return m2PNG();
+  }).then(function(url){
+    $("stage").style.transform=prevT;
+    var fn=fileName2();
+    var a=document.createElement("a");a.download=fn;a.href=url;a.click();
+    btn.disabled=false;btn.textContent="DOWNLOAD";
+    sendNotification2([{filename:fn, b64:url.split(",")[1]}]);
+  }).catch(function(err){ alert("خطأ بالتصدير: "+(err&&err.message||err)); $("stage").style.transform=prevT; btn.disabled=false;btn.textContent="DOWNLOAD"; });
 }
 async function sendNotification2(captured){
   try{
@@ -1359,6 +1560,7 @@ function loadProject(d){
   heroIMG=d.image||null;
   if(heroIMG){$("imgUp").classList.add("has");$("imgUp").childNodes[0].nodeValue="\u2713 تم رفع الصورة";}
   else{$("imgUp").classList.remove("has");$("imgUp").childNodes[0].nodeValue="اضغط لرفع الصورة";}
+  szSyncBranch();
   render();
 }
 function loadProject2(d){
@@ -1963,13 +2165,15 @@ $("hcExportBtn").onclick=hcExport;
     });
   }
   if($("cuExportBtn")) $("cuExportBtn").onclick=cuExport;
-  function cuCollect(){ return {app:"childrenuniversity",v:1,model:1,body:$("cuBody").value,specs:$("cuSpecs").value,note:$("cuNote").value,footer:$("cuFooter").value,image:CU.hero}; }
+  function cuCollect(){ if(typeof CU2!=="undefined"&&CU2.model==="2") return cu2Collect(); return {app:"childrenuniversity",v:1,model:1,body:$("cuBody").value,specs:$("cuSpecs").value,note:$("cuNote").value,footer:$("cuFooter").value,image:CU.hero}; }
   if($("cuSaveBtn")) $("cuSaveBtn").onclick=function(){
     var blob=new Blob([JSON.stringify(cuCollect(),null,2)],{type:"application/json"});
     var a=document.createElement("a"); a.download="008CU_"+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
   };
   function cuLoad(d){
     if(!d||typeof d!=="object"){ alert("بنية غير صحيحة"); return; }
+    if(d.model===2){ cu2Load(d); return; }
+    if($("cuModelSel")){ $("cuModelSel").value="1"; } if(typeof cuSetModel==="function") cuSetModel("1");
     $("cuBody").value=d.body||""; $("cuSpecs").value=d.specs||""; $("cuNote").value=d.note||""; $("cuFooter").value=d.footer||"";
     CU.hero=d.image||null;
     if(CU.hero){ $("cuImgUp").classList.add("has"); $("cuImgUp").childNodes[0].nodeValue="✓ تم رفع الصورة"; }
@@ -1998,6 +2202,131 @@ $("hcExportBtn").onclick=hcExport;
     cuRender();
     if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(function(){ cuRender(); }); }
   };
+
+  /* ===== النموذج 2: دعوة تخرّج (Story 1080×1920 / Mail 1920×1080) =====
+     مبني كـ SVG بنصوص أصلية (<text>) مثل Hope Center: العربية تُشكَّل صحيحاً على
+     كل الأجهزة بما فيها iOS، والتصدير يُنقّط الـ SVG (لا html2canvas). */
+  var CU2={model:"1",fmt:"story",ready:false,logoB64:"",heroB64:"",heroUser:null,logoRatio:1.271};
+  var CU2COL={navy:"#023c54",orange:"#f99d1c"};
+  var CU2LAY={
+    story:{W:1080,H:1920,
+      blob:{cx:544.7,cy:2024.35,rx:588.2,ry:492.15},
+      hero:{x:155.1,y:1136.3,w:785.2,h:785.2},
+      logo:{cx:540,top:87,w:207},
+      yat:{cx:542.1,by:450.4,sz:45.7}, title:{cx:539.9,by:543.5,sz:74.9},
+      invite:{cx:534.9,by:646.3,sz:45.7}, batch:{cx:534.85,by:713.6,sz:45.7},
+      day:{cx:324.9,by:879.3,sz:130.7}, month:{cx:478.0,by:827.9,sz:59.0}, year:{cx:478.6,by:879.3,sz:55.9},
+      div:{x:575,y1:782,y2:879}, wday:{cx:715.8,by:819.4,sz:47.0}, time:{cx:715.2,by:880.2,sz:57.0},
+      venue:{cx:535.5,by:967.6,sz:45.7}, vsub:{cx:535.7,by:1034.9,sz:45.7}, cards:{cx:540.2,by:1121.6,sz:35.9}},
+    mail:{W:1920,H:1080,
+      blob:{cx:21.3,cy:540,rx:742.6,ry:588.2},
+      hero:{x:3.2,y:37.8,w:1009.3,h:1018.1},
+      logo:{cx:1365,top:95,w:184},
+      yat:{cx:1362.8,by:411.7,sz:38.8}, title:{cx:1364.9,by:498.1,sz:69.2},
+      invite:{cx:1360.2,by:574.7,sz:42.2}, batch:{cx:1360.2,by:637.1,sz:42.2},
+      day:{cx:1146.9,by:802.3,sz:130.7}, month:{cx:1299.9,by:750.9,sz:59.0}, year:{cx:1300.6,by:802.3,sz:55.9},
+      div:{x:1397,y1:705,y2:802}, wday:{cx:1537.7,by:742.4,sz:47.0}, time:{cx:1537.1,by:803.2,sz:57.0},
+      venue:{cx:1365.2,by:903.6,sz:42.2}, vsub:{cx:1365.2,by:964.3,sz:42.2}, cards:null}
+  };
+  function cu2Esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function cu2V(id,d){ var e=$(id); var v=e?e.value:d; return (v==null||v==="")?"":v; }
+  var _cu2Fonts=null;
+  function cu2FontCSS(){
+    if(_cu2Fonts!=null) return _cu2Fonts;
+    var out="",want={"400":1,"600":1,"700":1,"800":1};
+    for(var i=0;i<document.styleSheets.length;i++){
+      var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+      if(!rules) continue;
+      for(var j=0;j<rules.length;j++){
+        var r=rules[j]; if(r.type!==5) continue;
+        var fam=(r.style.getPropertyValue("font-family")||"").replace(/['"]/g,"").toLowerCase().trim();
+        var w=(r.style.getPropertyValue("font-weight")||"400").trim();
+        if(fam==="somar sans"&&want[w]){ out+=r.cssText; want[w]=0; }
+      }
+    }
+    _cu2Fonts=out; return out;
+  }
+  function cu2LoadAssets(cb){
+    if(CU2.ready){ cb&&cb(); return; }
+    var todo=2, fin=function(){ if(--todo===0){ CU2.ready=true; cb&&cb(); } };
+    function grab(url,set,onImg){ var im=new Image(); im.onload=function(){ try{ var c=document.createElement("canvas"); c.width=im.naturalWidth;c.height=im.naturalHeight; c.getContext("2d").drawImage(im,0,0); set(c.toDataURL("image/png")); }catch(e){ set(url); } if(onImg)onImg(im); fin(); }; im.onerror=function(){ set(url); fin(); }; im.src=url; }
+    grab("assets/children-university/logo.png",function(v){CU2.logoB64=v;},function(im){ if(im.naturalWidth) CU2.logoRatio=im.naturalHeight/im.naturalWidth; });
+    grab("assets/children-university/graduation-kids.png",function(v){CU2.heroB64=v;});
+  }
+  function cu2SVG(fmt,withFonts){
+    var L=CU2LAY[fmt]||CU2LAY.story, C=CU2COL;
+    var logoSrc=CU2.logoB64||"assets/children-university/logo.png";
+    var heroSrc=CU2.heroUser||CU2.heroB64||"assets/children-university/graduation-kids.png";
+    var lw=L.logo.w, lh=lw*(CU2.logoRatio||1.271), lx=L.logo.cx-lw/2;
+    function img(src,x,y,w,h){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'"/>'; }
+    function TR(o,weight,fill,inner){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+inner+'</text>'; }
+    function TL(o,weight,fill,txt){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="ltr" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+cu2Esc(txt)+'</text>'; }
+    var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+L.W+' '+L.H+'" width="'+L.W+'" height="'+L.H+'">';
+    if(withFonts) s+='<defs><style>'+cu2FontCSS()+'</style></defs>';
+    s+='<rect width="'+L.W+'" height="'+L.H+'" fill="#ffffff"/>';
+    s+='<ellipse cx="'+L.blob.cx+'" cy="'+L.blob.cy+'" rx="'+L.blob.rx+'" ry="'+L.blob.ry+'" fill="'+C.orange+'"/>';
+    s+=img(heroSrc,L.hero.x,L.hero.y,L.hero.w,L.hero.h);
+    s+=img(logoSrc,lx,L.logo.top,lw,lh);
+    s+=TR(L.yat,400,C.navy,cu2Esc("يتشرف مركز"));
+    s+=TR(L.title,700,C.orange,cu2Esc("أكاديمية الأطفال"));
+    s+=TR(L.invite,400,C.navy,cu2Esc(cu2V("cu2Invite","بدعوتكم لحضور حفل تخرج")));
+    s+=TR(L.batch,400,C.navy,'<tspan font-weight="700">'+cu2Esc(cu2V("cu2Batch","الدفعة العاشرة"))+'</tspan>'+cu2Esc(" من الأطفال وذلك في:"));
+    s+=TL(L.day,600,C.navy,cu2V("cu2Day","22"));
+    s+=TL(L.month,700,C.navy,cu2V("cu2Month","DEC"));
+    s+=TL(L.year,700,C.navy,cu2V("cu2Year","2025"));
+    s+='<line x1="'+L.div.x+'" y1="'+L.div.y1+'" x2="'+L.div.x+'" y2="'+L.div.y2+'" stroke="'+C.navy+'" stroke-width="4"/>';
+    s+=TL(L.wday,700,C.navy,cu2V("cu2Weekday","MONDAY"));
+    s+=TL(L.time,700,C.navy,cu2V("cu2Time","3:30 PM"));
+    s+=TR(L.venue,400,C.navy,cu2Esc("في صالة ")+'<tspan font-weight="700">'+cu2Esc(cu2V("cu2Venue","كنيسة الأرمن الأرثوذكس"))+'</tspan>');
+    s+=TR(L.vsub,400,C.navy,cu2Esc(cu2V("cu2VenueSub","كنيسة السيدة العذراء - الفيلات")));
+    if(L.cards){ s+=TR(L.cards,400,C.navy, cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cu2V("cu2Cards","3"))+'</tspan>'+cu2Esc(") أشخاص")); }
+    s+='</svg>';
+    return s;
+  }
+  function cu2Fit(){ var st=$("cuStage"); if(!st) return; var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return; var L=CU2LAY[CU2.fmt]||CU2LAY.story; var sc=Math.min((pv.clientWidth-60)/L.W,(pv.clientHeight-60)/L.H,1); st.style.transform="scale("+sc+")"; }
+  function cu2Render(){ var w=$("cuSvg"); if(!w) return; w.innerHTML=cu2SVG(CU2.fmt,false); cu2Fit(); }
+  function cuSetModel(m){
+    CU2.model=String(m);
+    var m1=$("cuM1Fields"),m2=$("cuM2Fields"),poster=$("cuPoster"),svg=$("cuSvg");
+    if(CU2.model==="2"){ if(m1)m1.style.display="none"; if(m2)m2.style.display=""; if(poster)poster.style.display="none"; if(svg)svg.style.display=""; cu2LoadAssets(cu2Render); cu2Render(); }
+    else { if(m1)m1.style.display=""; if(m2)m2.style.display="none"; if(poster)poster.style.display=""; if(svg)svg.style.display="none"; cuRender(); }
+  }
+  function cu2SetFmt(f){ CU2.fmt=f; var bs=$("cu2Story"),bm=$("cu2Mail"),cf=$("cu2CardsField"); if(bs)bs.classList.toggle("active",f==="story"); if(bm)bm.classList.toggle("active",f==="mail"); if(cf)cf.style.display=(f==="story")?"":"none"; cu2Render(); }
+  if($("cuModelSel")) $("cuModelSel").addEventListener("change",function(){ cuSetModel(this.value); });
+  if($("cu2Story")) $("cu2Story").onclick=function(){ cu2SetFmt("story"); };
+  if($("cu2Mail")) $("cu2Mail").onclick=function(){ cu2SetFmt("mail"); };
+  ["cu2Invite","cu2Batch","cu2Day","cu2Month","cu2Year","cu2Weekday","cu2Time","cu2Venue","cu2VenueSub","cu2Cards"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cu2Render); });
+  if($("cu2ImgFile")) $("cu2ImgFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return;
+    var r=new FileReader();
+    r.onload=function(){ CU2.heroUser=r.result; var up=$("cu2ImgUp"); if(up){ up.classList.add("has"); up.childNodes[0].nodeValue="✓ تم رفع الصورة"; } cu2Render(); };
+    r.readAsDataURL(f);
+  });
+  window.addEventListener("resize",function(){ if(CU2.model==="2") cu2Fit(); });
+  function cu2Export(){
+    var btn=$("cuExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
+    cu2LoadAssets(function(){
+      (document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(function(){
+        var fmt=CU2.fmt, L=CU2LAY[fmt]||CU2LAY.story, sc=2, W=L.W*sc, H=L.H*sc;
+        var url=URL.createObjectURL(new Blob([cu2SVG(fmt,true)],{type:"image/svg+xml;charset=utf-8"}));
+        var im=new Image();
+        im.onload=function(){ var c=document.createElement("canvas"); c.width=W;c.height=H; c.getContext("2d").drawImage(im,0,0,W,H); URL.revokeObjectURL(url);
+          var out=c.toDataURL("image/png"); var code=(typeof cuCityCode==="function")?cuCityCode():"";
+          var fn="008CU_"+(code?code+"_":"")+"Graduation Invitation_"+(fmt==="story"?"Story":"Mail")+"_"+todayMMDDYYYY()+".png";
+          var a=document.createElement("a"); a.download=fn; a.href=out; a.click();
+          btn.disabled=false; btn.textContent="DOWNLOAD";
+        };
+        im.onerror=function(){ URL.revokeObjectURL(url); alert("خطأ بالتصدير (SVG)"); btn.disabled=false; btn.textContent="DOWNLOAD"; };
+        im.src=url;
+      });
+    });
+  }
+  function cu2Collect(){ return {app:"childrenuniversity",v:1,model:2,fmt:CU2.fmt,city:$("cuCity")?$("cuCity").value:"",invite:cu2V("cu2Invite",""),batch:cu2V("cu2Batch",""),day:cu2V("cu2Day",""),month:cu2V("cu2Month",""),year:cu2V("cu2Year",""),weekday:cu2V("cu2Weekday",""),time:cu2V("cu2Time",""),venue:cu2V("cu2Venue",""),venueSub:cu2V("cu2VenueSub",""),cards:cu2V("cu2Cards",""),image:CU2.heroUser||null}; }
+  function cu2Load(d){ if($("cuModelSel")) $("cuModelSel").value="2"; cuSetModel("2"); function set(id,v){ var e=$(id); if(e&&v!=null) e.value=v; } if(d.city&&$("cuCity")) $("cuCity").value=d.city;
+    CU2.heroUser=d.image||null; var up=$("cu2ImgUp"); if(up) up.childNodes[0].nodeValue=CU2.heroUser?"✓ تم رفع الصورة":"✓ الصورة الافتراضية"; set("cu2Invite",d.invite);set("cu2Batch",d.batch);set("cu2Day",d.day);set("cu2Month",d.month);set("cu2Year",d.year);set("cu2Weekday",d.weekday);set("cu2Time",d.time);set("cu2Venue",d.venue);set("cu2VenueSub",d.venueSub);set("cu2Cards",d.cards); if(d.fmt) cu2SetFmt(d.fmt); else cu2Render(); }
+  window.cuExportRouter=function(){ if(CU2.model==="2") cu2Export(); else cuExport(); };
+  if($("cuExportBtn")) $("cuExportBtn").onclick=window.cuExportRouter;
+  cuSetModel($("cuModelSel")?$("cuModelSel").value:"1");
 })();
 </script>
 </body></html>
