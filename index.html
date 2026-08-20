@@ -452,7 +452,15 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
   <div class="pg-wrap">
     <div class="pg-title">اختر المشروع</div>
     <div class="proj-grid" id="projGrid"></div>
-    <button class="pg-logout" id="pgLogout" type="button">تسجيل خروج</button>
+  </div>
+  <div class="acct">
+    <button class="acct-av" id="pgAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="acctShadowPg" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="acctClipPg"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#acctShadowPg)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#acctClipPg)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
+    <img class="acct-photo" id="pgAvatarPhoto" alt="">
+    <div class="acct-menu" id="pgAcctMenu">
+      <button id="pgPhotoBtn">تغيير الصورة الشخصية</button>
+      <button id="pgMgmtToggle" style="display:none">إدارة المستخدمين</button>
+      <button id="pgLogout">تسجيل خروج</button>
+    </div>
   </div>
   <div class="app-copyright">HC Generator, a project by Christian Hope Center. © 2026 All Rights Reserved.</div>
 </div>
@@ -1743,13 +1751,14 @@ document.addEventListener("click",closeAcctMenus);
 document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeAcctMenus(); });
 wireAcct("szAvatar","szAcctMenu");
 wireAcct("hcAvatar","hcAcctMenu");
+wireAcct("pgAvatar","pgAcctMenu");
 
 /* ---------- الصورة الشخصية ----------
    Stored server-side on the users row and returned by /login and /me, so it
    follows the user across devices and browsers. */
 var ACCT_PHOTO_PX=256;
 function acctApplyPhoto(src){
-  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"],["cuAvatarPhoto","cuAvatar"]];
+  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"],["cuAvatarPhoto","cuAvatar"],["pgAvatarPhoto","pgAvatar"]];
   for(var i=0;i<ids.length;i++){
     var img=$(ids[i][0]), av=$(ids[i][1]);
     if(!img||!av) continue;
@@ -1789,6 +1798,7 @@ function acctReadPhoto(file){
   function pick(){ fileInput.value=""; fileInput.click(); }
   if($("szPhotoBtn")) $("szPhotoBtn").onclick=pick;
   if($("hcPhotoBtn")) $("hcPhotoBtn").onclick=pick;
+  if($("pgPhotoBtn")) $("pgPhotoBtn").onclick=pick;
   fileInput.onchange=async function(){
     var f=this.files&&this.files[0]; if(!f) return;
     if(!/^image\//.test(f.type)){ alert("الرجاء اختيار ملف صورة."); return; }
@@ -1859,13 +1869,15 @@ function umpToggleProjects(){ $("umpProjects").style.display=($("umpRole").value
 var umgmtReturn="app";
 function closeUserMgmt(){
   $("userMgmtPage").style.display="none";
+  if(umgmtReturn==="pg"){ if(typeof showProjectPicker==="function") showProjectPicker(); return; }
   if(umgmtReturn==="hc"){ $("hcApp").classList.add("on"); }
   else if(umgmtReturn==="cu"){ if($("cuApp")) $("cuApp").classList.add("on"); }
   else { $("appRoot").style.display="grid"; }
 }
 async function openUserMgmt(){
   var cuOn=$("cuApp")&&$("cuApp").classList.contains("on");
-  umgmtReturn=cuOn?"cu":($("hcApp").classList.contains("on")?"hc":"app");
+  var pgOn=$("projectGate")&&$("projectGate").style.display==="flex";
+  umgmtReturn=pgOn?"pg":(cuOn?"cu":($("hcApp").classList.contains("on")?"hc":"app"));
   $("hcApp").classList.remove("on");
   if($("cuApp")) $("cuApp").classList.remove("on");
   $("appRoot").style.display="none";
@@ -1956,6 +1968,8 @@ async function showProjectPicker(){
   $("loginGate").style.display="none";
   $("appRoot").style.display="none";
   $("projectGate").style.display="flex";
+  acctLoadPhoto();                                    // show the signed-in user's photo on the gate avatar
+  var pgMg=$("pgMgmtToggle"); if(pgMg){ pgMg.style.display=(Auth.can&&Auth.can("manage_users"))?"":"none"; }
   var grid=$("projGrid"); grid.innerHTML='<div class="proj-msg">…جارٍ تحميل المشاريع</div>';
   var res=await Auth.projects();
   if(!res.ok){ grid.innerHTML='<div class="proj-msg">تعذّر تحميل المشاريع: '+esc(res.error||"")+'</div>'; return; }
@@ -1979,6 +1993,7 @@ function selectProject(p){
   openProject(p);
 }
 $("pgLogout").onclick=async function(){ await Auth.logout(); $("projectGate").style.display="none"; $("loginGate").style.display="flex"; };
+if($("pgMgmtToggle")) $("pgMgmtToggle").onclick=openUserMgmt;
 
 async function doLogin(){
   var btn=$("loginBtn"); btn.disabled=true; btn.classList.add("loading"); btn.textContent="LOGGING IN…";
