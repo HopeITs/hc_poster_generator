@@ -947,8 +947,6 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
         <div class="field"><label>القاعة <span class="hint">عريض</span></label><input type="text" id="cu3Venue" value="كنيسة الأرمن الأرثوذكس"></div>
         <div class="field"><label>العنوان الفرعي</label><input type="text" id="cu3VenueSub" value="كنيسة السيدة العذراء - الفيلات"></div>
         <div class="field" id="cu3CardsField"><label>عدد أشخاص البطاقة</label><input type="text" id="cu3Cards" value="3"></div>
-        <div class="field"><label>صورة التخرّج <span class="hint">PNG شفاف أفضل</span></label>
-          <label class="upload has" id="cu3ImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="cu3ImgFile"></label></div>
       </div>
     </div>
     <div class="export-bar">
@@ -2387,12 +2385,12 @@ $("hcExportBtn").onclick=hcExport;
      المساس بالنموذج 2. تعيد استخدام الدوال الصرفة المشتركة
      (cu2Esc / cu2V / cu2PersonWord / cu2FontCSS / cuCityCode) وتملك حالتها
      (CU3) وتخطيطها (CU3LAY) ودوال الرسم/التصدير/الحفظ الخاصة بها. */
-  var CU3={fmt:"story",ready:false,logoB64:"",heroB64:"",heroUser:null,logoRatio:1.271};
-  /* Story فقط — أُزيل تخطيط Mail من النموذج 3. */
+  var CU3={fmt:"story",ready:false,logoB64:"",logoRatio:1.271};
+  /* Story فقط، بلا صورة: أُزيلت الصورة والدائرة البرتقالية خلفها، واستُبدلتا
+     بمستطيل سفلي (bar) بسماكة bar.h بيكسل في نهاية الستوري. */
   var CU3LAY={
     story:{W:1080,H:1920,
-      blob:{cx:544.7,cy:2024.35,rx:588.2,ry:492.15},
-      hero:{x:155.1,y:1136.3,w:785.2,h:785.2},
+      bar:{h:47.5969},
       logo:{cx:540,top:87,w:207},
       yat:{cx:542.1,by:450.4,sz:45.7}, title:{cx:539.9,by:543.5,sz:74.9},
       invite:{cx:534.9,by:646.3,sz:45.7}, batch:{cx:534.85,by:713.6,sz:45.7},
@@ -2402,15 +2400,13 @@ $("hcExportBtn").onclick=hcExport;
   };
   function cu3LoadAssets(cb){
     if(CU3.ready){ cb&&cb(); return; }
-    var todo=2, fin=function(){ if(--todo===0){ CU3.ready=true; cb&&cb(); } };
+    var todo=1, fin=function(){ if(--todo===0){ CU3.ready=true; cb&&cb(); } };
     function grab(url,set,onImg){ var im=new Image(); im.onload=function(){ try{ var c=document.createElement("canvas"); c.width=im.naturalWidth;c.height=im.naturalHeight; c.getContext("2d").drawImage(im,0,0); set(c.toDataURL("image/png")); }catch(e){ set(url); } if(onImg)onImg(im); fin(); }; im.onerror=function(){ set(url); fin(); }; im.src=url; }
     grab("assets/children-university/logo.png",function(v){CU3.logoB64=v;},function(im){ if(im.naturalWidth) CU3.logoRatio=im.naturalHeight/im.naturalWidth; });
-    grab("assets/children-university/graduation-kids.png",function(v){CU3.heroB64=v;});
   }
   function cu3SVG(fmt,withFonts){
     var L=CU3LAY[fmt]||CU3LAY.story, C=CU2COL;
     var logoSrc=CU3.logoB64||"assets/children-university/logo.png";
-    var heroSrc=CU3.heroUser||CU3.heroB64||"assets/children-university/graduation-kids.png";
     var lw=L.logo.w, lh=lw*(CU3.logoRatio||1.271), lx=L.logo.cx-lw/2;
     function img(src,x,y,w,h){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'"/>'; }
     function TR(o,weight,fill,inner){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+inner+'</text>'; }
@@ -2418,8 +2414,6 @@ $("hcExportBtn").onclick=hcExport;
     var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+L.W+' '+L.H+'" width="'+L.W+'" height="'+L.H+'">';
     if(withFonts) s+='<defs><style>'+cu2FontCSS()+'</style></defs>';
     s+='<rect width="'+L.W+'" height="'+L.H+'" fill="#ffffff"/>';
-    s+='<ellipse cx="'+L.blob.cx+'" cy="'+L.blob.cy+'" rx="'+L.blob.rx+'" ry="'+L.blob.ry+'" fill="'+C.orange+'"/>';
-    s+=img(heroSrc,L.hero.x,L.hero.y,L.hero.w,L.hero.h);
     s+=img(logoSrc,lx,L.logo.top,lw,lh);
     s+=TR(L.yat,400,C.navy,cu2Esc("يتشرف مركز"));
     s+=TR(L.title,700,C.orange,cu2Esc("أكاديمية الأطفال"));
@@ -2434,18 +2428,13 @@ $("hcExportBtn").onclick=hcExport;
     s+=TR(L.venue,400,C.navy,cu2Esc("في صالة ")+'<tspan font-weight="700">'+cu2Esc(cu2V("cu3Venue","كنيسة الأرمن الأرثوذكس"))+'</tspan>');
     s+=TR(L.vsub,400,C.navy,cu2Esc(cu2V("cu3VenueSub","كنيسة السيدة العذراء - الفيلات")));
     if(L.cards){ var cardsN=cu2V("cu3Cards","3"); s+=TR(L.cards,400,C.navy, cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cardsN)+'</tspan>'+cu2Esc(") "+cu2PersonWord(cardsN))); }
+    if(L.bar){ s+='<rect x="0" y="'+(L.H-L.bar.h)+'" width="'+L.W+'" height="'+L.bar.h+'" fill="'+C.orange+'"/>'; }
     s+='</svg>';
     return s;
   }
   function cu3Fit(){ var st=$("cuStage"); if(!st) return; var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return; var L=CU3LAY[CU3.fmt]||CU3LAY.story; var sc=Math.min((pv.clientWidth-60)/L.W,(pv.clientHeight-60)/L.H,1); st.style.transform="scale("+sc+")"; }
   function cu3Render(){ var w=$("cuSvg"); if(!w) return; CU3.fmt="story"; w.innerHTML=cu3SVG(CU3.fmt,false); cu3Fit(); }
   ["cu3Invite","cu3Batch","cu3Day","cu3Month","cu3Year","cu3Weekday","cu3Time","cu3Venue","cu3VenueSub","cu3Cards"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cu3Render); });
-  if($("cu3ImgFile")) $("cu3ImgFile").addEventListener("change",function(e){
-    var f=e.target.files[0]; if(!f) return;
-    var r=new FileReader();
-    r.onload=function(){ CU3.heroUser=r.result; var up=$("cu3ImgUp"); if(up){ up.classList.add("has"); up.childNodes[0].nodeValue="✓ تم رفع الصورة"; } cu3Render(); };
-    r.readAsDataURL(f);
-  });
   function cu3Export(){
     var btn=$("cuExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
     cu3LoadAssets(function(){
@@ -2464,9 +2453,9 @@ $("hcExportBtn").onclick=hcExport;
       });
     });
   }
-  function cu3Collect(){ return {app:"childrenuniversity",v:1,model:3,fmt:CU3.fmt,city:$("cuCity")?$("cuCity").value:"",invite:cu2V("cu3Invite",""),batch:cu2V("cu3Batch",""),day:cu2V("cu3Day",""),month:cu2V("cu3Month",""),year:cu2V("cu3Year",""),weekday:cu2V("cu3Weekday",""),time:cu2V("cu3Time",""),venue:cu2V("cu3Venue",""),venueSub:cu2V("cu3VenueSub",""),cards:cu2V("cu3Cards",""),image:CU3.heroUser||null}; }
+  function cu3Collect(){ return {app:"childrenuniversity",v:1,model:3,fmt:CU3.fmt,city:$("cuCity")?$("cuCity").value:"",invite:cu2V("cu3Invite",""),batch:cu2V("cu3Batch",""),day:cu2V("cu3Day",""),month:cu2V("cu3Month",""),year:cu2V("cu3Year",""),weekday:cu2V("cu3Weekday",""),time:cu2V("cu3Time",""),venue:cu2V("cu3Venue",""),venueSub:cu2V("cu3VenueSub",""),cards:cu2V("cu3Cards",""),image:null}; }
   function cu3Load(d){ if($("cuModelSel")) $("cuModelSel").value="3"; cuSetModel("3"); function set(id,v){ var e=$(id); if(e&&v!=null) e.value=v; } if(d.city&&$("cuCity")) $("cuCity").value=d.city;
-    CU3.heroUser=d.image||null; var up=$("cu3ImgUp"); if(up) up.childNodes[0].nodeValue=CU3.heroUser?"✓ تم رفع الصورة":"✓ الصورة الافتراضية"; set("cu3Invite",d.invite);set("cu3Batch",d.batch);set("cu3Day",d.day);set("cu3Month",d.month);set("cu3Year",d.year);set("cu3Weekday",d.weekday);set("cu3Time",d.time);set("cu3Venue",d.venue);set("cu3VenueSub",d.venueSub);set("cu3Cards",d.cards); CU3.fmt="story"; cu3Render(); }
+    set("cu3Invite",d.invite);set("cu3Batch",d.batch);set("cu3Day",d.day);set("cu3Month",d.month);set("cu3Year",d.year);set("cu3Weekday",d.weekday);set("cu3Time",d.time);set("cu3Venue",d.venue);set("cu3VenueSub",d.venueSub);set("cu3Cards",d.cards); CU3.fmt="story"; cu3Render(); }
   window.cuExportRouter=function(){ if(CU2.model==="2") cu2Export(); else if(CU2.model==="3") cu3Export(); else cuExport(); };
   if($("cuExportBtn")) $("cuExportBtn").onclick=window.cuExportRouter;
   cuSetModel($("cuModelSel")?$("cuModelSel").value:"1");
