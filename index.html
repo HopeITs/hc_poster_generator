@@ -185,6 +185,13 @@
 
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(--brand-navy);height:100vh;overflow:hidden;}
+/* سكرول أنعم لكامل الموقع (كل النماذج والمشاريع، الحالية والمستقبلية):
+   نصف السماكة الافتراضية (~16px → 8px) مع مقبض رمادي ناعم ومستدير. */
+*{scrollbar-width:thin;scrollbar-color:#c3ced6 transparent;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#c3ced6;border-radius:8px;}
+::-webkit-scrollbar-thumb:hover{background:#a9b7c0;}
 .app{display:grid;grid-template-columns:430px 1fr;height:100vh;}
 .panel{background:#fff;border-left:1px solid #e2e8ec;overflow-y:auto;}
 .panel-head{position:sticky;top:0;background:var(--brand-navy);color:#fff;padding:18px 22px;z-index:5;}
