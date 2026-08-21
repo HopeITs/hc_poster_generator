@@ -958,8 +958,21 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
           <textarea id="cu3ExhibitTimes" rows="2">سيستمر المعرض ليومي **1-2026/9/2**
 من الساعة **6:30 مساءً** حتى **9:30 مساءً**</textarea></div>
         <div class="sec-divider">البطاقة</div>
-        <label style="display:flex;align-items:center;gap:8px;font-family:'Somar Sans';font-size:13px;font-weight:700;color:#58595b;margin:0 0 9px;cursor:pointer;">
-          <input type="checkbox" id="cu3Public" style="width:16px;height:16px;cursor:pointer;">
+        <style>
+          .cu3-check{display:flex;align-items:center;gap:8px;font-family:'Somar Sans';font-size:13px;font-weight:700;color:#58595b;margin:0 0 9px;cursor:pointer;}
+          .cu3-check input{position:absolute;opacity:0;width:0;height:0;}
+          .cu3-check .cu3-box{width:20px;height:20px;flex:0 0 auto;line-height:0;}
+          .cu3-check .cu3-box svg{width:100%;height:100%;display:block;}
+          .cu3-check .cu3-box .cu3-on{display:none;}
+          .cu3-check input:checked ~ .cu3-box .cu3-off{display:none;}
+          .cu3-check input:checked ~ .cu3-box .cu3-on{display:block;}
+        </style>
+        <label class="cu3-check">
+          <input type="checkbox" id="cu3Public">
+          <span class="cu3-box">
+            <svg class="cu3-off" viewBox="0 0 55.18 55.18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#023c54" d="M38.89,2c7.88,0,14.29,6.41,14.29,14.29v22.6c0,7.88-6.41,14.29-14.29,14.29h-22.6c-7.88,0-14.29-6.41-14.29-14.29v-22.6c0-7.88,6.41-14.29,14.29-14.29h22.6M38.89,0h-22.6C7.29,0,0,7.29,0,16.29v22.6c0,9,7.29,16.29,16.29,16.29h22.6c9,0,16.29-7.29,16.29-16.29v-22.6C55.18,7.29,47.89,0,38.89,0h0Z"/></svg>
+            <svg class="cu3-on" viewBox="0 0 55.18 55.18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect fill="#023c54" width="55.18" height="55.18" rx="16.29" ry="16.29"/><polyline fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="5" points="16.38 27.96 22.42 36.62 38.8 18.56"/></svg>
+          </span>
           الدعوة عامة
         </label>
         <div class="field" id="cu3CardsField"><label>عدد أشخاص البطاقة</label><input type="text" id="cu3Cards" value="2"></div>
