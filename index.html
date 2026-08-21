@@ -2442,8 +2442,15 @@ $("hcExportBtn").onclick=hcExport;
     function rich(t){ var p=cu2Esc(t==null?"":t).split("**"),o=""; for(var i=0;i<p.length;i++){ o+=(i%2)?'<tspan font-weight="700">'+p[i]+'</tspan>':p[i]; } return o; }
     /* سطر واحد على خط أساس y */
     function T(cx,y,sz,weight,fill,inner){ return '<text x="'+cx+'" y="'+y+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+sz+'" fill="'+fill+'">'+inner+'</text>'; }
-    function ln(o,weight,fill,inner){ return {cx:o.cx,sz:o.sz,w:weight,f:fill,inner:inner}; }
     function splitLines(v){ return String(v==null?"":v).split(/\r?\n/); }
+    /* سطر مع علامة "فارغ": يُحسب الفراغ من النص الخام بعد إزالة ** والمسافات.
+       useRich=استخدام تحديد **عريض**؛ forceInner=محتوى جاهز (مثل سطر البطاقة). */
+    function mk(o,weight,fill,raw,useRich,forceInner){
+      var t=String(raw==null?"":raw);
+      return {cx:o.cx,sz:o.sz,w:weight,f:fill,
+        inner:(forceInner!=null?forceInner:(useRich?rich(t):cu2Esc(t))),
+        empty:(t.replace(/\*\*/g,"").replace(/\s/g,"")==="")};
+    }
     var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+L.W+' '+L.H+'" width="'+L.W+'" height="'+L.H+'">';
     if(withFonts) s+='<defs><style>'+cu2FontCSS()+'</style></defs>';
     s+='<rect width="'+L.W+'" height="'+L.H+'" fill="#ffffff"/>';
@@ -2453,25 +2460,29 @@ $("hcExportBtn").onclick=hcExport;
     var cardsInner=cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cardsN)+'</tspan>'+cu2Esc(") "+cu2PersonWord(cardsN));
     /* الكتل السّت. كل كتلة = مصفوفة أسطر؛ الفقرات تُقسَّم على الأسطر تلقائيًا. */
     var blocks=[
-      [ ln(L.verse,700,C.navy,cu2Esc(cu2V("cu3Verse","هَأَنَذَا صَانِعٌ أَمْرًا جَدِيدًا. الآنَ يَنْبُتُ. أَلَا تَعْرِفُونَهُ؟"))),
-        ln(L.verseRef,700,C.navy,cu2Esc(cu2V("cu3VerseRef","إشعياء 43:19"))) ],
-      [ ln(L.yat,400,C.navy,cu2Esc("يتشرف مركز")),
-        ln(L.title,700,C.orange,cu2Esc("أكاديمية الأطفال")) ],
-      [ ln(L.invite,400,C.navy,cu2Esc(cu2V("cu3Invite","بدعوتكم لحضور حفل تخرج"))),
-        ln(L.batch,400,C.navy,rich(cu2V("cu3Batch","**الدفعتين السادسة والسابعة** من الأطفال وذلك في:"))),
-        ln(L.date,400,C.navy,rich(cu2V("cu3Date","يوم الاثنين **2026/08/31** الساعة **06:00 مساءً**"))),
-        ln(L.venue,400,C.navy,rich(cu2V("cu3Venue","في **ملعب دير المخلص**"))) ],
-      splitLines(cu2V("cu3Exhibit","يلي الحفل **معرض لمشاريع الأطفال**\nفي **مركز أكاديمية الأطفال** حيث سيكون هناك\nأجواء تفاعلية بين أطفال الأكاديمية والزوار،\nلتجربة المشاريع المبتكرة.")).map(function(t){ return ln(L.exhibit,400,C.navy,rich(t)); }),
-      splitLines(cu2V("cu3ExhibitTimes","سيستمر المعرض ليومي **2026/9/2-1**\nمن الساعة **6:30 مساءً** حتى **9:30 مساءً**")).map(function(t){ return ln(L.exhibitTimes,400,C.navy,rich(t)); }),
-      [ ln(L.cards,400,C.navy,cardsInner) ]
+      [ mk(L.verse,700,C.navy,cu2V("cu3Verse",""),false),
+        mk(L.verseRef,700,C.navy,cu2V("cu3VerseRef",""),false) ],
+      [ mk(L.yat,400,C.navy,"يتشرف مركز",false),
+        mk(L.title,700,C.orange,"أكاديمية الأطفال",false) ],
+      [ mk(L.invite,400,C.navy,cu2V("cu3Invite",""),false),
+        mk(L.batch,400,C.navy,cu2V("cu3Batch",""),true),
+        mk(L.date,400,C.navy,cu2V("cu3Date",""),true),
+        mk(L.venue,400,C.navy,cu2V("cu3Venue",""),true) ],
+      splitLines(cu2V("cu3Exhibit","")).map(function(t){ return mk(L.exhibit,400,C.navy,t,true); }),
+      splitLines(cu2V("cu3ExhibitTimes","")).map(function(t){ return mk(L.exhibitTimes,400,C.navy,t,true); }),
+      [ mk(L.cards,400,C.navy,cardsN,false,cardsInner) ]
     ];
+    /* أي سطر بلا أحرف يُحذف؛ وأي كتلة تُصبح بلا أسطر تُعامَل كأنها غير موجودة،
+       فتُعاد قسمة الأبعاد المتساوية على الكتل الظاهرة فقط. */
+    blocks=blocks.map(function(blk){ return blk.filter(function(q){ return !q.empty; }); }).filter(function(blk){ return blk.length>0; });
     /* البُعد داخل الكتلة بين خطّي أساس = أكبر الحجمين × lead. */
     var LEAD=L.lead||1.5;
     function adv(a,b){ return Math.max(a,b)*LEAD; }
     var spans=0;
     for(var bi=0;bi<blocks.length;bi++){ var blk=blocks[bi]; for(var li=0;li<blk.length-1;li++){ spans+=adv(blk[li].sz,blk[li+1].sz); } }
     /* البُعد بين الكتل متساوٍ، يملأ ما بين flowTop و flowBottom. */
-    var gap=(L.flowBottom-L.flowTop-spans)/(blocks.length-1); if(gap<10) gap=10;
+    var denom=blocks.length-1;
+    var gap=denom>0?(L.flowBottom-L.flowTop-spans)/denom:0; if(gap<10) gap=10;
     var y=L.flowTop;
     for(var bi=0;bi<blocks.length;bi++){
       var blk=blocks[bi];
