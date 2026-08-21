@@ -185,12 +185,13 @@
 
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(--brand-navy);height:100vh;overflow:hidden;}
-/* شكل السكرول (Asset 1) لكامل الموقع: مسار بإطار رمادي فاتح مستدير، ومقبض
-   حبّة نحيلة بنفس اللون داخله (نُحّف عبر إطار شفّاف + background-clip). */
-*{scrollbar-width:thin;scrollbar-color:#e6e7e8 transparent;}
-::-webkit-scrollbar{width:9px;height:9px;}
-::-webkit-scrollbar-track{background:transparent;border:1px solid #e6e7e8;border-radius:5px;}
-::-webkit-scrollbar-thumb{background:#e6e7e8;border-radius:5px;border:3px solid transparent;background-clip:content-box;}
+/* شكل السكرول (Asset 1) لكامل الموقع، مُزاح 5px عن الحافة اليسارية: يُدفع
+   المسار والمقبض لليمين عبر إطار أيسر شفّاف بعرض 5px، فتبقى فجوة 5px بين
+   حافة الحاوية والسكرول. ملاحظة: لا نضبط scrollbar-width القياسية لأنها
+   تُلغي تنسيق ::-webkit-scrollbar في Chromium. Firefox يبقى بالافتراضي. */
+::-webkit-scrollbar{width:14px;height:14px;}
+::-webkit-scrollbar-track{background:transparent;border:1px solid #e6e7e8;border-left:5px solid transparent;border-radius:5px;}
+::-webkit-scrollbar-thumb{background:#e6e7e8;border-radius:5px;border:3px solid transparent;border-left-width:8px;background-clip:content-box;}
 ::-webkit-scrollbar-thumb:hover{background:#d3d5d8;background-clip:content-box;}
 .app{display:grid;grid-template-columns:430px 1fr;height:100vh;}
 .panel{background:#fff;border-left:1px solid #e2e8ec;overflow-y:auto;}
