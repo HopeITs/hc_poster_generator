@@ -2431,7 +2431,7 @@ $("hcExportBtn").onclick=hcExport;
     var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+L.W+' '+L.H+'" width="'+L.W+'" height="'+L.H+'">';
     if(withFonts) s+='<defs><style>'+cu2FontCSS()+'</style></defs>';
     s+='<rect width="'+L.W+'" height="'+L.H+'" fill="#ffffff"/>';
-    s+=img(bgSrc,0,0,L.W,L.H);
+    s+='<image href="'+bgSrc+'" xlink:href="'+bgSrc+'" x="0" y="0" width="'+L.W+'" height="'+L.H+'" opacity="0.5"/>';
     s+=img(logoSrc,lx,L.logo.top,lw,lh);
     s+=TR(L.yat,400,C.navy,cu2Esc("يتشرف مركز"));
     s+=TR(L.title,700,C.orange,cu2Esc("أكاديمية الأطفال"));
