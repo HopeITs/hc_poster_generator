@@ -958,6 +958,10 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
           <textarea id="cu3ExhibitTimes" rows="2">سيستمر المعرض ليومي **1-2026/9/2**
 من الساعة **6:30 مساءً** حتى **9:30 مساءً**</textarea></div>
         <div class="sec-divider">البطاقة</div>
+        <label style="display:flex;align-items:center;gap:8px;font-family:'Somar Sans';font-size:13px;font-weight:700;color:#58595b;margin:0 0 9px;cursor:pointer;">
+          <input type="checkbox" id="cu3Public" style="width:16px;height:16px;cursor:pointer;">
+          الدعوة عامة
+        </label>
         <div class="field" id="cu3CardsField"><label>عدد أشخاص البطاقة</label><input type="text" id="cu3Cards" value="2"></div>
       </div>
     </div>
@@ -2456,8 +2460,10 @@ $("hcExportBtn").onclick=hcExport;
     s+='<rect width="'+L.W+'" height="'+L.H+'" fill="#ffffff"/>';
     s+='<image href="'+bgSrc+'" xlink:href="'+bgSrc+'" x="0" y="0" width="'+L.W+'" height="'+L.H+'" opacity="0.5"/>';
     s+=img(logoSrc,lx,L.logo.top,lw,lh);
-    var cardsN=cu2V("cu3Cards","2");
-    var cardsInner=cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cardsN)+'</tspan>'+cu2Esc(") "+cu2PersonWord(cardsN));
+    var isPublic=$("cu3Public")&&$("cu3Public").checked;
+    var cardsN=cu2V("cu3Cards","2"), cardsRaw, cardsInner, cardsWeight;
+    if(isPublic){ cardsRaw="دعـــوة عامـــة"; cardsInner=cu2Esc(cardsRaw); cardsWeight=700; }
+    else { cardsRaw=cardsN; cardsInner=cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cardsN)+'</tspan>'+cu2Esc(") "+cu2PersonWord(cardsN)); cardsWeight=400; }
     /* الكتل السّت. كل كتلة = مصفوفة أسطر؛ الفقرات تُقسَّم على الأسطر تلقائيًا. */
     var blocks=[
       [ mk(L.verse,700,C.navy,cu2V("cu3Verse",""),false),
@@ -2470,7 +2476,7 @@ $("hcExportBtn").onclick=hcExport;
         mk(L.venue,400,C.navy,cu2V("cu3Venue",""),true) ],
       splitLines(cu2V("cu3Exhibit","")).map(function(t){ return mk(L.exhibit,400,C.navy,t,true); }),
       splitLines(cu2V("cu3ExhibitTimes","")).map(function(t){ return mk(L.exhibitTimes,400,C.navy,t,true); }),
-      [ mk(L.cards,400,C.navy,cardsN,false,cardsInner) ]
+      [ mk(L.cards,cardsWeight,C.navy,cardsRaw,false,cardsInner) ]
     ];
     /* أي سطر بلا أحرف يُحذف؛ وأي كتلة تُصبح بلا أسطر تُعامَل كأنها غير موجودة،
        فتُعاد قسمة الأبعاد المتساوية على الكتل الظاهرة فقط. */
@@ -2500,6 +2506,7 @@ $("hcExportBtn").onclick=hcExport;
   function cu3Fit(){ var st=$("cuStage"); if(!st) return; var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return; var L=CU3LAY[CU3.fmt]||CU3LAY.story; var sc=Math.min((pv.clientWidth-60)/L.W,(pv.clientHeight-60)/L.H,1); st.style.transform="scale("+sc+")"; }
   function cu3Render(){ var w=$("cuSvg"); if(!w) return; CU3.fmt="story"; w.innerHTML=cu3SVG(CU3.fmt,false); cu3Fit(); }
   ["cu3Verse","cu3VerseRef","cu3Invite","cu3Batch","cu3Date","cu3Venue","cu3Exhibit","cu3ExhibitTimes","cu3Cards"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cu3Render); });
+  if($("cu3Public")) $("cu3Public").addEventListener("change",function(){ var cf=$("cu3CardsField"); if(cf) cf.style.display=this.checked?"none":""; cu3Render(); });
   function cu3Export(){
     var btn=$("cuExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
     cu3LoadAssets(function(){
@@ -2518,9 +2525,9 @@ $("hcExportBtn").onclick=hcExport;
       });
     });
   }
-  function cu3Collect(){ return {app:"childrenuniversity",v:1,model:3,fmt:CU3.fmt,city:$("cuCity")?$("cuCity").value:"",verse:cu2V("cu3Verse",""),verseRef:cu2V("cu3VerseRef",""),invite:cu2V("cu3Invite",""),batch:cu2V("cu3Batch",""),date:cu2V("cu3Date",""),venue:cu2V("cu3Venue",""),exhibit:cu2V("cu3Exhibit",""),exhibitTimes:cu2V("cu3ExhibitTimes",""),cards:cu2V("cu3Cards",""),image:null}; }
+  function cu3Collect(){ return {app:"childrenuniversity",v:1,model:3,fmt:CU3.fmt,city:$("cuCity")?$("cuCity").value:"",verse:cu2V("cu3Verse",""),verseRef:cu2V("cu3VerseRef",""),invite:cu2V("cu3Invite",""),batch:cu2V("cu3Batch",""),date:cu2V("cu3Date",""),venue:cu2V("cu3Venue",""),exhibit:cu2V("cu3Exhibit",""),exhibitTimes:cu2V("cu3ExhibitTimes",""),cards:cu2V("cu3Cards",""),public:!!($("cu3Public")&&$("cu3Public").checked),image:null}; }
   function cu3Load(d){ if($("cuModelSel")) $("cuModelSel").value="3"; cuSetModel("3"); function set(id,v){ var e=$(id); if(e&&v!=null) e.value=v; } if(d.city&&$("cuCity")) $("cuCity").value=d.city;
-    set("cu3Verse",d.verse);set("cu3VerseRef",d.verseRef);set("cu3Invite",d.invite);set("cu3Batch",d.batch);set("cu3Date",d.date);set("cu3Venue",d.venue);set("cu3Exhibit",d.exhibit);set("cu3ExhibitTimes",d.exhibitTimes);set("cu3Cards",d.cards); CU3.fmt="story"; cu3Render(); }
+    set("cu3Verse",d.verse);set("cu3VerseRef",d.verseRef);set("cu3Invite",d.invite);set("cu3Batch",d.batch);set("cu3Date",d.date);set("cu3Venue",d.venue);set("cu3Exhibit",d.exhibit);set("cu3ExhibitTimes",d.exhibitTimes);set("cu3Cards",d.cards); if($("cu3Public")){ $("cu3Public").checked=!!d.public; var cf=$("cu3CardsField"); if(cf) cf.style.display=d.public?"none":""; } CU3.fmt="story"; cu3Render(); }
   window.cuExportRouter=function(){ if(CU2.model==="2") cu2Export(); else if(CU2.model==="3") cu3Export(); else cuExport(); };
   if($("cuExportBtn")) $("cuExportBtn").onclick=window.cuExportRouter;
   cuSetModel($("cuModelSel")?$("cuModelSel").value:"1");
