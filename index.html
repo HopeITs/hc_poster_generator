@@ -2400,7 +2400,7 @@ $("hcExportBtn").onclick=hcExport;
      المساس بالنموذج 2. تعيد استخدام الدوال الصرفة المشتركة
      (cu2Esc / cu2V / cu2PersonWord / cu2FontCSS / cuCityCode) وتملك حالتها
      (CU3) وتخطيطها (CU3LAY) ودوال الرسم/التصدير/الحفظ الخاصة بها. */
-  var CU3={fmt:"story",ready:false,logoB64:"",logoRatio:1.271};
+  var CU3={fmt:"story",ready:false,logoB64:"",bgB64:"",logoRatio:1.271};
   /* Story فقط، بلا صورة: أُزيلت الصورة والدائرة البرتقالية خلفها، واستُبدلتا
      بمستطيل سفلي (bar) بسماكة bar.h بيكسل في نهاية الستوري. */
   var CU3LAY={
@@ -2415,13 +2415,15 @@ $("hcExportBtn").onclick=hcExport;
   };
   function cu3LoadAssets(cb){
     if(CU3.ready){ cb&&cb(); return; }
-    var todo=1, fin=function(){ if(--todo===0){ CU3.ready=true; cb&&cb(); } };
-    function grab(url,set,onImg){ var im=new Image(); im.onload=function(){ try{ var c=document.createElement("canvas"); c.width=im.naturalWidth;c.height=im.naturalHeight; c.getContext("2d").drawImage(im,0,0); set(c.toDataURL("image/png")); }catch(e){ set(url); } if(onImg)onImg(im); fin(); }; im.onerror=function(){ set(url); fin(); }; im.src=url; }
+    var todo=2, fin=function(){ if(--todo===0){ CU3.ready=true; cb&&cb(); } };
+    function grab(url,set,onImg,mime){ var im=new Image(); im.onload=function(){ try{ var c=document.createElement("canvas"); c.width=im.naturalWidth;c.height=im.naturalHeight; c.getContext("2d").drawImage(im,0,0); set(c.toDataURL(mime||"image/png")); }catch(e){ set(url); } if(onImg)onImg(im); fin(); }; im.onerror=function(){ set(url); fin(); }; im.src=url; }
     grab("assets/children-university/logo.png",function(v){CU3.logoB64=v;},function(im){ if(im.naturalWidth) CU3.logoRatio=im.naturalHeight/im.naturalWidth; });
+    grab("assets/children-university/model3-bg.jpg",function(v){CU3.bgB64=v;},null,"image/jpeg");
   }
   function cu3SVG(fmt,withFonts){
     var L=CU3LAY[fmt]||CU3LAY.story, C=CU2COL;
     var logoSrc=CU3.logoB64||"assets/children-university/logo.png";
+    var bgSrc=CU3.bgB64||"assets/children-university/model3-bg.jpg";
     var lw=L.logo.w, lh=lw*(CU3.logoRatio||1.271), lx=L.logo.cx-lw/2;
     function img(src,x,y,w,h){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'"/>'; }
     function TR(o,weight,fill,inner){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+inner+'</text>'; }
@@ -2429,6 +2431,7 @@ $("hcExportBtn").onclick=hcExport;
     var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+L.W+' '+L.H+'" width="'+L.W+'" height="'+L.H+'">';
     if(withFonts) s+='<defs><style>'+cu2FontCSS()+'</style></defs>';
     s+='<rect width="'+L.W+'" height="'+L.H+'" fill="#ffffff"/>';
+    s+=img(bgSrc,0,0,L.W,L.H);
     s+=img(logoSrc,lx,L.logo.top,lw,lh);
     s+=TR(L.yat,400,C.navy,cu2Esc("يتشرف مركز"));
     s+=TR(L.title,700,C.orange,cu2Esc("أكاديمية الأطفال"));
