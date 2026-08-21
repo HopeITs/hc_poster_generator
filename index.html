@@ -2462,7 +2462,7 @@ $("hcExportBtn").onclick=hcExport;
     s+=img(logoSrc,lx,L.logo.top,lw,lh);
     var isPublic=$("cu3Public")&&$("cu3Public").checked;
     var cardsN=cu2V("cu3Cards","2"), cardsRaw, cardsInner, cardsWeight;
-    if(isPublic){ cardsRaw="دعـــوة عامـــة"; cardsInner=cu2Esc(cardsRaw); cardsWeight=700; }
+    if(isPublic){ cardsRaw="الدعـــوة عامـــة"; cardsInner=cu2Esc(cardsRaw); cardsWeight=400; }
     else { cardsRaw=cardsN; cardsInner=cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cardsN)+'</tspan>'+cu2Esc(") "+cu2PersonWord(cardsN)); cardsWeight=400; }
     /* الكتل السّت. كل كتلة = مصفوفة أسطر؛ الفقرات تُقسَّم على الأسطر تلقائيًا. */
     var blocks=[
