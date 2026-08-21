@@ -185,17 +185,23 @@
 
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(--brand-navy);height:100vh;overflow:hidden;}
-/* السكرول لكامل الموقع: مقبض حبّة رمادي فاتح مستدير مُزاح 5px عن الحافة
-   اليسرى، بلا مسار (شفّاف). الإزاحة عبر إطار أيسر شفّاف مع background-clip،
-   وهو الأسلوب الموثوق الذي يعطي رؤوسًا نصف دائرة نظيفة؛ إطار/ظِل مسار مُزاح
-   يكسر رأس المسار في السكرول الأصلي، لذا أُسقط المسار. أخفينا أزرار السكرول.
-   لا نضبط scrollbar-width القياسية (تُلغي ::-webkit-scrollbar في Chromium)؛
-   Firefox يبقى بالافتراضي. */
+/* السكرول الأصلي: fallback خفيف لأي حاوية لم يُفعَّل عليها السكرول المخصّص. */
 ::-webkit-scrollbar{width:10px;height:10px;}
 ::-webkit-scrollbar-button{display:none;width:0;height:0;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:#e6e7e8;border-radius:9px;border:2px solid transparent;border-left-width:5px;background-clip:content-box;}
 ::-webkit-scrollbar-thumb:hover{background:#d3d5d8;background-clip:content-box;}
+/* ===== السكرول المخصّص (NewScroll.svg) — عناصر DOM حقيقية بتحكّم كامل =====
+   يُطبَّق على كل لوحات التمرير عبر JS. نُخفي السكرول الأصلي على الحاوية
+   المُفعّلة (.has-csb) ونرسم فوقها مسارًا محاطًا وحبّة متمركزة، مُزاحين 5px
+   عن الحافة، برؤوس نصف دائرة نظيفة (border-radius على عناصر حقيقية). */
+.has-csb{scrollbar-width:none;}
+.has-csb::-webkit-scrollbar{width:0;height:0;display:none;}
+.csb{position:fixed;width:8px;pointer-events:none;z-index:2000;opacity:0;transition:opacity .18s;}
+.csb.on{opacity:1;}
+.csb-track{position:absolute;inset:0;border:1px solid #e6e7e8;border-radius:4px;box-sizing:border-box;pointer-events:auto;}
+.csb-thumb{position:absolute;left:50%;transform:translateX(-50%);width:3px;background:#e6e7e8;border-radius:3px;pointer-events:auto;}
+.csb-thumb:hover,.csb-thumb.csb-drag{background:#d3d5d8;}
 .app{display:grid;grid-template-columns:430px 1fr;height:100vh;}
 .panel{background:#fff;border-left:1px solid #e2e8ec;overflow-y:auto;}
 .panel-head{position:sticky;top:0;background:var(--brand-navy);color:#fff;padding:18px 22px;z-index:5;}
@@ -2555,6 +2561,74 @@ $("hcExportBtn").onclick=hcExport;
   window.cuExportRouter=function(){ if(CU2.model==="2") cu2Export(); else if(CU2.model==="3") cu3Export(); else cuExport(); };
   if($("cuExportBtn")) $("cuExportBtn").onclick=window.cuExportRouter;
   cuSetModel($("cuModelSel")?$("cuModelSel").value:"1");
+})();
+</script>
+<script>
+/* ===== سكرول مخصّص (NewScroll.svg) لكل لوحات التمرير =====
+   يبني لكل حاوية قابلة للتمرير طبقةً ثابتة (position:fixed) تحتوي مسارًا محاطًا
+   وحبّة متمركزة، مُزاحين 5px عن الحافة (يسار في RTL / يمين في LTR). يتتبّع موضع
+   التمرير، ويُسحب، وينقر على المسار للقفز، ويختفي حين لا تمرير، ويُحدَّث تلقائيًا
+   عند تغيّر الحجم/المحتوى/عرض الحاوية. يشمل الحاويات الحالية والمستقبلية عبر مسح
+   دوري خفيف، مع window.attachCustomScrollbar(el) لتفعيله يدويًا. */
+(function(){
+  var OFFSET=5, TRACKW=8, MIN=24;
+  var attached=new WeakSet(), instances=[];
+  function CSB(el){
+    var wrap=document.createElement("div"); wrap.className="csb";
+    var track=document.createElement("div"); track.className="csb-track";
+    var thumb=document.createElement("div"); thumb.className="csb-thumb";
+    wrap.appendChild(track); wrap.appendChild(thumb); document.body.appendChild(wrap);
+    el.classList.add("has-csb");
+    function update(){
+      if(!document.body.contains(el)){ wrap.classList.remove("on"); return; }
+      var r=el.getBoundingClientRect(), ch=el.clientHeight, sh=el.scrollHeight;
+      if(r.width===0||r.height===0||sh<=ch+1){ wrap.classList.remove("on"); return; }
+      var rtl=getComputedStyle(el).direction==="rtl";
+      var left=rtl?(r.left+OFFSET):(r.right-OFFSET-TRACKW);
+      wrap.style.left=left+"px"; wrap.style.top=(r.top+el.clientTop)+"px"; wrap.style.height=ch+"px";
+      var thumbH=Math.max(MIN, ch*ch/sh), maxS=sh-ch;
+      var ratio=maxS>0?el.scrollTop/maxS:0;
+      thumb.style.height=thumbH+"px"; thumb.style.top=(ratio*(ch-thumbH))+"px";
+      wrap.classList.add("on");
+    }
+    el.addEventListener("scroll",update,{passive:true});
+    if(window.ResizeObserver){ try{ new ResizeObserver(update).observe(el); }catch(e){} }
+    try{ new MutationObserver(update).observe(el,{childList:true,subtree:true,characterData:true}); }catch(e){}
+    thumb.addEventListener("mousedown",function(e){
+      e.preventDefault(); e.stopPropagation();
+      var sy=e.clientY, ss=el.scrollTop, ch=el.clientHeight, sh=el.scrollHeight, th=thumb.offsetHeight, maxS=sh-ch;
+      thumb.classList.add("csb-drag");
+      function mv(ev){ var range=ch-th; el.scrollTop=ss+(range>0?((ev.clientY-sy)/range)*maxS:0); }
+      function up(){ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); thumb.classList.remove("csb-drag"); }
+      document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
+    });
+    track.addEventListener("mousedown",function(e){
+      if(e.target===thumb) return;
+      var wr=wrap.getBoundingClientRect(), th=thumb.offsetHeight;
+      var t=((e.clientY-wr.top)-th/2)/(el.clientHeight-th); t=Math.max(0,Math.min(1,t));
+      el.scrollTop=t*(el.scrollHeight-el.clientHeight);
+    });
+    instances.push(update); update();
+  }
+  function scan(){
+    var els=document.querySelectorAll(".panel,.cu-app .panel-body,.hc-pbody,.umgmt-page");
+    for(var i=0;i<els.length;i++){ var el=els[i]; if(attached.has(el)) continue;
+      var ov=getComputedStyle(el).overflowY;
+      if(ov==="auto"||ov==="scroll"){ attached.add(el); CSB(el); } }
+  }
+  var raf=null;
+  function schedule(){ if(raf) return; raf=requestAnimationFrame(function(){ raf=null; scan(); for(var i=0;i<instances.length;i++) instances[i](); }); }
+  window.addEventListener("resize",schedule,{passive:true});
+  window.addEventListener("scroll",schedule,{passive:true,capture:true});
+  function boot(){ scan(); for(var i=0;i<instances.length;i++) instances[i]();
+    /* childList فقط لاكتشاف حاويات تمرير جديدة؛ إظهار/إخفاء الحاويات يلتقطه
+       ResizeObserver لكل عنصر. مراقبة السمات هنا تُحدث حلقة لا نهائية لأن
+       تحديث طبقات .csb يغيّر أنماطها فتُعيد إطلاق المراقب. */
+    if(document.body){ try{ new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true}); }catch(e){} } }
+  if(document.readyState!=="loading") boot(); else document.addEventListener("DOMContentLoaded",boot);
+  window.addEventListener("load",schedule);
+  window.attachCustomScrollbar=function(el){ if(el&&!attached.has(el)){ attached.add(el); CSB(el); } };
+  window.refreshCustomScrollbars=schedule;
 })();
 </script>
 </body></html>
