@@ -190,9 +190,10 @@ body{font-family:'Somar Sans',system-ui,sans-serif;background:#eef1f3;color:var(
    متمركز داخله (نُحّف عبر إطار شفّاف + background-clip). لا نضبط
    scrollbar-width القياسية لأنها تُلغي ::-webkit-scrollbar في Chromium؛
    Firefox يبقى بالافتراضي. */
-::-webkit-scrollbar{width:12.62px;height:12.62px;}
-::-webkit-scrollbar-track{background:transparent;border-left:5px solid transparent;box-shadow:inset 0 0 0 0.62px #e6e7e8;border-radius:9px;}
-::-webkit-scrollbar-thumb{background:#e6e7e8;border-radius:1.5px;border:2.5px solid transparent;border-left-width:7.5px;border-top-width:2px;border-bottom-width:2px;background-clip:content-box;}
+::-webkit-scrollbar{width:12px;height:12px;}
+::-webkit-scrollbar-button{display:none;width:0;height:0;}
+::-webkit-scrollbar-track{background:transparent;border-left:5px solid transparent;box-shadow:inset 0 0 0 1px #e6e7e8;border-radius:9px;}
+::-webkit-scrollbar-thumb{background:#e6e7e8;border-radius:9px;border:2px solid transparent;border-left-width:7px;background-clip:content-box;}
 ::-webkit-scrollbar-thumb:hover{background:#d3d5d8;background-clip:content-box;}
 .app{display:grid;grid-template-columns:430px 1fr;height:100vh;}
 .panel{background:#fff;border-left:1px solid #e2e8ec;overflow-y:auto;}
