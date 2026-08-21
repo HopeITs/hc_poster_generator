@@ -940,21 +940,25 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
           <label class="upload has" id="cu2ImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="cu2ImgFile"></label></div>
       </div>
       <div id="cuM3Fields" style="display:none">
+        <div class="sec-divider">الآية</div>
+        <div class="field"><label>الآية</label><input type="text" id="cu3Verse" value="هَأَنَذَا صَانِعٌ أَمْرًا جَدِيدًا. الآنَ يَنْبُتُ. أَلَا تَعْرِفُونَهُ؟"></div>
+        <div class="field"><label>المرجع</label><input type="text" id="cu3VerseRef" value="إشعياء 43:19"></div>
         <div class="sec-divider">محتوى الدعوة</div>
         <div class="field"><label>سطر الدعوة</label><input type="text" id="cu3Invite" value="بدعوتكم لحضور حفل تخرج"></div>
-        <div class="field"><label>الدفعة <span class="hint">عريض</span></label><input type="text" id="cu3Batch" value="الدفعة العاشرة"></div>
-        <div class="cu2-row">
-          <div class="field"><label>اليوم</label><input type="text" id="cu3Day" value="22"></div>
-          <div class="field"><label>الشهر</label><input type="text" id="cu3Month" value="DEC"></div>
-          <div class="field"><label>السنة</label><input type="text" id="cu3Year" value="2025"></div>
-        </div>
-        <div class="cu2-row">
-          <div class="field"><label>اليوم (نص)</label><input type="text" id="cu3Weekday" value="MONDAY"></div>
-          <div class="field"><label>الوقت</label><input type="text" id="cu3Time" value="3:30 PM"></div>
-        </div>
-        <div class="field"><label>القاعة <span class="hint">عريض</span></label><input type="text" id="cu3Venue" value="كنيسة الأرمن الأرثوذكس"></div>
-        <div class="field"><label>العنوان الفرعي</label><input type="text" id="cu3VenueSub" value="كنيسة السيدة العذراء - الفيلات"></div>
-        <div class="field" id="cu3CardsField"><label>عدد أشخاص البطاقة</label><input type="text" id="cu3Cards" value="3"></div>
+        <div class="field"><label>الدفعة <span class="hint">**نص** = عريض</span></label><input type="text" id="cu3Batch" value="**الدفعتين السادسة والسابعة** من الأطفال وذلك في:"></div>
+        <div class="field"><label>التاريخ والوقت <span class="hint">**نص** = عريض</span></label><input type="text" id="cu3Date" value="يوم الاثنين **2026/08/31** الساعة **06:00 مساءً**"></div>
+        <div class="field"><label>المكان <span class="hint">**نص** = عريض</span></label><input type="text" id="cu3Venue" value="في **ملعب دير المخلص**"></div>
+        <div class="sec-divider">المعرض</div>
+        <div class="field"><label>فقرة المعرض <span class="hint">سطر لكل صف — **نص** = عريض</span></label>
+          <textarea id="cu3Exhibit" rows="4">يلي الحفل **معرض لمشاريع الأطفال**
+في **مركز أكاديمية الأطفال** حيث سيكون هناك
+أجواء تفاعلية بين أطفال الأكاديمية والزوار،
+لتجربة المشاريع المبتكرة.</textarea></div>
+        <div class="field"><label>مواعيد المعرض <span class="hint">سطر لكل صف — **نص** = عريض</span></label>
+          <textarea id="cu3ExhibitTimes" rows="2">سيستمر المعرض ليومي **2026/9/2-1**
+من الساعة **6:30 مساءً** حتى **9:30 مساءً**</textarea></div>
+        <div class="sec-divider">البطاقة</div>
+        <div class="field" id="cu3CardsField"><label>عدد أشخاص البطاقة</label><input type="text" id="cu3Cards" value="2"></div>
       </div>
     </div>
     <div class="export-bar">
@@ -2403,15 +2407,19 @@ $("hcExportBtn").onclick=hcExport;
   var CU3={fmt:"story",ready:false,logoB64:"",bgB64:"",logoRatio:1.271};
   /* Story فقط، بلا صورة: أُزيلت الصورة والدائرة البرتقالية خلفها، واستُبدلتا
      بمستطيل سفلي (bar) بسماكة bar.h بيكسل في نهاية الستوري. */
+  /* المواضع مأخوذة مباشرةً من التصميم النهائي GRAD_INV_FINAL.pdf (1080×1920):
+     by = خط الأساس (baseline)، sz = حجم الخط، lh = ارتفاع السطر للفقرات. */
   var CU3LAY={
     story:{W:1080,H:1920,
       bar:{h:47.5969},
       logo:{cx:540,top:87,w:207},
-      yat:{cx:542.1,by:450.4,sz:45.7}, title:{cx:539.9,by:543.5,sz:74.9},
-      invite:{cx:534.9,by:646.3,sz:45.7}, batch:{cx:534.85,by:713.6,sz:45.7},
-      day:{cx:324.9,by:879.3,sz:130.7}, month:{cx:478.0,by:827.9,sz:59.0}, year:{cx:478.6,by:879.3,sz:55.9},
-      div:{x:575,y1:782,y2:879}, wday:{cx:715.8,by:819.4,sz:47.0}, time:{cx:715.2,by:880.2,sz:57.0},
-      venue:{cx:535.5,by:967.6,sz:45.7}, vsub:{cx:535.7,by:1034.9,sz:45.7}, cards:{cx:540.2,by:1121.6,sz:35.9}}
+      verse:{cx:544.4,by:472.4,sz:37.53}, verseRef:{cx:544.4,by:527.7,sz:31.27},
+      yat:{cx:542.1,by:673.8,sz:51.43}, title:{cx:539.7,by:778.6,sz:84.37},
+      invite:{cx:534.4,by:933.9,sz:41.7}, batch:{cx:534.5,by:996.5,sz:41.7},
+      date:{cx:534.4,by:1059.0,sz:41.7}, venue:{cx:534.4,by:1121.6,sz:41.7},
+      exhibit:{cx:546.6,by:1264.8,sz:41.7,lh:62.5},
+      exhibitTimes:{cx:539.3,by:1585.9,sz:41.7,lh:62.6},
+      cards:{cx:540.2,by:1786.4,sz:36.49}}
   };
   function cu3LoadAssets(cb){
     if(CU3.ready){ cb&&cb(); return; }
@@ -2427,32 +2435,33 @@ $("hcExportBtn").onclick=hcExport;
     var lw=L.logo.w, lh=lw*(CU3.logoRatio||1.271), lx=L.logo.cx-lw/2;
     function img(src,x,y,w,h){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'"/>'; }
     function TR(o,weight,fill,inner){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+inner+'</text>'; }
-    function TL(o,weight,fill,txt){ return '<text x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="ltr" font-family="Somar Sans" font-weight="'+weight+'" font-size="'+o.sz+'" fill="'+fill+'">'+cu2Esc(txt)+'</text>'; }
+    /* **نص** => عريض داخل السطر */
+    function rich(t){ var p=cu2Esc(t==null?"":t).split("**"),o=""; for(var i=0;i<p.length;i++){ o+=(i%2)?'<tspan font-weight="700">'+p[i]+'</tspan>':p[i]; } return o; }
+    /* فقرة متعددة الأسطر: كل سطر <text> مستقل بارتفاع o.lh، مع دعم ** للعريض */
+    function para(o,txt){ var ls=String(txt==null?"":txt).split(/\r?\n/),out=""; for(var i=0;i<ls.length;i++){ out+='<text x="'+o.cx+'" y="'+(o.by+i*o.lh)+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="400" font-size="'+o.sz+'" fill="'+C.navy+'">'+rich(ls[i])+'</text>'; } return out; }
     var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+L.W+' '+L.H+'" width="'+L.W+'" height="'+L.H+'">';
     if(withFonts) s+='<defs><style>'+cu2FontCSS()+'</style></defs>';
     s+='<rect width="'+L.W+'" height="'+L.H+'" fill="#ffffff"/>';
     s+='<image href="'+bgSrc+'" xlink:href="'+bgSrc+'" x="0" y="0" width="'+L.W+'" height="'+L.H+'" opacity="0.5"/>';
     s+=img(logoSrc,lx,L.logo.top,lw,lh);
+    s+=TR(L.verse,700,C.navy,cu2Esc(cu2V("cu3Verse","هَأَنَذَا صَانِعٌ أَمْرًا جَدِيدًا. الآنَ يَنْبُتُ. أَلَا تَعْرِفُونَهُ؟")));
+    s+=TR(L.verseRef,700,C.navy,cu2Esc(cu2V("cu3VerseRef","إشعياء 43:19")));
     s+=TR(L.yat,400,C.navy,cu2Esc("يتشرف مركز"));
     s+=TR(L.title,700,C.orange,cu2Esc("أكاديمية الأطفال"));
     s+=TR(L.invite,400,C.navy,cu2Esc(cu2V("cu3Invite","بدعوتكم لحضور حفل تخرج")));
-    s+=TR(L.batch,400,C.navy,'<tspan font-weight="700">'+cu2Esc(cu2V("cu3Batch","الدفعة العاشرة"))+'</tspan>'+cu2Esc(" من الأطفال وذلك في:"));
-    s+=TL(L.day,600,C.navy,cu2V("cu3Day","22"));
-    s+=TL(L.month,700,C.navy,cu2V("cu3Month","DEC"));
-    s+=TL(L.year,700,C.navy,cu2V("cu3Year","2025"));
-    s+='<line x1="'+L.div.x+'" y1="'+L.div.y1+'" x2="'+L.div.x+'" y2="'+L.div.y2+'" stroke="'+C.navy+'" stroke-width="4"/>';
-    s+=TL(L.wday,700,C.navy,cu2V("cu3Weekday","MONDAY"));
-    s+=TL(L.time,700,C.navy,cu2V("cu3Time","3:30 PM"));
-    s+=TR(L.venue,400,C.navy,cu2Esc("في صالة ")+'<tspan font-weight="700">'+cu2Esc(cu2V("cu3Venue","كنيسة الأرمن الأرثوذكس"))+'</tspan>');
-    s+=TR(L.vsub,400,C.navy,cu2Esc(cu2V("cu3VenueSub","كنيسة السيدة العذراء - الفيلات")));
-    if(L.cards){ var cardsN=cu2V("cu3Cards","3"); s+=TR(L.cards,400,C.navy, cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cardsN)+'</tspan>'+cu2Esc(") "+cu2PersonWord(cardsN))); }
+    s+=TR(L.batch,400,C.navy,rich(cu2V("cu3Batch","**الدفعتين السادسة والسابعة** من الأطفال وذلك في:")));
+    s+=TR(L.date,400,C.navy,rich(cu2V("cu3Date","يوم الاثنين **2026/08/31** الساعة **06:00 مساءً**")));
+    s+=TR(L.venue,400,C.navy,rich(cu2V("cu3Venue","في **ملعب دير المخلص**")));
+    s+=para(L.exhibit,cu2V("cu3Exhibit","يلي الحفل **معرض لمشاريع الأطفال**\nفي **مركز أكاديمية الأطفال** حيث سيكون هناك\nأجواء تفاعلية بين أطفال الأكاديمية والزوار،\nلتجربة المشاريع المبتكرة."));
+    s+=para(L.exhibitTimes,cu2V("cu3ExhibitTimes","سيستمر المعرض ليومي **2026/9/2-1**\nمن الساعة **6:30 مساءً** حتى **9:30 مساءً**"));
+    if(L.cards){ var cardsN=cu2V("cu3Cards","2"); s+=TR(L.cards,400,C.navy, cu2Esc("بطاقة دعوة (")+'<tspan font-weight="800" fill="'+C.orange+'">'+cu2Esc(cardsN)+'</tspan>'+cu2Esc(") "+cu2PersonWord(cardsN))); }
     if(L.bar){ s+='<rect x="0" y="'+(L.H-L.bar.h)+'" width="'+L.W+'" height="'+L.bar.h+'" fill="'+C.orange+'"/>'; }
     s+='</svg>';
     return s;
   }
   function cu3Fit(){ var st=$("cuStage"); if(!st) return; var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return; var L=CU3LAY[CU3.fmt]||CU3LAY.story; var sc=Math.min((pv.clientWidth-60)/L.W,(pv.clientHeight-60)/L.H,1); st.style.transform="scale("+sc+")"; }
   function cu3Render(){ var w=$("cuSvg"); if(!w) return; CU3.fmt="story"; w.innerHTML=cu3SVG(CU3.fmt,false); cu3Fit(); }
-  ["cu3Invite","cu3Batch","cu3Day","cu3Month","cu3Year","cu3Weekday","cu3Time","cu3Venue","cu3VenueSub","cu3Cards"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cu3Render); });
+  ["cu3Verse","cu3VerseRef","cu3Invite","cu3Batch","cu3Date","cu3Venue","cu3Exhibit","cu3ExhibitTimes","cu3Cards"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",cu3Render); });
   function cu3Export(){
     var btn=$("cuExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
     cu3LoadAssets(function(){
@@ -2471,9 +2480,9 @@ $("hcExportBtn").onclick=hcExport;
       });
     });
   }
-  function cu3Collect(){ return {app:"childrenuniversity",v:1,model:3,fmt:CU3.fmt,city:$("cuCity")?$("cuCity").value:"",invite:cu2V("cu3Invite",""),batch:cu2V("cu3Batch",""),day:cu2V("cu3Day",""),month:cu2V("cu3Month",""),year:cu2V("cu3Year",""),weekday:cu2V("cu3Weekday",""),time:cu2V("cu3Time",""),venue:cu2V("cu3Venue",""),venueSub:cu2V("cu3VenueSub",""),cards:cu2V("cu3Cards",""),image:null}; }
+  function cu3Collect(){ return {app:"childrenuniversity",v:1,model:3,fmt:CU3.fmt,city:$("cuCity")?$("cuCity").value:"",verse:cu2V("cu3Verse",""),verseRef:cu2V("cu3VerseRef",""),invite:cu2V("cu3Invite",""),batch:cu2V("cu3Batch",""),date:cu2V("cu3Date",""),venue:cu2V("cu3Venue",""),exhibit:cu2V("cu3Exhibit",""),exhibitTimes:cu2V("cu3ExhibitTimes",""),cards:cu2V("cu3Cards",""),image:null}; }
   function cu3Load(d){ if($("cuModelSel")) $("cuModelSel").value="3"; cuSetModel("3"); function set(id,v){ var e=$(id); if(e&&v!=null) e.value=v; } if(d.city&&$("cuCity")) $("cuCity").value=d.city;
-    set("cu3Invite",d.invite);set("cu3Batch",d.batch);set("cu3Day",d.day);set("cu3Month",d.month);set("cu3Year",d.year);set("cu3Weekday",d.weekday);set("cu3Time",d.time);set("cu3Venue",d.venue);set("cu3VenueSub",d.venueSub);set("cu3Cards",d.cards); CU3.fmt="story"; cu3Render(); }
+    set("cu3Verse",d.verse);set("cu3VerseRef",d.verseRef);set("cu3Invite",d.invite);set("cu3Batch",d.batch);set("cu3Date",d.date);set("cu3Venue",d.venue);set("cu3Exhibit",d.exhibit);set("cu3ExhibitTimes",d.exhibitTimes);set("cu3Cards",d.cards); CU3.fmt="story"; cu3Render(); }
   window.cuExportRouter=function(){ if(CU2.model==="2") cu2Export(); else if(CU2.model==="3") cu3Export(); else cuExport(); };
   if($("cuExportBtn")) $("cuExportBtn").onclick=window.cuExportRouter;
   cuSetModel($("cuModelSel")?$("cuModelSel").value:"1");
