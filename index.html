@@ -2572,7 +2572,7 @@ $("hcExportBtn").onclick=hcExport;
    دوري خفيف، مع window.attachCustomScrollbar(el) لتفعيله يدويًا. */
 (function(){
   var OFFSET=5, TRACKW=8, MIN=24, PAD=10, TPAD=2;   /* PAD=هامش المسار؛ TPAD=فراغ بين الحبّة وطرفَي المسار */
-  var attached=new WeakSet(), instances=[];
+  var attached=new WeakSet(), seen=new WeakSet(), instances=[];
   function CSB(el){
     var wrap=document.createElement("div"); wrap.className="csb";
     var track=document.createElement("div"); track.className="csb-track";
@@ -2612,11 +2612,22 @@ $("hcExportBtn").onclick=hcExport;
     });
     instances.push(update); update();
   }
+  /* كشف عام: أي عنصر تمريره العمودي auto/scroll يحصل على السكرول المخصّص،
+     فيشمل كل الأماكن في كل المشاريع (الحالية والمستقبلية). نتجاهل حقول النماذج
+     وعناصر SVG وطبقات .csb نفسها. seen يمنع إعادة التقييم لكل عنصر. */
   function scan(){
-    var els=document.querySelectorAll(".panel,.cu-app .panel-body,.hc-pbody,.umgmt-page");
-    for(var i=0;i<els.length;i++){ var el=els[i]; if(attached.has(el)) continue;
-      var ov=getComputedStyle(el).overflowY;
-      if(ov==="auto"||ov==="scroll"){ attached.add(el); CSB(el); } }
+    var all=document.getElementsByTagName("*");
+    for(var i=0;i<all.length;i++){
+      var el=all[i];
+      if(seen.has(el)) continue;
+      seen.add(el);
+      if(el.namespaceURI&&el.namespaceURI.indexOf("svg")>-1) continue;
+      var tag=el.tagName;
+      if(tag==="TEXTAREA"||tag==="INPUT"||tag==="SELECT"||tag==="HTML"||tag==="BODY") continue;
+      if(el.classList&&el.classList.contains("csb")) continue;
+      var oy=getComputedStyle(el).overflowY;
+      if((oy==="auto"||oy==="scroll")&&!attached.has(el)){ attached.add(el); CSB(el); }
+    }
   }
   var raf=null;
   function schedule(){ if(raf) return; raf=requestAnimationFrame(function(){ raf=null; scan(); for(var i=0;i<instances.length;i++) instances[i](); }); }
@@ -2629,7 +2640,7 @@ $("hcExportBtn").onclick=hcExport;
     if(document.body){ try{ new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true}); }catch(e){} } }
   if(document.readyState!=="loading") boot(); else document.addEventListener("DOMContentLoaded",boot);
   window.addEventListener("load",schedule);
-  window.attachCustomScrollbar=function(el){ if(el&&!attached.has(el)){ attached.add(el); CSB(el); } };
+  window.attachCustomScrollbar=function(el){ if(el&&!attached.has(el)){ attached.add(el); seen.add(el); CSB(el); } };
   window.refreshCustomScrollbars=schedule;
 })();
 </script>
