@@ -182,4 +182,22 @@ function route_users(string $method, string $path): void
         }
         json_out(['ok' => true]);
     }
+
+    /* ---- تعيين كلمة سر لمستخدم ---- */
+    if ($method === 'POST' && $path === '/users/set-password') {
+        $actor = require_user();
+        if (!can_manage($actor['role'])) fail('لا صلاحية', 403);
+
+        $b      = body();
+        $email  = strtolower(trim((string)($b['email'] ?? '')));
+        $pass   = (string)($b['password'] ?? '');
+        $target = db_one('SELECT email,role FROM users WHERE email = ?', [$email]);
+
+        if (!$target) fail('المستخدم غير موجود', 404);
+        if ($actor['role'] !== 'owner' && $target['role'] !== 'user') fail('فقط الـ Owner', 403);
+        if (strlen($pass) < 4) fail('كلمة السر 4 أحرف على الأقل', 400);
+
+        db_run('UPDATE users SET password = ? WHERE email = ?', [hash_password($pass), $email]);
+        json_out(['ok' => true]);
+    }
 }

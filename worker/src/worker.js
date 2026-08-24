@@ -355,6 +355,23 @@ export default {
         return json({ ok: true });
       }
 
+      /* ---- 7b) تعيين كلمة سر لمستخدم ---- */
+      if (request.method === "POST" && path === "/users/set-password") {
+        var pwActor = await getSessionUser(env, request);
+        if (!pwActor) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!canManage(pwActor.role)) return json({ error: "لا صلاحية" }, 403);
+        var pwb = await request.json();
+        var pwEmail = (pwb.email || "").trim().toLowerCase();
+        var pwPass = (pwb.password || "") + "";
+        var pwTarget = await env.DB.prepare("SELECT email,role FROM users WHERE email=?1").bind(pwEmail).first();
+        if (!pwTarget) return json({ error: "المستخدم غير موجود" }, 404);
+        if (pwActor.role !== "owner" && pwTarget.role !== "user") return json({ error: "فقط الـ Owner" }, 403);
+        if (pwPass.length < 4) return json({ error: "كلمة السر 4 أحرف على الأقل" }, 400);
+        var pwHash = await hashPassword(pwPass);
+        await env.DB.prepare("UPDATE users SET password=?1 WHERE email=?2").bind(pwHash, pwEmail).run();
+        return json({ ok: true });
+      }
+
       /* ---- 8) قائمة المشاريع ---- */
       if (request.method === "GET" && path === "/projects") {
         var pa = await getSessionUser(env, request);

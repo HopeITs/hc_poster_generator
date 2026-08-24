@@ -544,6 +544,10 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .umpeditor .cancel{background:none;border:1px solid #cdd8de;color:#5a7282;border-radius:8px;padding:7px 14px;font-family:'Somar Sans';font-weight:700;font-size:12px;cursor:pointer;}
 .umpeditor .emsg{font-size:11px;margin-top:8px;min-height:14px;}
 .umpeditor .emsg.err{color:#c0392b;} .umpeditor .emsg.ok{color:#1a9450;}
+.umpeditor .sec{margin-top:14px;} .umpeditor .sec:first-child{margin-top:0;}
+.umpeditor .pwrow{display:flex;gap:8px;align-items:center;}
+.umpeditor .pwrow input{flex:1;padding:8px 10px;border:1px solid #cdd8de;border-radius:8px;font-family:'Somar Sans';font-size:12px;direction:ltr;}
+.umpeditor .eye{background:none;border:1px solid #cdd8de;border-radius:8px;padding:7px 10px;cursor:pointer;color:#5a7282;font-size:11px;font-weight:700;white-space:nowrap;}
 </style>
 <div class="umgmt-page" id="userMgmtPage">
   <div class="ump-card">
@@ -1173,6 +1177,11 @@ var Auth = (function(){
           setProjects:async function(email,projectIds){
             try{ var res=await api("/users/set-projects","POST",{email:email,project_ids:projectIds||[]});
                  return res.ok?null:((res.data&&res.data.error)||"فشل تعديل المشاريع"); }
+            catch(e){ return "تعذّر الاتصال"; }
+          },
+          setPassword:async function(email,password){
+            try{ var res=await api("/users/set-password","POST",{email:email,password:password});
+                 return res.ok?null:((res.data&&res.data.error)||"فشل تعيين كلمة السر"); }
             catch(e){ return "تعذّر الاتصال"; }
           },
           listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify};
@@ -1987,39 +1996,63 @@ async function renderUsersPage(){
     row.appendChild(em); row.appendChild(rl);
     /* تعديل المشاريع متاح لأصحاب صلاحية المنح: الـ user يعدّله أي مدير؛ الـ admin
        الـ Owner فقط. الـ owner/comms وصولهم شامل فلا يُخصَّص. */
-    var editable=(u.role==="user")||(u.role==="admin"&&me.role==="owner");
+    /* تعديل المشاريع: user لأي مدير، admin للـ Owner فقط (owner/comms شامل).
+       تعيين كلمة السر: user لأي مدير، admin/comms للـ Owner فقط. */
+    var canEditProjects=(u.role==="user")||(u.role==="admin"&&me.role==="owner");
+    var canEditPass=(u.role==="user")||(me.role==="owner"&&(u.role==="admin"||u.role==="comms"));
     var editor=null;
-    if(editable){
-      var editBtn=document.createElement("button"); editBtn.className="umpedit"; editBtn.title="تعديل المشاريع"; editBtn.setAttribute("aria-label","تعديل المشاريع");
+    if(canEditProjects||canEditPass){
+      var editBtn=document.createElement("button"); editBtn.className="umpedit"; editBtn.title="تعديل"; editBtn.setAttribute("aria-label","تعديل");
       editBtn.innerHTML='<svg viewBox="0 0 145.99 145.14" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill="currentColor" d="M132.14,87.41s-.04,0-.05,0c-3.61.03-6.45,2.94-6.46,6.63l-.04,30.86c0,4.05-3.3,7.34-7.35,7.34H20.25c-3.94,0-7.27-3.38-7.27-7.37V33.98c0-4.07,3.36-7.39,7.49-7.4l30.88-.03c3.48,0,6.44-2.94,6.46-6.42,0-1.71-.69-3.39-1.92-4.63-1.22-1.23-2.84-1.9-4.55-1.9h-30.85c-10.32,0-18.93,7.6-20.46,18.06-.02.14-.03.29-.03.44v94.67c0,.15.01.3.03.44,1.44,9.7,8.78,16.9,18.25,17.92.11.01.21.02.32.02h101.3c.1,0,.21,0,.31-.01,10.51-1.1,18.41-9.92,18.38-20.5v-30.84c0-3.81-3.34-6.36-6.46-6.36Z"/><path fill="currentColor" d="M140.83,10.05l-4.65-4.69c-3.39-3.41-8.14-5.37-13.06-5.37s-9.55,1.89-12.99,5.32l-62.25,62.21c-.64.64-1.44,1.74-1.76,2.9l-8.16,29.49c-.63,2.28-.06,4.63,1.52,6.3,1.21,1.28,2.98,2.04,4.73,2.04.55,0,1.09-.07,1.6-.22l29.34-8.13c1.27-.35,2.39-.99,3.26-1.86l62.08-62.1c7.21-7.21,7.37-18.83.35-25.9ZM61.52,90.22l-8.04,2.24,2.23-8.06,5.81,5.81ZM120.5,37.57l-46.65,46.65-12.16-12.16,46.65-46.65,12.16,12.16ZM131.26,26.81l-1.56,1.58-12.15-12.15,1.51-1.53c1.11-1.12,2.57-1.74,4.12-1.74,1.45,0,2.81.56,3.84,1.59l4.37,4.37c2.13,2.13,2.07,5.66-.12,7.88Z"/></svg>';
       editor=document.createElement("div"); editor.className="umpeditor";
-      var ttl=document.createElement("div"); ttl.className="ttl"; ttl.textContent="المشاريع المسموح الوصول إليها:";
-      var eg=document.createElement("div"); eg.className="ump-pgrid";
-      var cur={}; (u.projects||[]).forEach(function(p){ cur[p.id]=1; });
-      UMP_PROJECTS.forEach(function(p){
-        var lab=document.createElement("label"); lab.className="ump-pchk"+(p.status==="ready"?"":" soon");
-        var cb=document.createElement("input"); cb.type="checkbox"; cb.value=p.id; if(cur[p.id]) cb.checked=true;
-        var sp=document.createElement("span"); sp.textContent=p.name+(p.status==="ready"?"":" (قريباً)");
-        lab.appendChild(cb); lab.appendChild(sp); eg.appendChild(lab);
-      });
       var emsg=document.createElement("div"); emsg.className="emsg";
-      var acts=document.createElement("div"); acts.className="acts";
-      var save=document.createElement("button"); save.className="save"; save.textContent="حفظ";
-      var cancel=document.createElement("button"); cancel.className="cancel"; cancel.textContent="إلغاء";
-      acts.appendChild(save); acts.appendChild(cancel);
-      editor.appendChild(ttl); editor.appendChild(eg); editor.appendChild(acts); editor.appendChild(emsg);
+      if(canEditProjects){
+        var psec=document.createElement("div"); psec.className="sec";
+        var ttl=document.createElement("div"); ttl.className="ttl"; ttl.textContent="المشاريع المسموح الوصول إليها:";
+        var eg=document.createElement("div"); eg.className="ump-pgrid";
+        var cur={}; (u.projects||[]).forEach(function(p){ cur[p.id]=1; });
+        UMP_PROJECTS.forEach(function(p){
+          var lab=document.createElement("label"); lab.className="ump-pchk"+(p.status==="ready"?"":" soon");
+          var cb=document.createElement("input"); cb.type="checkbox"; cb.value=p.id; if(cur[p.id]) cb.checked=true;
+          var sp=document.createElement("span"); sp.textContent=p.name+(p.status==="ready"?"":" (قريباً)");
+          lab.appendChild(cb); lab.appendChild(sp); eg.appendChild(lab);
+        });
+        var pacts=document.createElement("div"); pacts.className="acts";
+        var psave=document.createElement("button"); psave.className="save"; psave.textContent="حفظ المشاريع";
+        pacts.appendChild(psave);
+        psec.appendChild(ttl); psec.appendChild(eg); psec.appendChild(pacts); editor.appendChild(psec);
+        psave.onclick=async function(){
+          emsg.className="emsg"; emsg.textContent="";
+          var ids=[].slice.call(eg.querySelectorAll("input:checked")).map(function(c){ return parseInt(c.value,10); });
+          if(!ids.length){ emsg.className="emsg err"; emsg.textContent="اختر مشروعاً واحداً على الأقل"; return; }
+          psave.disabled=true; var err=await Auth.setProjects(u.email, ids); psave.disabled=false;
+          if(err){ emsg.className="emsg err"; emsg.textContent=err; } else { renderUsersPage(); }
+        };
+      }
+      if(canEditPass){
+        var wsec=document.createElement("div"); wsec.className="sec";
+        var wttl=document.createElement("div"); wttl.className="ttl"; wttl.textContent="كلمة سر جديدة (لا يمكن إظهار الحالية — مشفّرة):";
+        var wrow=document.createElement("div"); wrow.className="pwrow";
+        var pin=document.createElement("input"); pin.type="password"; pin.placeholder="كلمة سر جديدة (4 أحرف على الأقل)"; pin.setAttribute("autocomplete","new-password");
+        var eye=document.createElement("button"); eye.className="eye"; eye.type="button"; eye.textContent="إظهار";
+        eye.onclick=function(){ if(pin.type==="password"){ pin.type="text"; eye.textContent="إخفاء"; } else { pin.type="password"; eye.textContent="إظهار"; } };
+        var wsave=document.createElement("button"); wsave.className="save"; wsave.textContent="تعيين";
+        wrow.appendChild(pin); wrow.appendChild(eye); wrow.appendChild(wsave);
+        wsec.appendChild(wttl); wsec.appendChild(wrow); editor.appendChild(wsec);
+        wsave.onclick=async function(){
+          emsg.className="emsg"; emsg.textContent="";
+          var pw=pin.value||"";
+          if(pw.length<4){ emsg.className="emsg err"; emsg.textContent="كلمة السر 4 أحرف على الأقل"; return; }
+          wsave.disabled=true; var err=await Auth.setPassword(u.email, pw); wsave.disabled=false;
+          if(err){ emsg.className="emsg err"; emsg.textContent=err; }
+          else { emsg.className="emsg ok"; emsg.textContent="تم تعيين كلمة السر"; pin.value=""; pin.type="password"; eye.textContent="إظهار"; }
+        };
+      }
+      var cancel=document.createElement("button"); cancel.className="cancel"; cancel.textContent="إغلاق";
+      var cacts=document.createElement("div"); cacts.className="acts sec"; cacts.appendChild(cancel);
+      editor.appendChild(cacts); editor.appendChild(emsg);
       editBtn.onclick=function(){ editor.classList.toggle("on"); };
       cancel.onclick=function(){ editor.classList.remove("on"); };
-      save.onclick=async function(){
-        emsg.className="emsg"; emsg.textContent="";
-        var ids=[].slice.call(eg.querySelectorAll("input:checked")).map(function(c){ return parseInt(c.value,10); });
-        if(!ids.length){ emsg.className="emsg err"; emsg.textContent="اختر مشروعاً واحداً على الأقل"; return; }
-        save.disabled=true;
-        var err=await Auth.setProjects(u.email, ids);
-        save.disabled=false;
-        if(err){ emsg.className="emsg err"; emsg.textContent=err; }
-        else { renderUsersPage(); }
-      };
       row.appendChild(editBtn);
     }
     var canDel=(u.role!=="owner") && (u.email!==me.email) && !((u.role==="admin"||u.role==="comms")&&me.role!=="owner");
