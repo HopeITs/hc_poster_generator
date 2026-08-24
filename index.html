@@ -533,8 +533,9 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .ump-msg.err{color:#c0392b;}
 .ump-msg.ok{color:#1a9450;}
 /* تعديل مشاريع مستخدم داخل صفّه */
-.umpedit{background:none;border:1px solid #cfe0e6;color:#33697e;font-size:11px;font-weight:700;border-radius:6px;padding:3px 9px;cursor:pointer;white-space:nowrap;}
+.umpedit{background:none;border:1px solid #cfe0e6;color:#33697e;border-radius:6px;padding:4px;cursor:pointer;display:inline-flex;align-items:center;line-height:0;}
 .umpedit:hover{background:#eef5f8;}
+.umpedit svg{width:15px;height:15px;display:block;}
 .umpeditor{flex-basis:100%;border-top:1px dashed #dde6ea;margin-top:8px;padding-top:10px;display:none;}
 .umpeditor.on{display:block;}
 .umpeditor .ttl{font-size:11px;font-weight:700;color:#5a7282;margin-bottom:8px;}
@@ -1989,7 +1990,8 @@ async function renderUsersPage(){
     var editable=(u.role==="user")||(u.role==="admin"&&me.role==="owner");
     var editor=null;
     if(editable){
-      var editBtn=document.createElement("button"); editBtn.className="umpedit"; editBtn.textContent="تعديل المشاريع";
+      var editBtn=document.createElement("button"); editBtn.className="umpedit"; editBtn.title="تعديل المشاريع"; editBtn.setAttribute("aria-label","تعديل المشاريع");
+      editBtn.innerHTML='<svg viewBox="0 0 139.98 139.14" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill="currentColor" d="M129.11,87.41c-1.94.02-3.48,1.58-3.48,3.64l-.04,30.86c0,5.65-4.61,10.34-10.35,10.34H17.25c-5.65,0-10.27-4.74-10.27-10.37V30.98c0-5.83,4.76-10.39,10.49-10.4l30.88-.03c1.97,0,3.46-1.71,3.47-3.44,0-1.8-1.48-3.52-3.47-3.52h-30.85c-9.12,0-16.2,6.67-17.5,15.5v94.67c1.2,8.08,7.29,14.48,15.6,15.38h101.3c9.01-.94,15.72-8.45,15.69-17.51v-30.85c0-1.96-1.84-3.38-3.48-3.37Z"/><path fill="currentColor" d="M135.7,9.17l-4.65-4.69c-5.85-5.89-15.78-6.04-21.8-.03l-62.25,62.21c-.41.41-.85,1.08-.99,1.58l-8.16,29.49c-.36,1.29-.03,2.56.8,3.44.75.79,2.08,1.35,3.35.99l29.34-8.13c.77-.21,1.44-.59,1.94-1.09l62.08-62.1c5.98-5.98,6.22-15.75.34-21.66ZM46.17,93.78l5.02-18.14,13.07,13.09-18.09,5.05ZM70.86,85.46l-16.4-16.4,50.89-50.89,16.4,16.4-50.89,50.89ZM130.39,25.92l-3.68,3.73-16.39-16.39,3.61-3.65c3.35-3.39,8.81-3.56,12.21-.16l4.37,4.37c3.31,3.31,3.25,8.71-.11,12.11Z"/></svg>';
       editor=document.createElement("div"); editor.className="umpeditor";
       var ttl=document.createElement("div"); ttl.className="ttl"; ttl.textContent="المشاريع المسموح الوصول إليها:";
       var eg=document.createElement("div"); eg.className="ump-pgrid";
