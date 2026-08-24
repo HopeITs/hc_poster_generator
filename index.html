@@ -546,8 +546,10 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .umpeditor .emsg.err{color:#c0392b;} .umpeditor .emsg.ok{color:#1a9450;}
 .umpeditor .sec{margin-top:14px;} .umpeditor .sec:first-child{margin-top:0;}
 .umpeditor .pwrow{display:flex;gap:8px;align-items:center;}
-.umpeditor .pwrow input{flex:1;padding:8px 10px;border:1px solid #cdd8de;border-radius:8px;font-family:'Somar Sans';font-size:12px;direction:ltr;}
-.umpeditor .eye{background:none;border:1px solid #cdd8de;border-radius:8px;padding:6px 9px;cursor:pointer;color:#5a7282;display:inline-flex;align-items:center;line-height:0;}
+.umpeditor .pwfield{position:relative;flex:1;}
+.umpeditor .pwfield input{width:100%;box-sizing:border-box;padding:8px 34px 8px 10px;border:1px solid #cdd8de;border-radius:8px;font-family:'Somar Sans';font-size:12px;direction:ltr;}
+.umpeditor .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;padding:0;cursor:pointer;color:#8a97a0;display:inline-flex;align-items:center;line-height:0;}
+.umpeditor .eye:hover{color:var(--brand-navy);}
 .umpeditor .eye svg{width:18px;height:auto;display:block;}
 </style>
 <div class="umgmt-page" id="userMgmtPage">
@@ -2040,7 +2042,8 @@ async function renderUsersPage(){
         var eye=document.createElement("button"); eye.className="eye"; eye.type="button"; eye.title="إظهار"; eye.setAttribute("aria-label","إظهار كلمة السر"); eye.innerHTML=ICON_HID;
         eye.onclick=function(){ if(pin.type==="password"){ pin.type="text"; eye.innerHTML=ICON_VIS; eye.title="إخفاء"; eye.setAttribute("aria-label","إخفاء كلمة السر"); } else { pin.type="password"; eye.innerHTML=ICON_HID; eye.title="إظهار"; eye.setAttribute("aria-label","إظهار كلمة السر"); } };
         var wsave=document.createElement("button"); wsave.className="save"; wsave.textContent="حفظ";
-        wrow.appendChild(pin); wrow.appendChild(eye); wrow.appendChild(wsave);
+        var pwf=document.createElement("div"); pwf.className="pwfield"; pwf.appendChild(pin); pwf.appendChild(eye);
+        wrow.appendChild(pwf); wrow.appendChild(wsave);
         wsec.appendChild(wttl); wsec.appendChild(wrow); editor.appendChild(wsec);
         wsave.onclick=async function(){
           emsg.className="emsg"; emsg.textContent="";
