@@ -2571,7 +2571,7 @@ $("hcExportBtn").onclick=hcExport;
    عند تغيّر الحجم/المحتوى/عرض الحاوية. يشمل الحاويات الحالية والمستقبلية عبر مسح
    دوري خفيف، مع window.attachCustomScrollbar(el) لتفعيله يدويًا. */
 (function(){
-  var OFFSET=5, TRACKW=8, MIN=24, PAD=10;   /* PAD = هامش فارغ أعلى وأسفل المسار */
+  var OFFSET=5, TRACKW=8, MIN=24, PAD=10, TPAD=2;   /* PAD=هامش المسار؛ TPAD=فراغ بين الحبّة وطرفَي المسار */
   var attached=new WeakSet(), instances=[];
   function CSB(el){
     var wrap=document.createElement("div"); wrap.className="csb";
@@ -2586,10 +2586,11 @@ $("hcExportBtn").onclick=hcExport;
       var rtl=getComputedStyle(el).direction==="rtl";
       var left=rtl?(r.left+OFFSET):(r.right-OFFSET-TRACKW);
       var trackH=Math.max(0, ch-2*PAD);       /* هامش PAD فارغ أعلى وأسفل */
+      var innerH=Math.max(0, trackH-2*TPAD);  /* مجال حركة الحبّة داخل المسار */
       wrap.style.left=left+"px"; wrap.style.top=(r.top+el.clientTop+PAD)+"px"; wrap.style.height=trackH+"px";
-      var thumbH=Math.max(MIN, trackH*ch/sh), maxS=sh-ch;
+      var thumbH=Math.max(MIN, innerH*ch/sh), maxS=sh-ch;
       var ratio=maxS>0?el.scrollTop/maxS:0;
-      thumb.style.height=thumbH+"px"; thumb.style.top=(ratio*(trackH-thumbH))+"px";
+      thumb.style.height=thumbH+"px"; thumb.style.top=(TPAD+ratio*(innerH-thumbH))+"px";
       wrap.classList.add("on");
     }
     el.addEventListener("scroll",update,{passive:true});
@@ -2599,14 +2600,14 @@ $("hcExportBtn").onclick=hcExport;
       e.preventDefault(); e.stopPropagation();
       var sy=e.clientY, ss=el.scrollTop, sh=el.scrollHeight, th=thumb.offsetHeight, maxS=sh-el.clientHeight, trackH=wrap.offsetHeight;
       thumb.classList.add("csb-drag");
-      function mv(ev){ var range=trackH-th; el.scrollTop=ss+(range>0?((ev.clientY-sy)/range)*maxS:0); }
+      function mv(ev){ var range=trackH-2*TPAD-th; el.scrollTop=ss+(range>0?((ev.clientY-sy)/range)*maxS:0); }
       function up(){ document.removeEventListener("mousemove",mv); document.removeEventListener("mouseup",up); thumb.classList.remove("csb-drag"); }
       document.addEventListener("mousemove",mv); document.addEventListener("mouseup",up);
     });
     track.addEventListener("mousedown",function(e){
       if(e.target===thumb) return;
       var wr=wrap.getBoundingClientRect(), th=thumb.offsetHeight;
-      var t=((e.clientY-wr.top)-th/2)/(wr.height-th); t=Math.max(0,Math.min(1,t));
+      var t=((e.clientY-wr.top-TPAD)-th/2)/(wr.height-2*TPAD-th); t=Math.max(0,Math.min(1,t));
       el.scrollTop=t*(el.scrollHeight-el.clientHeight);
     });
     instances.push(update); update();
