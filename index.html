@@ -2325,6 +2325,10 @@ $("hcExportBtn").onclick=hcExport;
     blocks.forEach(function(b){ b.style.marginTop=gap+"px"; });
   }
   function cuFit(){
+    /* fit النموذج 1 فقط. النموذجان 2/3 يشاركان نفس #cuStage ولهما تحجيمهما
+       الخاص (cu2Fit/cu3Fit)؛ بلا هذا الحارس كان تغيير المحافظة (يستدعي cuRender)
+       يعيد تحجيم المعاينة بأبعاد النموذج 1 فيحدث زووم خاطئ يبقى حتى Refresh. */
+    if(typeof CU2!=="undefined"&&CU2.model&&CU2.model!=="1") return;
     var st=$("cuStage"); if(!st) return;
     var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return;
     var scale=Math.min((pv.clientWidth-60)/1080,(pv.clientHeight-60)/1350,1);
