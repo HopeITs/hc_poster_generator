@@ -532,6 +532,17 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .ump-msg{font-size:12px;margin-top:10px;min-height:16px;}
 .ump-msg.err{color:#c0392b;}
 .ump-msg.ok{color:#1a9450;}
+/* تعديل مشاريع مستخدم داخل صفّه */
+.umpedit{background:none;border:1px solid #cfe0e6;color:#33697e;font-size:11px;font-weight:700;border-radius:6px;padding:3px 9px;cursor:pointer;white-space:nowrap;}
+.umpedit:hover{background:#eef5f8;}
+.umpeditor{flex-basis:100%;border-top:1px dashed #dde6ea;margin-top:8px;padding-top:10px;display:none;}
+.umpeditor.on{display:block;}
+.umpeditor .ttl{font-size:11px;font-weight:700;color:#5a7282;margin-bottom:8px;}
+.umpeditor .acts{display:flex;gap:8px;margin-top:10px;}
+.umpeditor .save{background:var(--brand-navy);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-family:'Somar Sans';font-weight:700;font-size:12px;cursor:pointer;}
+.umpeditor .cancel{background:none;border:1px solid #cdd8de;color:#5a7282;border-radius:8px;padding:7px 14px;font-family:'Somar Sans';font-weight:700;font-size:12px;cursor:pointer;}
+.umpeditor .emsg{font-size:11px;margin-top:8px;min-height:14px;}
+.umpeditor .emsg.err{color:#c0392b;} .umpeditor .emsg.ok{color:#1a9450;}
 </style>
 <div class="umgmt-page" id="userMgmtPage">
   <div class="ump-card">
@@ -1157,6 +1168,11 @@ var Auth = (function(){
                  if(r.ok&&current) current.photo=r.data.photo;
                  return r.ok?{ok:true}:{ok:false,error:(r.data&&r.data.error)||"تعذّر الحفظ"}; }
             catch(e){ return {ok:false,error:"تعذّر الاتصال بالخادم"}; }
+          },
+          setProjects:async function(email,projectIds){
+            try{ var res=await api("/users/set-projects","POST",{email:email,project_ids:projectIds||[]});
+                 return res.ok?null:((res.data&&res.data.error)||"فشل تعديل المشاريع"); }
+            catch(e){ return "تعذّر الاتصال"; }
           },
           listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify};
 })();
@@ -1924,6 +1940,7 @@ function umpToggleProjects(){ $("umpProjects").style.display=($("umpRole").value
 // Which UI the user management page was opened from, so closing it returns
 // there. Without this an HC user who opens it lands in the Study Zone UI.
 var umgmtReturn="app";
+var UMP_PROJECTS=[];   // مشاريع يمكن للمدير الحالي منحها (لمحرّر مشاريع المستخدم)
 function closeUserMgmt(){
   $("userMgmtPage").style.display="none";
   if(umgmtReturn==="pg"){ if(typeof showProjectPicker==="function") showProjectPicker(); return; }
@@ -1946,7 +1963,7 @@ async function openUserMgmt(){
   if(me.role==="owner"){ opts.push(["admin","Admin"]); opts.push(["comms","Comms Manager"]); }
   opts.forEach(function(o){var op=document.createElement("option");op.value=o[0];op.textContent=o[1];rs.appendChild(op);});
   rs.onchange=umpToggleProjects;
-  var pr=await Auth.projects(); var PR=(pr.ok?pr.projects:[])||[];
+  var pr=await Auth.projects(); var PR=(pr.ok?pr.projects:[])||[]; UMP_PROJECTS=PR;
   var grid=$("umpPGrid"); grid.innerHTML="";
   PR.forEach(function(p){
     var lab=document.createElement("label"); lab.className="ump-pchk"+(p.status==="ready"?"":" soon");
@@ -1967,6 +1984,42 @@ async function renderUsersPage(){
     var em=document.createElement("span"); em.className="em"; em.textContent=u.email;
     var rl=document.createElement("span"); rl.className="rl "+u.role; rl.textContent=(ROLE_LABEL[u.role]||u.role);
     row.appendChild(em); row.appendChild(rl);
+    /* تعديل المشاريع متاح لأصحاب صلاحية المنح: الـ user يعدّله أي مدير؛ الـ admin
+       الـ Owner فقط. الـ owner/comms وصولهم شامل فلا يُخصَّص. */
+    var editable=(u.role==="user")||(u.role==="admin"&&me.role==="owner");
+    var editor=null;
+    if(editable){
+      var editBtn=document.createElement("button"); editBtn.className="umpedit"; editBtn.textContent="تعديل المشاريع";
+      editor=document.createElement("div"); editor.className="umpeditor";
+      var ttl=document.createElement("div"); ttl.className="ttl"; ttl.textContent="المشاريع المسموح الوصول إليها:";
+      var eg=document.createElement("div"); eg.className="ump-pgrid";
+      var cur={}; (u.projects||[]).forEach(function(p){ cur[p.id]=1; });
+      UMP_PROJECTS.forEach(function(p){
+        var lab=document.createElement("label"); lab.className="ump-pchk"+(p.status==="ready"?"":" soon");
+        var cb=document.createElement("input"); cb.type="checkbox"; cb.value=p.id; if(cur[p.id]) cb.checked=true;
+        var sp=document.createElement("span"); sp.textContent=p.name+(p.status==="ready"?"":" (قريباً)");
+        lab.appendChild(cb); lab.appendChild(sp); eg.appendChild(lab);
+      });
+      var emsg=document.createElement("div"); emsg.className="emsg";
+      var acts=document.createElement("div"); acts.className="acts";
+      var save=document.createElement("button"); save.className="save"; save.textContent="حفظ";
+      var cancel=document.createElement("button"); cancel.className="cancel"; cancel.textContent="إلغاء";
+      acts.appendChild(save); acts.appendChild(cancel);
+      editor.appendChild(ttl); editor.appendChild(eg); editor.appendChild(acts); editor.appendChild(emsg);
+      editBtn.onclick=function(){ editor.classList.toggle("on"); };
+      cancel.onclick=function(){ editor.classList.remove("on"); };
+      save.onclick=async function(){
+        emsg.className="emsg"; emsg.textContent="";
+        var ids=[].slice.call(eg.querySelectorAll("input:checked")).map(function(c){ return parseInt(c.value,10); });
+        if(!ids.length){ emsg.className="emsg err"; emsg.textContent="اختر مشروعاً واحداً على الأقل"; return; }
+        save.disabled=true;
+        var err=await Auth.setProjects(u.email, ids);
+        save.disabled=false;
+        if(err){ emsg.className="emsg err"; emsg.textContent=err; }
+        else { renderUsersPage(); }
+      };
+      row.appendChild(editBtn);
+    }
     var canDel=(u.role!=="owner") && (u.email!==me.email) && !((u.role==="admin"||u.role==="comms")&&me.role!=="owner");
     if(canDel){
       var del=document.createElement("button"); del.className="umpdel"; del.textContent="×"; del.title="حذف";
@@ -1976,7 +2029,7 @@ async function renderUsersPage(){
     var tags=document.createElement("div"); tags.className="umptags";
     if(u.role==="owner"||u.role==="comms"){ var t=document.createElement("span"); t.className="umptag all"; t.textContent="كل المشاريع"; tags.appendChild(t); }
     else { var pl=(u.projects||[]); if(pl.length){ pl.forEach(function(p){ var t=document.createElement("span"); t.className="umptag"; t.textContent=p.name; tags.appendChild(t); }); } else { var t0=document.createElement("span"); t0.className="umptag"; t0.textContent="—"; tags.appendChild(t0); } }
-    row.appendChild(tags); list.appendChild(row);
+    row.appendChild(tags); if(editor) row.appendChild(editor); list.appendChild(row);
   });
 }
 $("uAddBtn").onclick=async function(){
