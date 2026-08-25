@@ -372,6 +372,58 @@ export default {
         return json({ ok: true });
       }
 
+      /* ---- 7c) تدقيق إملائي/نحوي عبر Gemini (يعيد نصًّا مصحَّحًا لكل حقل) ---- */
+      if (request.method === "POST" && path === "/proofread") {
+        var prUser = await getSessionUser(env, request);
+        if (!prUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!env.GEMINI_API_KEY) return json({ error: "مفتاح التدقيق غير مضبوط" }, 500);
+        var prb = await request.json();
+        var prFields = Array.isArray(prb.fields) ? prb.fields : [];
+        prFields = prFields.map(function (f) { return { id: String(f && f.id != null ? f.id : ""), text: String(f && f.text != null ? f.text : "") }; })
+                           .filter(function (f) { return f.id && f.text.replace(/\s/g, "") !== ""; });
+        if (!prFields.length) return json({ error: "لا يوجد نص للتدقيق" }, 400);
+
+        var sys =
+"You are a professional Arabic/English proofreader and grammar editor. You correct spelling, punctuation, spacing, and obvious grammar, and improve wording lightly.\n" +
+"You will receive a JSON object {\"fields\":[{\"id\",\"text\"}]}. Return ONLY a JSON object with the SAME shape {\"fields\":[{\"id\",\"text\"}]}, same ids, where each text is the CORRECTED version.\n" +
+"HARD RULES:\n" +
+"- Preserve EXACTLY the bold markers written as double asterisks **...** (do not add, remove, or move them).\n" +
+"- Preserve line breaks (\\n) and the number of lines exactly; correct within each line.\n" +
+"- Do NOT change proper nouns, names, places, or organisations (e.g. دير المخلص، أكاديمية الأطفال).\n" +
+"- Do NOT change numbers or dates; keep only Western (Arabic) numerals 0-9 — convert any Indic numerals ٠-٩ to Western.\n" +
+"- Keep a consistent, respectful tone; avoid mixing direct and indirect address.\n" +
+"- If a text is already correct, return it unchanged. Do not add commentary or explanations.";
+
+        var payload = {
+          system_instruction: { parts: [{ text: sys }] },
+          contents: [{ role: "user", parts: [{ text: JSON.stringify({ fields: prFields }) }] }],
+          generationConfig: {
+            temperature: 0.2,
+            thinkingConfig: { thinkingBudget: 0 },
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: { fields: { type: "ARRAY", items: {
+                type: "OBJECT", properties: { id: { type: "STRING" }, text: { type: "STRING" } }, required: ["id", "text"]
+              } } },
+              required: ["fields"]
+            }
+          }
+        };
+        var gr, gd;
+        try {
+          gr = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + env.GEMINI_API_KEY,
+            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+          gd = await gr.json();
+        } catch (e) { return json({ error: "تعذّر الاتصال بخدمة التدقيق" }, 502); }
+        if (!gr.ok) return json({ error: (gd && gd.error && gd.error.message) || "فشل التدقيق" }, 502);
+        var outTxt = "";
+        try { outTxt = gd.candidates[0].content.parts[0].text || ""; } catch (e) {}
+        var parsed;
+        try { parsed = JSON.parse(outTxt); } catch (e) { return json({ error: "ردّ التدقيق غير صالح" }, 502); }
+        return json({ ok: true, fields: (parsed && parsed.fields) || [] });
+      }
+
       /* ---- 8) قائمة المشاريع ---- */
       if (request.method === "GET" && path === "/projects") {
         var pa = await getSessionUser(env, request);
