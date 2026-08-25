@@ -1190,6 +1190,11 @@ var Auth = (function(){
                  return res.ok?null:((res.data&&res.data.error)||"فشل تعيين كلمة السر"); }
             catch(e){ return "تعذّر الاتصال"; }
           },
+          proofread:async function(fields){
+            try{ var res=await api("/proofread","POST",{fields:fields});
+                 return res.ok?{ok:true,fields:res.data.fields||[]}:{ok:false,error:(res.data&&res.data.error)||"فشل التدقيق"}; }
+            catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
+          },
           listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify};
 })();
 
@@ -2830,6 +2835,57 @@ $("hcExportBtn").onclick=hcExport;
   function boot(){ ensurePop(); scan();
     if(document.body){ try{ new MutationObserver(scan).observe(document.body,{childList:true,subtree:true}); }catch(e){} } }
   if(document.readyState!=="loading") boot(); else document.addEventListener("DOMContentLoaded",boot);
+})();
+</script>
+<style>
+/* زر «تدقيق المحتوى» (Gemini) بعد آخر حقل في كل نموذج */
+.proof-wrap{margin:16px 0 2px;}
+.proof-btn{width:100%;background:#0e7c66;color:#fff;border:none;border-radius:10px;padding:12px;font-family:'Somar Sans';font-weight:800;font-size:14px;cursor:pointer;transition:.15s;}
+.proof-btn:hover{filter:brightness(1.06);}
+.proof-btn:disabled{opacity:.65;cursor:default;}
+.proof-status{font-size:12px;margin-top:8px;min-height:16px;text-align:center;font-family:'Somar Sans';font-weight:700;}
+.proof-status.ok{color:#1a9450;} .proof-status.err{color:#c0392b;}
+</style>
+<script>
+/* ===== تدقيق المحتوى عبر Gemini: زر لكل نموذج يجمع الحقول الظاهرة ويستبدلها
+   بالنص المصحَّح (بلا إبراز فروقات وبلا زر تطبيق). ===== */
+(function(){
+  function collect(container){
+    var els=container.querySelectorAll("input[type=text], textarea");
+    var fields=[], map={};
+    for(var i=0;i<els.length;i++){ var e=els[i];
+      if(e.offsetParent===null) continue;                 // مخفي
+      var v=(e.value||""); if(v.replace(/\s/g,"")==="") continue;
+      var id=e.id||e.getAttribute("data-pfid");
+      if(!id){ id="pf"+i+"_"+Date.now(); e.setAttribute("data-pfid",id); }
+      map[id]=e; fields.push({id:id,text:v});
+    }
+    return {fields:fields,map:map};
+  }
+  function run(btn,container,status){
+    if(typeof Auth==="undefined"||!Auth.proofread){ status.className="proof-status err"; status.textContent="غير متاح"; return; }
+    var c=collect(container);
+    if(!c.fields.length){ status.className="proof-status err"; status.textContent="لا يوجد نص للتدقيق"; return; }
+    btn.disabled=true; var lbl=btn.textContent; btn.textContent="جارٍ التدقيق…"; status.className="proof-status"; status.textContent="";
+    Auth.proofread(c.fields).then(function(res){
+      btn.disabled=false; btn.textContent=lbl;
+      if(!res.ok){ status.className="proof-status err"; status.textContent=res.error||"فشل التدقيق"; return; }
+      var changed=0;
+      (res.fields||[]).forEach(function(f){ var e=c.map[f.id];
+        if(e&&typeof f.text==="string"&&e.value!==f.text){ e.value=f.text; e.dispatchEvent(new Event("input",{bubbles:true})); e.dispatchEvent(new Event("change",{bubbles:true})); changed++; } });
+      status.className="proof-status ok"; status.textContent=changed?("تم التصحيح — "+changed+" حقل"):"لا أخطاء";
+    });
+  }
+  function addButton(container){
+    if(!container||container.querySelector(".proof-wrap")) return;
+    var wrap=document.createElement("div"); wrap.className="proof-wrap";
+    var btn=document.createElement("button"); btn.type="button"; btn.className="proof-btn"; btn.textContent="تدقيق المحتوى";
+    var status=document.createElement("div"); status.className="proof-status";
+    wrap.appendChild(btn); wrap.appendChild(status); container.appendChild(wrap);
+    btn.onclick=function(){ run(btn,container,status); };
+  }
+  function scan(){ ["#cuApp .panel-body","#appRoot > .panel > .panel-body",".hc-pbody"].forEach(function(sel){ var c=document.querySelector(sel); if(c) addButton(c); }); }
+  if(document.readyState!=="loading") scan(); else document.addEventListener("DOMContentLoaded",scan);
 })();
 </script>
 </body></html>
