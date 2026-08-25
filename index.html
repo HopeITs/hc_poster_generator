@@ -1933,7 +1933,7 @@ async function renderUsers(){
     var em=document.createElement("span"); em.className="uemail"; em.textContent=u.email;
     var rl=document.createElement("span"); rl.className="urole "+u.role; rl.textContent=(ROLE_LABEL[u.role]||u.role);
     row.appendChild(em); row.appendChild(rl);
-    var canDel=(u.role!=="owner") && (u.email!==me.email) && !((u.role==="admin"||u.role==="comms")&&me.role!=="owner");
+    var canDel=(u.email!==me.email) && umpCanTarget(me.role,u.role);
     if(canDel){
       var del=document.createElement("button"); del.className="udel"; del.textContent="×"; del.title="حذف";
       del.onclick=async function(){ del.disabled=true; var err=await Auth.deleteUser(u.email); if(err){$("uMsg").textContent=err;del.disabled=false;} else {renderUsers();} };
@@ -1994,6 +1994,15 @@ async function openUserMgmt(){
   });
   umpToggleProjects(); renderUsersPage();
 }
+/* صلاحية إدارة (تعديل/حذف) دور الهدف — مطابِقة للـ backend (canTarget):
+   owner: الكل عدا owner | comms: user + admin | admin: user. */
+function umpCanTarget(actor,target){
+  if(target==="owner") return false;
+  if(target==="comms") return actor==="owner";
+  if(target==="admin") return actor==="owner"||actor==="comms";
+  if(target==="user")  return actor==="owner"||actor==="admin"||actor==="comms";
+  return false;
+}
 async function renderUsersPage(){
   var list=$("umpList"); list.innerHTML='<div style="font-size:12px;color:#9bb0bc;padding:8px">… جارٍ التحميل</div>';
   var me=Auth.current();
@@ -2009,8 +2018,8 @@ async function renderUsersPage(){
        الـ Owner فقط. الـ owner/comms وصولهم شامل فلا يُخصَّص. */
     /* تعديل المشاريع: user لأي مدير، admin للـ Owner فقط (owner/comms شامل).
        تعيين كلمة السر: user لأي مدير، admin/comms للـ Owner فقط. */
-    var canEditProjects=(u.role==="user")||(u.role==="admin"&&me.role==="owner");
-    var canEditPass=(u.role==="user")||(me.role==="owner"&&(u.role==="admin"||u.role==="comms"));
+    var canEditProjects=(u.role==="user"||u.role==="admin")&&umpCanTarget(me.role,u.role);
+    var canEditPass=umpCanTarget(me.role,u.role);
     var editor=null;
     if(canEditProjects||canEditPass){
       var editBtn=document.createElement("button"); editBtn.className="umpedit"; editBtn.title="تعديل"; editBtn.setAttribute("aria-label","تعديل");
@@ -2069,7 +2078,7 @@ async function renderUsersPage(){
       cancel.onclick=function(){ editor.classList.remove("on"); };
       row.appendChild(editBtn);
     }
-    var canDel=(u.role!=="owner") && (u.email!==me.email) && !((u.role==="admin"||u.role==="comms")&&me.role!=="owner");
+    var canDel=(u.email!==me.email) && umpCanTarget(me.role,u.role);
     if(canDel){
       var del=document.createElement("button"); del.className="umpdel"; del.textContent="×"; del.title="حذف";
       del.onclick=async function(){ del.disabled=true; var err=await Auth.deleteUser(u.email); if(err){ umpMsg(err,true); del.disabled=false; } else { renderUsersPage(); } };

@@ -119,9 +119,19 @@ async function getUserProjectsBrief(env, email, role) {
 function canManage(role) { return role === "owner" || role === "admin" || role === "comms"; }
 function isGlobalRole(role) { return role === "owner" || role === "comms"; } // وصول شامل لكل المشاريع
 function rolesVisibleTo(role) {
-  if (role === "owner") return ROLES;                        // يرى الجميع
-  if (role === "admin" || role === "comms") return ["user"]; // يرى الـ users فقط
+  if (role === "owner") return ROLES;                 // يرى الجميع
+  if (role === "comms") return ["user", "admin"];     // Comms يدير الـ users والـ admins
+  if (role === "admin") return ["user"];              // Admin يرى الـ users فقط
   return [];
+}
+// هل يملك هذا الدور صلاحية إدارة (تعديل/حذف) دور الهدف؟
+// owner: الكل عدا owner | comms: user + admin | admin: user
+function canTarget(actorRole, targetRole) {
+  if (targetRole === "owner") return false;
+  if (targetRole === "comms") return actorRole === "owner";
+  if (targetRole === "admin") return actorRole === "owner" || actorRole === "comms";
+  if (targetRole === "user")  return actorRole === "owner" || actorRole === "admin" || actorRole === "comms";
+  return false;
 }
 function canAssign(actorRole, targetRole) {
   if (actorRole === "owner") return ["user", "admin", "comms"].indexOf(targetRole) >= 0;
@@ -319,9 +329,7 @@ export default {
         if (!target) return json({ error: "المستخدم غير موجود" }, 404);
         if (target.role === "owner") return json({ error: "لا يمكن حذف الـ Owner" }, 403);
         if (target.email === actor3.email) return json({ error: "لا يمكنك حذف حسابك" }, 403);
-        if ((target.role === "admin" || target.role === "comms") && actor3.role !== "owner") {
-          return json({ error: "فقط الـ Owner يحذف هذا الدور" }, 403);
-        }
+        if (!canTarget(actor3.role, target.role)) return json({ error: "لا صلاحية على هذا الدور" }, 403);
         await env.DB.prepare("DELETE FROM users WHERE email=?1").bind(temail).run();
         await env.DB.prepare("DELETE FROM sessions WHERE email=?1").bind(temail).run();
         await env.DB.prepare("DELETE FROM user_projects WHERE email=?1").bind(temail).run();
@@ -339,7 +347,7 @@ export default {
         var spTarget = await env.DB.prepare("SELECT email,role FROM users WHERE email=?1").bind(spEmail).first();
         if (!spTarget) return json({ error: "المستخدم غير موجود" }, 404);
         if (spTarget.role === "owner" || spTarget.role === "comms") return json({ error: "هذا الدور وصوله شامل ولا يُخصّص" }, 400);
-        if (spActor.role !== "owner" && spTarget.role !== "user") return json({ error: "فقط الـ Owner" }, 403);
+        if (!canTarget(spActor.role, spTarget.role)) return json({ error: "لا صلاحية على هذا الدور" }, 403);
         if (spPids.length === 0) return json({ error: "يجب اختيار مشروع واحد على الأقل" }, 400);
         for (var si = 0; si < spPids.length; si++) {
           var spChk = await env.DB.prepare("SELECT id FROM projects WHERE id=?1").bind(spPids[si]).first();
@@ -365,7 +373,7 @@ export default {
         var pwPass = (pwb.password || "") + "";
         var pwTarget = await env.DB.prepare("SELECT email,role FROM users WHERE email=?1").bind(pwEmail).first();
         if (!pwTarget) return json({ error: "المستخدم غير موجود" }, 404);
-        if (pwActor.role !== "owner" && pwTarget.role !== "user") return json({ error: "فقط الـ Owner" }, 403);
+        if (!canTarget(pwActor.role, pwTarget.role)) return json({ error: "لا صلاحية على هذا الدور" }, 403);
         if (pwPass.length < 4) return json({ error: "كلمة السر 4 أحرف على الأقل" }, 400);
         var pwHash = await hashPassword(pwPass);
         await env.DB.prepare("UPDATE users SET password=?1 WHERE email=?2").bind(pwHash, pwEmail).run();

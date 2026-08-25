@@ -130,9 +130,7 @@ function route_users(string $method, string $path): void
         if (!$target)                                fail('المستخدم غير موجود', 404);
         if ($target['role'] === 'owner')             fail('لا يمكن حذف الـ Owner', 403);
         if ($target['email'] === $actor['email'])    fail('لا يمكنك حذف حسابك', 403);
-        if (in_array($target['role'], ['admin', 'comms'], true) && $actor['role'] !== 'owner') {
-            fail('فقط الـ Owner يحذف هذا الدور', 403);
-        }
+        if (!can_target($actor['role'], (string)$target['role'])) fail('لا صلاحية على هذا الدور', 403);
 
         $pdo = db();
         $pdo->beginTransaction();
@@ -163,7 +161,7 @@ function route_users(string $method, string $path): void
         if (in_array($target['role'], ['owner', 'comms'], true)) {
             fail('هذا الدور وصوله شامل ولا يُخصّص', 400);
         }
-        if ($actor['role'] !== 'owner' && $target['role'] !== 'user') fail('فقط الـ Owner', 403);
+        if (!can_target($actor['role'], (string)$target['role'])) fail('لا صلاحية على هذا الدور', 403);
         if (!$pids) fail('يجب اختيار مشروع واحد على الأقل', 400);
         assert_projects_allowed($pids, $actor);
 
@@ -194,7 +192,7 @@ function route_users(string $method, string $path): void
         $target = db_one('SELECT email,role FROM users WHERE email = ?', [$email]);
 
         if (!$target) fail('المستخدم غير موجود', 404);
-        if ($actor['role'] !== 'owner' && $target['role'] !== 'user') fail('فقط الـ Owner', 403);
+        if (!can_target($actor['role'], (string)$target['role'])) fail('لا صلاحية على هذا الدور', 403);
         if (strlen($pass) < 4) fail('كلمة السر 4 أحرف على الأقل', 400);
 
         db_run('UPDATE users SET password = ? WHERE email = ?', [hash_password($pass), $email]);
