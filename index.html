@@ -2840,7 +2840,7 @@ $("hcExportBtn").onclick=hcExport;
 <style>
 /* زر «تدقيق المحتوى» (Gemini) بعد آخر حقل في كل نموذج */
 .proof-wrap{margin:16px 0 2px;}
-.proof-btn{width:100%;background:#0e7c66;color:#fff;border:none;border-radius:10px;padding:12px;font-family:'Somar Sans';font-weight:800;font-size:14px;cursor:pointer;transition:.15s;}
+.proof-btn{width:100%;background:#6d6e71;color:#fff;border:none;border-radius:10px;padding:12px;font-family:'Somar Sans';font-weight:800;font-size:14px;cursor:pointer;transition:.15s;}
 .proof-btn:hover{filter:brightness(1.06);}
 .proof-btn:disabled{opacity:.65;cursor:default;}
 .proof-status{font-size:12px;margin-top:8px;min-height:16px;text-align:center;font-family:'Somar Sans';font-weight:700;}
@@ -2879,7 +2879,7 @@ $("hcExportBtn").onclick=hcExport;
   function addButton(container){
     if(!container||container.querySelector(".proof-wrap")) return;
     var wrap=document.createElement("div"); wrap.className="proof-wrap";
-    var btn=document.createElement("button"); btn.type="button"; btn.className="proof-btn"; btn.textContent="تدقيق المحتوى";
+    var btn=document.createElement("button"); btn.type="button"; btn.className="proof-btn"; btn.textContent="تدقيق وتصحيح المحتوى";
     var status=document.createElement("div"); status.className="proof-status";
     wrap.appendChild(btn); wrap.appendChild(status); container.appendChild(wrap);
     btn.onclick=function(){ run(btn,container,status); };
