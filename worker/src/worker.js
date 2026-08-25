@@ -399,20 +399,12 @@ export default {
           contents: [{ role: "user", parts: [{ text: JSON.stringify({ fields: prFields }) }] }],
           generationConfig: {
             temperature: 0.2,
-            thinkingConfig: { thinkingBudget: 0 },
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: { fields: { type: "ARRAY", items: {
-                type: "OBJECT", properties: { id: { type: "STRING" }, text: { type: "STRING" } }, required: ["id", "text"]
-              } } },
-              required: ["fields"]
-            }
+            responseMimeType: "application/json"
           }
         };
         var gr, gd;
         try {
-          gr = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + env.GEMINI_API_KEY,
+          gr = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=" + env.GEMINI_API_KEY,
             { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
           gd = await gr.json();
         } catch (e) { return json({ error: "تعذّر الاتصال بخدمة التدقيق" }, 502); }
