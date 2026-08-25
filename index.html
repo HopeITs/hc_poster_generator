@@ -477,7 +477,7 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .proj-card:hover:not(:disabled){border-color:var(--pc-hover,#003c54);background:var(--pc-hover,#003c54);color:#fff;}
 .proj-card:hover:not(:disabled) .proj-go{color:#fff;}
 .proj-card.soon{cursor:not-allowed;opacity:.6;background:#f4f6f8;color:#8697a3;}
-.proj-name{flex:1;text-align:left;}
+.proj-name{flex:1;text-align:center;}
 .proj-go{font-size:13px;color:#58595b;font-weight:700;white-space:nowrap;}
 .proj-badge{font-size:11px;font-weight:700;color:#5a7282;white-space:nowrap;}
 .pg-logout{margin-top:19.5px;background:none;border:none;color:#808285;font-family:'Somar Sans';font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;}
@@ -2150,7 +2150,7 @@ async function showProjectPicker(){
     card.disabled=!ready;
     if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); }
     var h='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
-    h+= ready ? '<span class="proj-go">اختيار ←</span>' : '<span class="proj-badge">قريبــــاً</span>';
+    h+= ready ? '' : '<span class="proj-badge">قريبــــاً</span>';
     card.innerHTML=h;
     if(ready){ card.onclick=function(){ selectProject(p); }; }
     grid.appendChild(card);
