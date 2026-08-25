@@ -2150,7 +2150,6 @@ async function showProjectPicker(){
     card.disabled=!ready;
     if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); }
     var h='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
-    h+= ready ? '' : '<span class="proj-badge">قريبــــاً</span>';
     card.innerHTML=h;
     if(ready){ card.onclick=function(){ selectProject(p); }; }
     grid.appendChild(card);
