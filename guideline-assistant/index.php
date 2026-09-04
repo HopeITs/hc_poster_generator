@@ -141,11 +141,11 @@
     <div class="card">
       <div class="sec-title">2 · اختر المحافظة (واحدة أو أكثر أو الكل)</div>
       <div class="opts">
-        <label class="chk all"><input type="checkbox" disabled><span>كل المحافظات</span></label>
-        <label class="chk"><input type="checkbox" disabled><span>دمشق</span></label>
-        <label class="chk"><input type="checkbox" disabled><span>حمص</span></label>
-        <label class="chk"><input type="checkbox" disabled><span>اللاذقية</span></label>
-        <label class="chk"><input type="checkbox" disabled><span>حلب</span></label>
+        <label class="chk all"><input type="checkbox" id="gaGovAll"><span>كل المحافظات</span></label>
+        <label class="chk"><input type="checkbox" class="ga-gov" value="DMS"><span>دمشق</span></label>
+        <label class="chk"><input type="checkbox" class="ga-gov" value="HMS"><span>حمص</span></label>
+        <label class="chk"><input type="checkbox" class="ga-gov" value="LAT"><span>اللاذقية</span></label>
+        <label class="chk"><input type="checkbox" class="ga-gov" value="ALP"><span>حلب</span></label>
       </div>
     </div>
 
@@ -153,8 +153,8 @@
     <div class="card">
       <div class="sec-title">3 · صيغة الإخراج</div>
       <div class="opts">
-        <label class="chk"><input type="checkbox" checked disabled><span>Word</span></label>
-        <label class="chk"><input type="checkbox" disabled><span>PDF</span></label>
+        <label class="chk"><input type="checkbox" class="ga-fmt" value="docx" checked><span>Word</span></label>
+        <label class="chk"><input type="checkbox" class="ga-fmt" value="pdf"><span>PDF</span></label>
       </div>
     </div>
 
@@ -166,8 +166,8 @@
       </div>
       <div id="gaReview"></div>
       <div class="startrow" style="margin-top:16px">
-        <button class="btn" disabled>توليد المستند</button>
-        <span class="soon">التوليد على ترويسة المحافظة — الخطوة التالية.</span>
+        <button class="btn" id="gaGenerate">توليد المستند</button>
+        <span class="status" id="gaGenStatus"></span>
       </div>
     </div>
 
