@@ -483,11 +483,23 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .pg-logout{margin-top:19.5px;background:none;border:none;color:#808285;font-family:'Somar Sans';font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;}
 .app-copyright{position:absolute;bottom:24px;left:0;right:0;text-align:center;padding:0 12px;direction:ltr;font-family:'Somar Sans';font-weight:500;font-size:11px;color:#5b5b5b;}
 #projectGate .app-copyright{color:#848484;}
+.pg-stack{display:flex;flex-direction:column;align-items:center;gap:15px;}
+.pg-ga{width:min(92vw,440px);background:#fff;border-radius:18px;padding:21px 33px;box-shadow:0 10px 40px rgba(0,0,0,.12);}
+.pg-ga .proj-card{text-decoration:none;}
+.proj-badge.new{display:inline-block;background:#be1f24;color:#fff;font-size:9px;font-weight:800;letter-spacing:.05em;padding:2px 7px;border-radius:7px;vertical-align:middle;margin-inline-start:7px;font-family:'Somar Sans',system-ui,sans-serif;}
+.pg-ga .proj-card:hover .proj-badge.new{background:#fff;color:#be1f24;}
 </style>
 <div class="project-gate" id="projectGate" style="display:none">
-  <div class="pg-wrap">
-    <div class="pg-title">اختر المشروع</div>
-    <div class="proj-grid" id="projGrid"></div>
+  <div class="pg-stack">
+    <div class="pg-wrap">
+      <div class="pg-title">اختر المشروع</div>
+      <div class="proj-grid" id="projGrid"></div>
+    </div>
+    <div class="pg-ga">
+      <a class="proj-card" href="guideline-assistant/" style="--pc-hover:#be1f24">
+        <span class="proj-name">Guidelines Assistant <span class="proj-badge new">NEW</span></span>
+      </a>
+    </div>
   </div>
   <div class="acct">
     <button class="acct-av" id="pgAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="acctShadowPg" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="acctClipPg"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#acctShadowPg)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#acctClipPg)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
