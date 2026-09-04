@@ -30,6 +30,16 @@ function ga_xml(string $s): string
     return str_replace(['&', '<', '>', '"'], ['&amp;', '&lt;', '&gt;', '&quot;'], $s);
 }
 
+/**
+ * يثبّت التسلسلات الرقميّة (تواريخ/أوقات مثل 2026/9/20) كوحدة LTR بإحاطتها
+ * بعلامة LRM، فلا ينعكس ترتيب مقاطعها داخل السطر العربيّ (RTL).
+ */
+function ga_ltr_numbers(string $s): string
+{
+    $LRM = "\u{200E}";
+    return preg_replace('/([0-9]+(?:[\/.:\-][0-9]+)+)/u', $LRM . '$1' . $LRM, $s);
+}
+
 /** خصائص التشغيل (rPr) لدور معيّن، مع تجاوزات اختيارية. */
 function ga_rpr(array $st, ?int $sz = null, ?string $color = null): string
 {
@@ -51,7 +61,7 @@ function ga_para(string $role, string $text): string
     $jc = $st['jc'] === 'center' ? '<w:jc w:val="center"/>' : '<w:jc w:val="right"/>';
     // <w:bidi/> = فقرة RTL ؛ <w:rPr><w:rtl/> = علامة الفقرة RTL (يلزم Word)
     $ppr = '<w:pPr><w:bidi/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/>' . $jc . '<w:rPr><w:rtl/></w:rPr></w:pPr>';
-    $run = '<w:r>' . ga_rpr($st) . '<w:t xml:space="preserve">' . ga_xml($text) . '</w:t></w:r>';
+    $run = '<w:r>' . ga_rpr($st) . '<w:t xml:space="preserve">' . ga_xml(ga_ltr_numbers($text)) . '</w:t></w:r>';
     return '<w:p>' . $ppr . $run . '</w:p>';
 }
 
@@ -69,7 +79,7 @@ function ga_cell(string $text, int $colw, array $o): string
     $b = !empty($o['bold']) ? '<w:b/><w:bCs/>' : '';
     $rpr = '<w:rPr><w:rFonts w:ascii="' . ga_xml($o['font']) . '" w:hAnsi="' . ga_xml($o['font']) . '" w:cs="' . ga_xml($o['font']) . '"/>'
         . $b . '<w:color w:val="' . $o['color'] . '"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:rtl/><w:cs/></w:rPr>';
-    $run = $text === '' ? '' : '<w:r>' . $rpr . '<w:t xml:space="preserve">' . ga_xml($text) . '</w:t></w:r>';
+    $run = $text === '' ? '' : '<w:r>' . $rpr . '<w:t xml:space="preserve">' . ga_xml(ga_ltr_numbers($text)) . '</w:t></w:r>';
     return '<w:tc><w:tcPr><w:tcW w:w="' . $colw . '" w:type="dxa"/>' . $shd . '<w:vAlign w:val="center"/></w:tcPr>'
         . '<w:p>' . $ppr . $run . '</w:p></w:tc>';
 }
