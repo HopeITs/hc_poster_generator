@@ -18,7 +18,7 @@ function ga_role_styles(): array
 {
     return [
         'عنوان رئيسي' => ['f' => 'Somar Sans Black',    'cs' => 'Somar Sans Bold', 'sz' => 40, 'color' => 'BE1F24', 'jc' => 'center'],
-        'عنوان فرعي'  => ['f' => 'Somar Sans Bold',     'cs' => 'Somar Sans Bold', 'sz' => 32, 'color' => '58595B', 'jc' => 'right'],
+        'عنوان فرعي'  => ['f' => 'Somar Sans Bold',     'cs' => 'Somar Sans Bold', 'sz' => 32, 'color' => '58595B', 'jc' => 'center'],
         'نص'          => ['f' => 'Somar Sans',          'cs' => 'Somar Sans',      'sz' => 28, 'color' => '58595B', 'jc' => 'right'],
         'تعداد ناعم'  => ['f' => 'Somar Sans',          'cs' => 'Somar Sans',      'sz' => 28, 'color' => '58595B', 'jc' => 'right'],
         'تعداد خشن'   => ['f' => 'Somar Sans SemiBold',  'cs' => 'Somar Sans SemiBold', 'sz' => 32, 'color' => '58595B', 'jc' => 'right'],
@@ -39,7 +39,7 @@ function ga_rpr(array $st, ?int $sz = null, ?string $color = null): string
         . '<w:rFonts w:ascii="' . ga_xml($st['f']) . '" w:hAnsi="' . ga_xml($st['f']) . '" w:cs="' . ga_xml($st['cs']) . '"/>'
         . '<w:color w:val="' . $color . '"/>'
         . '<w:sz w:val="' . $sz . '"/><w:szCs w:val="' . $sz . '"/>'
-        . '<w:rtl/>'
+        . '<w:rtl/><w:cs/>'
         . '</w:rPr>';
 }
 
@@ -68,7 +68,7 @@ function ga_cell(string $text, int $colw, array $o): string
     $ppr = '<w:pPr><w:bidi/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/><w:rPr><w:rtl/></w:rPr></w:pPr>';
     $b = !empty($o['bold']) ? '<w:b/><w:bCs/>' : '';
     $rpr = '<w:rPr><w:rFonts w:ascii="' . ga_xml($o['font']) . '" w:hAnsi="' . ga_xml($o['font']) . '" w:cs="' . ga_xml($o['font']) . '"/>'
-        . $b . '<w:color w:val="' . $o['color'] . '"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:rtl/></w:rPr>';
+        . $b . '<w:color w:val="' . $o['color'] . '"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:rtl/><w:cs/></w:rPr>';
     $run = $text === '' ? '' : '<w:r>' . $rpr . '<w:t xml:space="preserve">' . ga_xml($text) . '</w:t></w:r>';
     return '<w:tc><w:tcPr><w:tcW w:w="' . $colw . '" w:type="dxa"/>' . $shd . '<w:vAlign w:val="center"/></w:tcPr>'
         . '<w:p>' . $ppr . $run . '</w:p></w:tc>';
@@ -116,22 +116,18 @@ function ga_table(array $rows): string
 /** يبني محتوى الجسم من الكتل المُراجَعة. */
 function ga_build_content(array $blocks): string
 {
-    $out = '';
-    $lastWasTable = false;
+    $out = ga_empty_para();   // سطر فاصل تحت الهيدر
     foreach ($blocks as $b) {
         $type = $b['type'] ?? 'para';
         if ($type === 'table' && !empty($b['rows'])) {
             $out .= ga_table($b['rows']);
-            $lastWasTable = true;
         } else {
             $text = trim((string)($b['text'] ?? ''));
             if ($text === '') continue;
             $out .= ga_para($b['role'] ?? 'نص', $text);
-            $lastWasTable = false;
         }
     }
-    // الجسم يجب أن ينتهي بفقرة قبل sectPr (خاصّة بعد جدول)
-    if ($out === '' || $lastWasTable) $out .= ga_empty_para();
+    $out .= ga_empty_para();   // سطر فاصل فوق الفووتر (ويضمن انتهاء الجسم بفقرة)
     return $out;
 }
 
@@ -155,6 +151,14 @@ function ga_gen_docx(array $blocks, string $templatePath, string $outPath): stri
         throw new RuntimeException('بنية القالب غير متوقّعة (لا sectPr)');
     }
     $sectPr = $m[0];
+    // اجعل السيكشن نفسه RTL (يمنع Word من فرض LTR على الفقرات)
+    if (strpos($sectPr, '<w:bidi/>') === false) {
+        if (strpos($sectPr, '<w:docGrid') !== false) {
+            $sectPr = str_replace('<w:docGrid', '<w:bidi/><w:docGrid', $sectPr);
+        } else {
+            $sectPr = str_replace('</w:sectPr>', '<w:bidi/></w:sectPr>', $sectPr);
+        }
+    }
 
     $bodyOpen = strpos($doc, '<w:body');
     $contentStart = strpos($doc, '>', $bodyOpen);
