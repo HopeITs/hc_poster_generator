@@ -67,7 +67,8 @@ try {
         $base = '001HC_' . $g . '_' . $title;
         $docxPath = $work . DIRECTORY_SEPARATOR . $base . '.docx';
         ga_gen_docx($blocks, $tmpl, $docxPath);
-        ga_embed_fonts($docxPath);   // تضمين Somar داخل الملفّ
+        // ملاحظة: تضمين الخطوط (ga_embed_fonts) مُعطَّل — كان يكسر بنية الملفّ
+        // فيصلّحه Word ويفقد اتجاه RTL. الـPDF يضمّن الخطوط تلقائيًّا للحمل.
 
         if (in_array('docx', $formats, true)) $files[$base . '.docx'] = $docxPath;
         if (in_array('pdf', $formats, true)) {

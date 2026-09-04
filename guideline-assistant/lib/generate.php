@@ -49,7 +49,7 @@ function ga_rpr(array $st, ?int $sz = null, ?string $color = null): string
         . '<w:rFonts w:ascii="' . ga_xml($st['f']) . '" w:hAnsi="' . ga_xml($st['f']) . '" w:cs="' . ga_xml($st['cs']) . '"/>'
         . '<w:color w:val="' . $color . '"/>'
         . '<w:sz w:val="' . $sz . '"/><w:szCs w:val="' . $sz . '"/>'
-        . '<w:rtl/><w:cs/>'
+        . '<w:rtl/>'
         . '</w:rPr>';
 }
 
@@ -59,8 +59,8 @@ function ga_para(string $role, string $text): string
     $styles = ga_role_styles();
     $st = $styles[$role] ?? $styles['نص'];
     $jc = $st['jc'] === 'center' ? '<w:jc w:val="center"/>' : '<w:jc w:val="right"/>';
-    // <w:bidi/> = فقرة RTL ؛ <w:rPr><w:rtl/> = علامة الفقرة RTL (يلزم Word)
-    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/>' . $jc . '<w:rPr><w:rtl/></w:rPr></w:pPr>';
+    // مطابق لمستندات Word العربيّة عندهم: <w:bidi/> بالفقرة + <w:rtl/> بالتشغيل
+    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/>' . $jc . '</w:pPr>';
     $run = '<w:r>' . ga_rpr($st) . '<w:t xml:space="preserve">' . ga_xml(ga_ltr_numbers($text)) . '</w:t></w:r>';
     return '<w:p>' . $ppr . $run . '</w:p>';
 }
@@ -68,17 +68,17 @@ function ga_para(string $role, string $text): string
 /** فقرة فارغة (فاصل / إغلاق بعد جدول). */
 function ga_empty_para(): string
 {
-    return '<w:p><w:pPr><w:bidi/><w:rPr><w:rtl/></w:rPr></w:pPr></w:p>';
+    return '<w:p><w:pPr><w:bidi/></w:pPr></w:p>';
 }
 
 /** خليّة جدول. $o: fill (تعبئة)، font، color، bold. */
 function ga_cell(string $text, int $colw, array $o): string
 {
     $shd = !empty($o['fill']) ? '<w:shd w:val="clear" w:color="auto" w:fill="' . $o['fill'] . '"/>' : '';
-    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/><w:rPr><w:rtl/></w:rPr></w:pPr>';
+    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>';
     $b = !empty($o['bold']) ? '<w:b/><w:bCs/>' : '';
     $rpr = '<w:rPr><w:rFonts w:ascii="' . ga_xml($o['font']) . '" w:hAnsi="' . ga_xml($o['font']) . '" w:cs="' . ga_xml($o['font']) . '"/>'
-        . $b . '<w:color w:val="' . $o['color'] . '"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:rtl/><w:cs/></w:rPr>';
+        . $b . '<w:color w:val="' . $o['color'] . '"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:rtl/></w:rPr>';
     $run = $text === '' ? '' : '<w:r>' . $rpr . '<w:t xml:space="preserve">' . ga_xml(ga_ltr_numbers($text)) . '</w:t></w:r>';
     return '<w:tc><w:tcPr><w:tcW w:w="' . $colw . '" w:type="dxa"/>' . $shd . '<w:vAlign w:val="center"/></w:tcPr>'
         . '<w:p>' . $ppr . $run . '</w:p></w:tc>';
@@ -161,14 +161,6 @@ function ga_gen_docx(array $blocks, string $templatePath, string $outPath): stri
         throw new RuntimeException('بنية القالب غير متوقّعة (لا sectPr)');
     }
     $sectPr = $m[0];
-    // اجعل السيكشن نفسه RTL (يمنع Word من فرض LTR على الفقرات)
-    if (strpos($sectPr, '<w:bidi/>') === false) {
-        if (strpos($sectPr, '<w:docGrid') !== false) {
-            $sectPr = str_replace('<w:docGrid', '<w:bidi/><w:docGrid', $sectPr);
-        } else {
-            $sectPr = str_replace('</w:sectPr>', '<w:bidi/></w:sectPr>', $sectPr);
-        }
-    }
 
     $bodyOpen = strpos($doc, '<w:body');
     $contentStart = strpos($doc, '>', $bodyOpen);
