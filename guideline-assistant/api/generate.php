@@ -67,6 +67,7 @@ try {
         $base = '001HC_' . $g . '_' . $title;
         $docxPath = $work . DIRECTORY_SEPARATOR . $base . '.docx';
         ga_gen_docx($blocks, $tmpl, $docxPath);
+        ga_embed_fonts($docxPath);   // تضمين Somar داخل الملفّ
 
         if (in_array('docx', $formats, true)) $files[$base . '.docx'] = $docxPath;
         if (in_array('pdf', $formats, true)) {

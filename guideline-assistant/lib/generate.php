@@ -49,7 +49,8 @@ function ga_para(string $role, string $text): string
     $styles = ga_role_styles();
     $st = $styles[$role] ?? $styles['نص'];
     $jc = $st['jc'] === 'center' ? '<w:jc w:val="center"/>' : '<w:jc w:val="right"/>';
-    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/>' . $jc . '</w:pPr>';
+    // <w:bidi/> = فقرة RTL ؛ <w:rPr><w:rtl/> = علامة الفقرة RTL (يلزم Word)
+    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/>' . $jc . '<w:rPr><w:rtl/></w:rPr></w:pPr>';
     $run = '<w:r>' . ga_rpr($st) . '<w:t xml:space="preserve">' . ga_xml($text) . '</w:t></w:r>';
     return '<w:p>' . $ppr . $run . '</w:p>';
 }
@@ -57,16 +58,19 @@ function ga_para(string $role, string $text): string
 /** فقرة فارغة (فاصل / إغلاق بعد جدول). */
 function ga_empty_para(): string
 {
-    return '<w:p><w:pPr><w:bidi/></w:pPr></w:p>';
+    return '<w:p><w:pPr><w:bidi/><w:rPr><w:rtl/></w:rPr></w:pPr></w:p>';
 }
 
-/** خليّة جدول بنصّها (Somar Sans 10pt، توسيط). */
-function ga_cell(string $text, int $colw): string
+/** خليّة جدول. $o: fill (تعبئة)، font، color، bold. */
+function ga_cell(string $text, int $colw, array $o): string
 {
-    $st = ['f' => 'Somar Sans', 'cs' => 'Somar Sans', 'sz' => 20, 'color' => '58595B'];
-    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>';
-    $run = $text === '' ? '' : '<w:r>' . ga_rpr($st) . '<w:t xml:space="preserve">' . ga_xml($text) . '</w:t></w:r>';
-    return '<w:tc><w:tcPr><w:tcW w:w="' . $colw . '" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>'
+    $shd = !empty($o['fill']) ? '<w:shd w:val="clear" w:color="auto" w:fill="' . $o['fill'] . '"/>' : '';
+    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/><w:rPr><w:rtl/></w:rPr></w:pPr>';
+    $b = !empty($o['bold']) ? '<w:b/><w:bCs/>' : '';
+    $rpr = '<w:rPr><w:rFonts w:ascii="' . ga_xml($o['font']) . '" w:hAnsi="' . ga_xml($o['font']) . '" w:cs="' . ga_xml($o['font']) . '"/>'
+        . $b . '<w:color w:val="' . $o['color'] . '"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:rtl/></w:rPr>';
+    $run = $text === '' ? '' : '<w:r>' . $rpr . '<w:t xml:space="preserve">' . ga_xml($text) . '</w:t></w:r>';
+    return '<w:tc><w:tcPr><w:tcW w:w="' . $colw . '" w:type="dxa"/>' . $shd . '<w:vAlign w:val="center"/></w:tcPr>'
         . '<w:p>' . $ppr . $run . '</w:p></w:tc>';
 }
 
@@ -84,13 +88,20 @@ function ga_table(array $rows): string
         . '</w:tblBorders>';
     $grid = '<w:tblGrid>' . str_repeat('<w:gridCol w:w="' . $colw . '"/>', $maxCols) . '</w:tblGrid>';
 
+    // الصفّ الأول = رأس أحمر بنصّ أبيض؛ بقيّة الصفوف زِبرا (أبيض / #F4F4F5)
     $trs = '';
-    foreach ($rows as $r) {
+    foreach ($rows as $ri => $r) {
         $cells = '';
         for ($i = 0; $i < $maxCols; $i++) {
-            $cells .= ga_cell((string)($r[$i] ?? ''), $colw);
+            if ($ri === 0) {
+                $o = ['fill' => 'BE1F24', 'font' => 'Somar Sans SemiBold', 'color' => 'FFFFFF', 'bold' => true];
+            } else {
+                $o = ['fill' => ($ri % 2 === 0) ? 'F4F4F5' : '', 'font' => 'Somar Sans Medium', 'color' => '6F6E71', 'bold' => false];
+            }
+            $cells .= ga_cell((string)($r[$i] ?? ''), $colw, $o);
         }
-        $trs .= '<w:tr>' . $cells . '</w:tr>';
+        $trHead = $ri === 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : '';
+        $trs .= '<w:tr>' . $trHead . $cells . '</w:tr>';
     }
 
     return '<w:tbl><w:tblPr>'
@@ -164,6 +175,96 @@ function ga_gen_docx(array $blocks, string $templatePath, string $outPath): stri
     $zo->close();
 
     return $outPath;
+}
+
+/* ============================ تضمين الخطوط ============================ */
+
+/** الخطوط المضمَّنة: اسم العائلة => ملفّ OTF. */
+function ga_embed_map(): array
+{
+    $d = __DIR__ . '/../fonts/';
+    return [
+        'Somar Sans'          => $d . 'SomarSans-Regular.otf',
+        'Somar Sans Medium'   => $d . 'SomarSans-Medium.otf',
+        'Somar Sans SemiBold' => $d . 'SomarSans-SemiBold.otf',
+        'Somar Sans Bold'     => $d . 'SomarSans-Bold.otf',
+        'Somar Sans Black'    => $d . 'SomarSans-Black.otf',
+    ];
+}
+
+/**
+ * يشوّش أول 32 بايت وفق ECMA-376 (نفس ترتيب بايتات GUID عند Word:
+ * Guid.ToByteArray). يُعيد [البيانات المشوّشة، نصّ الـGUID للـfontKey].
+ */
+function ga_obfuscate_font(string $font): array
+{
+    $R = array_values(unpack('C16', random_bytes(16)));  // 16 بايت (= ToByteArray)
+    // نصّ الـGUID الذي يعيد Word تحليله إلى نفس $R (عكس أول 3 مجموعات)
+    $guid = sprintf(
+        '{%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X}',
+        $R[3], $R[2], $R[1], $R[0], $R[5], $R[4], $R[7], $R[6],
+        $R[8], $R[9], $R[10], $R[11], $R[12], $R[13], $R[14], $R[15]
+    );
+    $n = min(32, strlen($font));
+    for ($i = 0; $i < $n; $i++) {
+        $font[$i] = chr(ord($font[$i]) ^ $R[15 - ($i % 16)]);
+    }
+    return [$font, $guid];
+}
+
+/** يضمّن خطوط Somar داخل docx موجود (يعدّله في مكانه). */
+function ga_embed_fonts(string $docxPath): void
+{
+    $zip = new ZipArchive();
+    if ($zip->open($docxPath) !== true) return;
+
+    $fontTable = $zip->getFromName('word/fontTable.xml');
+    $ctypes    = $zip->getFromName('[Content_Types].xml');
+    $settings  = $zip->getFromName('word/settings.xml');
+    if ($fontTable === false || $ctypes === false || $settings === false) { $zip->close(); return; }
+
+    $fontsXml = '';
+    $rels = '';
+    $i = 0;
+    foreach (ga_embed_map() as $family => $otf) {
+        if (!is_file($otf)) continue;
+        $i++;
+        [$obf, $guid] = ga_obfuscate_font(file_get_contents($otf));
+        $zip->addFromString("word/fonts/font$i.odttf", $obf);
+        $rid = "gaFont$i";
+        $rels .= '<Relationship Id="' . $rid . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/font" Target="fonts/font' . $i . '.odttf"/>';
+        $fontsXml .= '<w:font w:name="' . ga_xml($family) . '"><w:embedRegular r:id="' . $rid . '" w:fontKey="' . $guid . '"/></w:font>';
+    }
+    if ($i === 0) { $zip->close(); return; }
+
+    // 1) fontTable.xml — أضف عائلات الخطوط المضمَّنة
+    $fontTable = str_replace('</w:fonts>', $fontsXml . '</w:fonts>', $fontTable);
+    $zip->deleteName('word/fontTable.xml');
+    $zip->addFromString('word/fontTable.xml', $fontTable);
+
+    // 2) علاقات fontTable
+    $relsXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' . $rels . '</Relationships>';
+    $zip->deleteName('word/_rels/fontTable.xml.rels');
+    $zip->addFromString('word/_rels/fontTable.xml.rels', $relsXml);
+
+    // 3) [Content_Types] — نوع odttf
+    if (strpos($ctypes, 'Extension="odttf"') === false) {
+        $ctypes = str_replace('</Types>',
+            '<Default Extension="odttf" ContentType="application/vnd.openxmlformats-officedocument.obfuscatedFont"/></Types>',
+            $ctypes);
+        $zip->deleteName('[Content_Types].xml');
+        $zip->addFromString('[Content_Types].xml', $ctypes);
+    }
+
+    // 4) settings.xml — فعّل التضمين
+    if (strpos($settings, '<w:embedTrueTypeFonts/>') === false) {
+        $settings = preg_replace('/(<w:settings\b[^>]*>)/', '$1<w:embedTrueTypeFonts/><w:embedSystemFonts/>', $settings, 1);
+        $zip->deleteName('word/settings.xml');
+        $zip->addFromString('word/settings.xml', $settings);
+    }
+
+    $zip->close();
 }
 
 /** يبحث عن soffice.exe (LibreOffice). */
