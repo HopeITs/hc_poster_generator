@@ -69,8 +69,9 @@ function ga_para(string $role, string $text): string
     $styles = ga_role_styles();
     $st = $styles[$role] ?? $styles['نص'];
     $jc = $st['jc'] === 'center' ? '<w:jc w:val="center"/>' : '<w:jc w:val="right"/>';
-    // مطابق لمستندات Word العربيّة عندهم: <w:bidi/> بالفقرة + <w:rtl/> بالتشغيل
-    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="120" w:line="276" w:lineRule="auto"/>' . $jc . '</w:pPr>';
+    // مطابق تمامًا لِما يُنتجه Word لدى المستخدم: محاذاة + <w:rtl/> على التشغيل،
+    // بلا <w:bidi/> (وجودها يجعل Word عنده يعرض الفقرة LTR).
+    $ppr = '<w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/>' . $jc . '</w:pPr>';
     $run = '<w:r>' . ga_rpr($st) . '<w:t xml:space="preserve">' . ga_xml(ga_ltr_numbers($text)) . '</w:t></w:r>';
     return '<w:p>' . $ppr . $run . '</w:p>';
 }
@@ -78,14 +79,14 @@ function ga_para(string $role, string $text): string
 /** فقرة فارغة (فاصل / إغلاق بعد جدول). */
 function ga_empty_para(): string
 {
-    return '<w:p><w:pPr><w:bidi/></w:pPr></w:p>';
+    return '<w:p/>';
 }
 
 /** خليّة جدول. $o: fill (تعبئة)، font، color، bold. */
 function ga_cell(string $text, int $colw, array $o): string
 {
     $shd = !empty($o['fill']) ? '<w:shd w:val="clear" w:color="auto" w:fill="' . $o['fill'] . '"/>' : '';
-    $ppr = '<w:pPr><w:bidi/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>';
+    $ppr = '<w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>';
     $b = !empty($o['bold']) ? '<w:b/><w:bCs/>' : '';
     $rpr = '<w:rPr><w:rFonts w:ascii="' . ga_xml($o['font']) . '" w:hAnsi="' . ga_xml($o['font']) . '" w:cs="' . ga_xml($o['font']) . '"/>'
         . $b . '<w:color w:val="' . $o['color'] . '"/><w:sz w:val="20"/><w:szCs w:val="20"/><w:rtl/></w:rPr>';
