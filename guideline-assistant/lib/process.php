@@ -18,7 +18,19 @@ const GA_ROLES = ['عنوان رئيسي', 'عنوان فرعي', 'نص', 'تع�
 
 function ga_key(): string
 {
-    return (string)(getenv('GEMINI_API_KEY') ?: '');
+    // 1) متغيّر البيئة (يُستخدم في التطوير: php -S أو SetEnv)
+    $k = (string)(getenv('GEMINI_API_KEY') ?: '');
+    // 2) بديل للإنتاج على Apache/XAMPP: ملفّ config.php محليّ خارج git
+    if ($k === '') {
+        $cfg = __DIR__ . '/../config.php';
+        if (is_file($cfg)) {
+            $c = include $cfg;
+            if (is_array($c) && !empty($c['GEMINI_API_KEY'])) {
+                $k = trim((string)$c['GEMINI_API_KEY']);
+            }
+        }
+    }
+    return $k;
 }
 
 /** يوحّد اسم الدور القادم من النموذج إلى أحد الأدوار القانونيّة. */
