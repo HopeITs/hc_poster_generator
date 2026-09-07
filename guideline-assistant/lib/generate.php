@@ -40,6 +40,16 @@ function ga_ltr_numbers(string $s): string
     return preg_replace('/([0-9]+(?:[\/.:\-][0-9]+)+)/u', $LRM . '$1' . $LRM, $s);
 }
 
+/**
+ * يفرض اتجاه النصّ RTL على مستوى المحتوى نفسه عبر تضمين Unicode
+ * (RLE ‥ PDF)، فيُعرض من اليمين لليسار حتى لو تجاهل Word خاصيّة اتجاه
+ * الفقرة (حين لا تكون لغة تحرير RTL مفعّلة). الأرقام تبقى LTR بداخله.
+ */
+function ga_rtl_text(string $s): string
+{
+    return "\u{202B}" . ga_ltr_numbers($s) . "\u{202C}";   // RLE … PDF
+}
+
 /** خصائص التشغيل (rPr) لدور معيّن، مع تجاوزات اختيارية. */
 function ga_rpr(array $st, ?int $sz = null, ?string $color = null): string
 {
