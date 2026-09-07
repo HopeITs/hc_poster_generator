@@ -190,7 +190,61 @@ function ga_gen_docx(array $blocks, string $templatePath, string $outPath): stri
     $zo->addFromString('word/document.xml', $newDoc);
     $zo->close();
 
+    ga_validate_docx($outPath);   // بوّابة جودة قبل الإرجاع
     return $outPath;
+}
+
+/**
+ * بوّابة جودة: يتحقّق أنّ الـdocx المولَّد سليم بنيويًّا قبل تسليمه.
+ * يرمي RuntimeException عند أي خلل، فلا يصل ملفّ مكسور إلى المستخدم.
+ */
+function ga_validate_docx(string $path): void
+{
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) {
+        throw new RuntimeException('فشل التحقّق: تعذّر فتح الملفّ المولَّد');
+    }
+
+    // 1) الأجزاء الأساسيّة موجودة
+    foreach (['[Content_Types].xml', 'word/document.xml', 'word/_rels/document.xml.rels'] as $part) {
+        if ($zip->locateName($part) === false) {
+            $zip->close();
+            throw new RuntimeException("فشل التحقّق: جزء أساسيّ مفقود ($part)");
+        }
+    }
+
+    // 2) الترويسة والوسائط محفوظة (تأكيد عدم كسر قالب المحافظة)
+    $hasHeader = false; $hasMedia = false;
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $n = $zip->getNameIndex($i);
+        if (strncmp($n, 'word/header', 11) === 0) $hasHeader = true;
+        if (strncmp($n, 'word/media/', 11) === 0) $hasMedia = true;
+    }
+    $doc = $zip->getFromName('word/document.xml');
+    $zip->close();
+
+    if (!$hasHeader || !$hasMedia) {
+        throw new RuntimeException('فشل التحقّق: ترويسة القالب أو صورتها مفقودة');
+    }
+
+    // 3) document.xml صالح XML (يكشف أي كسر ناتج عن دمج المحتوى)
+    $prev = libxml_use_internal_errors(true);
+    $dom = new DOMDocument();
+    $ok = $dom->loadXML($doc, LIBXML_NONET);
+    libxml_clear_errors();
+    libxml_use_internal_errors($prev);
+    if (!$ok) {
+        throw new RuntimeException('فشل التحقّق: XML المستند غير صالح (بنية مكسورة)');
+    }
+
+    // 4) الجسم سليم وينتهي بـ sectPr، وكل فقرة/جدول متوازن
+    if (strpos($doc, '<w:body') === false || strpos($doc, '</w:body>') === false
+        || strpos($doc, '<w:sectPr') === false) {
+        throw new RuntimeException('فشل التحقّق: بنية جسم المستند ناقصة');
+    }
+    if (substr_count($doc, '<w:tbl>') !== substr_count($doc, '</w:tbl>')) {
+        throw new RuntimeException('فشل التحقّق: جدول غير متوازن');
+    }
 }
 
 /* ============================ تضمين الخطوط ============================ */
