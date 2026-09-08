@@ -29,15 +29,14 @@
     font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;
     -webkit-font-smoothing:antialiased;min-height:100vh;}
 
-  .topbar{display:flex;align-items:center;gap:14px;max-width:900px;margin:0 auto;padding:22px 20px 6px;}
+  .topbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;max-width:900px;margin:0 auto;padding:22px 20px 6px;}
   .back{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);
     border-radius:10px;padding:9px 14px;color:var(--ink);font-family:inherit;font-weight:700;font-size:13px;
     text-decoration:none;transition:.15s;white-space:nowrap;}
   .back:hover{background:var(--red);border-color:var(--red);color:#fff;}
-  .brand{display:flex;align-items:center;gap:9px;flex:1;}
+  .back{justify-self:start;}
+  .brand{display:flex;align-items:center;gap:9px;justify-content:center;grid-column:2;}
   .brand h1{margin:0;font-size:20px;font-weight:900;color:var(--red);letter-spacing:-.01em;}
-  .badge-new{background:var(--red);color:#fff;font-size:9px;font-weight:800;letter-spacing:.05em;
-    padding:3px 8px;border-radius:7px;}
 
   .wrap{max-width:900px;margin:0 auto;padding:14px 20px 40px;}
   .card{background:var(--card);border-radius:18px;box-shadow:0 10px 40px rgba(0,0,0,.08);
@@ -103,7 +102,6 @@
     <a class="back" href="../">→ المشاريع</a>
     <div class="brand">
       <h1>Guidelines Assistant</h1>
-      <span class="badge-new">NEW</span>
     </div>
   </div>
 
