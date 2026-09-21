@@ -69,6 +69,9 @@ function ga_worker_post(string $path, array $payload): array
         CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8', 'x-ga-secret: ' . $sec],
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
         CURLOPT_TIMEOUT => 120,
+        CURLOPT_CONNECTTIMEOUT => 15,
+        // XAMPP/ويندوز: تفاوض HTTP/2 يفشل أحيانًا («HTTP2 framing layer») — أجبر HTTP/1.1
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
     ]);
     $body = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
