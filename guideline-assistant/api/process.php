@@ -21,9 +21,8 @@ function ga_fail(string $msg, int $code = 400): never
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     ga_fail('الطريقة غير مسموحة', 405);
 }
-$key = ga_key();
-if ($key === '') {
-    ga_fail('مفتاح المعالجة غير مضبوط على الخادم (GEMINI_API_KEY)', 500);
+if (!ga_ai_ready()) {
+    ga_fail('خدمة المعالجة غير مضبوطة على الخادم (GA_SHARED_SECRET)', 500);
 }
 if (empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
     ga_fail('لم يصل أي ملفّ صالح');
@@ -48,7 +47,7 @@ $visionMime = [
 try {
     if (isset($visionMime[$ext])) {
         /* صورة أو PDF: استخراج + تصحيح + تصنيف بنداء واحد */
-        $blocks = ga_vision_extract($work, $visionMime[$ext], $key);
+        $blocks = ga_vision_extract($work, $visionMime[$ext]);
         $source = $ext === 'pdf' ? 'pdf' : 'image';
     } else {
         /* نصّ أو docx: استخراج محليّ ثم تدقيق + تصنيف */
@@ -59,7 +58,7 @@ try {
         foreach ($ex['blocks'] as $i => $b) {
             if ($b['type'] === 'para') $paras[] = ['i' => $i, 'text' => $b['text']];
         }
-        $map = ga_process_paragraphs($paras, $key);
+        $map = ga_process_paragraphs($paras);
 
         $blocks = [];
         foreach ($ex['blocks'] as $i => $b) {

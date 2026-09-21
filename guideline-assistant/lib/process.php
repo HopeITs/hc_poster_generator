@@ -2,8 +2,11 @@
 /**
  * Guidelines Assistant — المرحلة 2: المعالجة (تدقيق + تصنيف الأدوار)
  * -----------------------------------------------------------------
- * يستدعي Gemini. المفتاح يُقرأ من متغيّر البيئة GEMINI_API_KEY فقط
- * (لا يُكتب في أي ملفّ ولا في الـgit).
+ * نداءات Gemini تمرّ عبر Cloudflare Worker (studyzone-auth)، لأنّ Gemini
+ * محظور جغرافيًّا على الخوادم في سوريا؛ الـWorker على شبكة Cloudflare
+ * يتجاوز الحظر. المصادقة خادم-لخادم بسرّ مشترك GA_SHARED_SECRET
+ * (يُقرأ من config.php المحليّ أو من متغيّر بيئة). مفتاح Gemini نفسه
+ * مخزَّن سرًّا داخل الـWorker فقط.
  *
  * - ga_process_paragraphs(): للنصّ/الـdocx (بعد الاستخراج المحليّ).
  * - ga_vision_extract():     للصورة/الـPDF (استخراج + تصحيح + تصنيف بنداء واحد).
@@ -11,26 +14,38 @@
 
 declare(strict_types=1);
 
-const GA_MODEL = 'gemini-flash-lite-latest';
-
 /** الأدوار القانونيّة (مطابقة لأنماط Template.docx). */
 const GA_ROLES = ['عنوان رئيسي', 'عنوان فرعي', 'نص', 'تعداد ناعم', 'تعداد خشن'];
 
-function ga_key(): string
+/** عنوان الـWorker الافتراضيّ (يمكن تجاوزه من config.php أو البيئة). */
+const GA_WORKER_DEFAULT = 'https://studyzone-auth.ct-aleppo3.workers.dev';
+
+/** إعدادات محليّة من config.php (مع تخزين مؤقّت). */
+function ga_cfg(): array
 {
-    // 1) متغيّر البيئة (يُستخدم في التطوير: php -S أو SetEnv)
-    $k = (string)(getenv('GEMINI_API_KEY') ?: '');
-    // 2) بديل للإنتاج على Apache/XAMPP: ملفّ config.php محليّ خارج git
-    if ($k === '') {
-        $cfg = __DIR__ . '/../config.php';
-        if (is_file($cfg)) {
-            $c = include $cfg;
-            if (is_array($c) && !empty($c['GEMINI_API_KEY'])) {
-                $k = trim((string)$c['GEMINI_API_KEY']);
-            }
-        }
-    }
-    return $k;
+    static $c = null;
+    if ($c !== null) return $c;
+    $c = [];
+    $f = __DIR__ . '/../config.php';
+    if (is_file($f)) { $v = include $f; if (is_array($v)) $c = $v; }
+    return $c;
+}
+
+function ga_worker_url(): string
+{
+    $u = (string)(getenv('GA_WORKER_URL') ?: (ga_cfg()['WORKER_URL'] ?? GA_WORKER_DEFAULT));
+    return rtrim($u, '/');
+}
+
+function ga_worker_secret(): string
+{
+    return (string)(getenv('GA_SHARED_SECRET') ?: (ga_cfg()['GA_SHARED_SECRET'] ?? ''));
+}
+
+/** جاهزيّة خدمة المعالجة: السرّ المشترك مضبوط. */
+function ga_ai_ready(): bool
+{
+    return ga_worker_secret() !== '';
 }
 
 /** يوحّد اسم الدور القادم من النموذج إلى أحد الأدوار القانونيّة. */
@@ -40,16 +55,20 @@ function ga_norm_role($r): string
     return in_array($r, GA_ROLES, true) ? $r : 'نص';
 }
 
-/** نداء Gemini عامّ: يُعيد نصّ المرشّح الأول، أو يرمي استثناءً. */
-function ga_gemini_call(array $payload, string $key): string
+/** نداء الـWorker: POST JSON مع السرّ المشترك. يُعيد المصفوفة أو يرمي استثناءً. */
+function ga_worker_post(string $path, array $payload): array
 {
-    $ch = curl_init("https://generativelanguage.googleapis.com/v1beta/models/" . GA_MODEL . ":generateContent");
+    $sec = ga_worker_secret();
+    if ($sec === '') {
+        throw new RuntimeException('سرّ المعالجة غير مضبوط على الخادم (GA_SHARED_SECRET)');
+    }
+    $ch = curl_init(ga_worker_url() . $path);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'x-goog-api-key: ' . $key],
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=utf-8', 'x-ga-secret: ' . $sec],
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
-        CURLOPT_TIMEOUT => 90,
+        CURLOPT_TIMEOUT => 120,
     ]);
     $body = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -57,54 +76,31 @@ function ga_gemini_call(array $payload, string $key): string
     curl_close($ch);
 
     if ($body === false) {
-        throw new RuntimeException('تعذّر الاتصال بخدمة الذكاء الاصطناعي: ' . $cerr);
+        throw new RuntimeException('تعذّر الاتصال بخدمة المعالجة: ' . $cerr);
     }
     $d = json_decode($body, true);
-    if ($code !== 200) {
-        $msg = $d['error']['message'] ?? ('HTTP ' . $code);
+    if ($code !== 200 || !is_array($d)) {
+        $msg = (is_array($d) && !empty($d['error'])) ? $d['error'] : ('HTTP ' . $code);
         throw new RuntimeException('فشل المعالجة: ' . $msg);
     }
-    $txt = $d['candidates'][0]['content']['parts'][0]['text'] ?? '';
-    if ($txt === '') {
-        throw new RuntimeException('ردّ فارغ من خدمة المعالجة');
-    }
-    return $txt;
+    return $d;
 }
 
 /**
- * يدقّق ويصنّف فقرات نصّية.
+ * يدقّق ويصنّف فقرات نصّية عبر الـWorker.
  * $paras: [ ['i'=>int, 'text'=>string], ... ]
  * يُعيد خريطة i => ['role'=>..., 'text'=>...]
  */
-function ga_process_paragraphs(array $paras, string $key): array
+function ga_process_paragraphs(array $paras): array
 {
     if (!$paras) return [];
-
-    $sys =
-"You format Arabic documents into the Hope Center house style.\n" .
-"Input: JSON {\"items\":[{\"i\",\"text\"}]}.\n" .
-"For EACH item: (1) lightly correct spelling, punctuation, spacing and obvious grammar WITHOUT changing meaning; " .
-"keep proper nouns, places and organisations unchanged; keep numbers and dates EXACTLY as written — same digits, same order, same separators (do NOT reorder day/month/year) — only converting Indic numerals ٠-٩ to Western 0-9.\n" .
-"(2) assign exactly ONE role from this CLOSED set:\n" .
-"  عنوان_رئيسي = the document main title\n" .
-"  عنوان_فرعي = a section heading / subtitle\n" .
-"  نص = a normal body paragraph\n" .
-"  تعداد_ناعم = a plain list item / minor point\n" .
-"  تعداد_خشن = an emphasized list item / key point\n" .
-"Return ONLY JSON {\"items\":[{\"i\",\"role\",\"text\"}]} with the SAME i values. No commentary.";
-
-    $payload = [
-        'system_instruction' => ['parts' => [['text' => $sys]]],
-        'contents' => [['role' => 'user', 'parts' => [['text' => json_encode(['items' => $paras], JSON_UNESCAPED_UNICODE)]]]],
-        'generationConfig' => ['temperature' => 0.2, 'responseMimeType' => 'application/json'],
-    ];
-    $txt = ga_gemini_call($payload, $key);
-    $parsed = json_decode($txt, true);
-    if (!is_array($parsed) || !isset($parsed['items'])) {
+    $items = array_map(fn($p) => ['i' => $p['i'], 'text' => $p['text']], $paras);
+    $d = ga_worker_post('/ga/process', ['items' => $items]);
+    if (!isset($d['items']) || !is_array($d['items'])) {
         throw new RuntimeException('ردّ التصنيف غير صالح');
     }
     $out = [];
-    foreach ($parsed['items'] as $it) {
+    foreach ($d['items'] as $it) {
         if (!isset($it['i'])) continue;
         $out[(int)$it['i']] = [
             'role' => ga_norm_role($it['role'] ?? 'نص'),
@@ -115,38 +111,20 @@ function ga_process_paragraphs(array $paras, string $key): array
 }
 
 /**
- * استخراج + تصحيح + تصنيف من صورة أو PDF بنداء واحد (متعدّد الوسائط).
+ * استخراج + تصحيح + تصنيف من صورة أو PDF عبر الـWorker (نداء متعدّد الوسائط).
  * يُعيد قائمة كتل: [ ['type'=>'para','role'=>..,'text'=>..] , ['type'=>'table','rows'=>[[..]]] ]
  */
-function ga_vision_extract(string $path, string $mime, string $key): array
+function ga_vision_extract(string $path, string $mime): array
 {
     $bytes = file_get_contents($path);
     if ($bytes === false) throw new RuntimeException('تعذّرت قراءة الملف');
 
-    $sys =
-"You read an Arabic document (image or PDF) and return its CONTENT as structured blocks.\n" .
-"Extract the visible text ONLY (ignore logos, page decoration, headers/footers of letterhead).\n" .
-"Correct obvious spelling/spacing lightly WITHOUT changing meaning; keep proper nouns; keep numbers and dates EXACTLY as written (same order and separators), only converting Indic numerals ٠-٩ to Western 0-9.\n" .
-"Return ONLY JSON: {\"blocks\":[ ... ]} where each block is either\n" .
-"  {\"type\":\"para\",\"role\":ROLE,\"text\":\"...\"}  with ROLE in {عنوان_رئيسي,عنوان_فرعي,نص,تعداد_ناعم,تعداد_خشن}\n" .
-"  or {\"type\":\"table\",\"rows\":[[\"cell\",...],...]}  (text cells only)\n" .
-"Preserve reading order. No commentary.";
-
-    $payload = [
-        'system_instruction' => ['parts' => [['text' => $sys]]],
-        'contents' => [['role' => 'user', 'parts' => [
-            ['inline_data' => ['mime_type' => $mime, 'data' => base64_encode($bytes)]],
-            ['text' => 'استخرج المحتوى وفق التعليمات.'],
-        ]]],
-        'generationConfig' => ['temperature' => 0.2, 'responseMimeType' => 'application/json'],
-    ];
-    $txt = ga_gemini_call($payload, $key);
-    $parsed = json_decode($txt, true);
-    if (!is_array($parsed) || !isset($parsed['blocks'])) {
+    $d = ga_worker_post('/ga/vision', ['mime' => $mime, 'data' => base64_encode($bytes)]);
+    if (!isset($d['blocks']) || !is_array($d['blocks'])) {
         throw new RuntimeException('ردّ الاستخراج غير صالح');
     }
     $blocks = [];
-    foreach ($parsed['blocks'] as $b) {
+    foreach ($d['blocks'] as $b) {
         if (($b['type'] ?? '') === 'para') {
             $t = trim((string)($b['text'] ?? ''));
             if ($t !== '') $blocks[] = ['type' => 'para', 'role' => ga_norm_role($b['role'] ?? 'نص'), 'text' => $t];

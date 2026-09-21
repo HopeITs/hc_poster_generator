@@ -424,6 +424,56 @@ export default {
         return json({ ok: true, fields: (parsed && parsed.fields) || [] });
       }
 
+      /* ---- 7d) Guidelines Assistant: تدقيق + تصنيف (خادم-لخادم بسرّ مشترك) ----
+         تُنادى من api/process.php لأنّ Gemini محظور جغرافيًّا على سيرفر سوريا؛
+         الـWorker على شبكة Cloudflare فيتجاوز الحظر. */
+      if (request.method === "POST" && (path === "/ga/process" || path === "/ga/vision")) {
+        if (!env.GA_SHARED_SECRET || request.headers.get("x-ga-secret") !== env.GA_SHARED_SECRET) {
+          return json({ error: "forbidden" }, 403);
+        }
+        if (!env.GEMINI_API_KEY) return json({ error: "مفتاح المعالجة غير مضبوط" }, 500);
+        var gaBody = await request.json();
+        var gaPayload;
+        if (path === "/ga/process") {
+          var gaItems = (Array.isArray(gaBody.items) ? gaBody.items : [])
+            .map(function (x) { return { i: x && x.i, text: String(x && x.text != null ? x.text : "") }; })
+            .filter(function (x) { return x.text.replace(/\s/g, "") !== ""; });
+          if (!gaItems.length) return json({ ok: true, items: [] });
+          gaPayload = {
+            system_instruction: { parts: [{ text:
+"You format Arabic documents into the Hope Center house style.\n" +
+"Input: JSON {\"items\":[{\"i\",\"text\"}]}.\n" +
+"For EACH item: (1) lightly correct spelling, punctuation, spacing and obvious grammar WITHOUT changing meaning; keep proper nouns, places and organisations unchanged; keep numbers and dates EXACTLY as written — same digits, same order, same separators (do NOT reorder day/month/year) — only converting Indic numerals ٠-٩ to Western 0-9.\n" +
+"(2) assign exactly ONE role from this CLOSED set: عنوان_رئيسي = main title; عنوان_فرعي = section heading; نص = body paragraph; تعداد_ناعم = plain list item; تعداد_خشن = emphasized list item.\n" +
+"Return ONLY JSON {\"items\":[{\"i\",\"role\",\"text\"}]} with the SAME i values. No commentary." }] },
+            contents: [{ role: "user", parts: [{ text: JSON.stringify({ items: gaItems }) }] }],
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
+          };
+        } else {
+          var gaMime = String(gaBody.mime || ""), gaData = String(gaBody.data || "");
+          if (!gaMime || !gaData) return json({ error: "لا يوجد ملف" }, 400);
+          gaPayload = {
+            system_instruction: { parts: [{ text:
+"You read an Arabic document (image or PDF) and return its CONTENT as structured blocks.\n" +
+"Extract the visible text ONLY (ignore logos, page decoration, letterhead headers/footers).\n" +
+"Correct obvious spelling/spacing lightly WITHOUT changing meaning; keep proper nouns; keep numbers and dates EXACTLY as written (same order and separators), only converting Indic numerals ٠-٩ to Western 0-9.\n" +
+"Return ONLY JSON {\"blocks\":[...]} where each block is either {\"type\":\"para\",\"role\":ROLE,\"text\":\"...\"} with ROLE in {عنوان_رئيسي,عنوان_فرعي,نص,تعداد_ناعم,تعداد_خشن} or {\"type\":\"table\",\"rows\":[[\"cell\",...],...]} (text cells only). Preserve reading order. No commentary." }] },
+            contents: [{ role: "user", parts: [ { inline_data: { mime_type: gaMime, data: gaData } }, { text: "Extract the content per the instructions." } ] }],
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
+          };
+        }
+        var gaR, gaD;
+        try {
+          gaR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=" + env.GEMINI_API_KEY,
+            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(gaPayload) });
+          gaD = await gaR.json();
+        } catch (e) { return json({ error: "تعذّر الاتصال بخدمة المعالجة" }, 502); }
+        if (!gaR.ok) return json({ error: (gaD && gaD.error && gaD.error.message) || "فشل المعالجة" }, 502);
+        var gaTxt = ""; try { gaTxt = gaD.candidates[0].content.parts[0].text || ""; } catch (e) {}
+        var gaParsed; try { gaParsed = JSON.parse(gaTxt); } catch (e) { return json({ error: "ردّ غير صالح" }, 502); }
+        return json({ ok: true, items: (gaParsed && gaParsed.items) || [], blocks: (gaParsed && gaParsed.blocks) || [] });
+      }
+
       /* ---- 8) قائمة المشاريع ---- */
       if (request.method === "GET" && path === "/projects") {
         var pa = await getSessionUser(env, request);
