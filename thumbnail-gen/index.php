@@ -108,15 +108,12 @@
   .yt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px 14px;}
   @media(max-width:700px){.yt-grid{grid-template-columns:1fr;}}
   .yt-thumb{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:var(--yt-skel);}
-  .yt-thumb canvas{display:block;width:100%;height:100%;}
+  .yt-thumb canvas,.yt-thumb img{display:block;width:100%;height:100%;object-fit:cover;}
   .yt-dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.8);color:#fff;font-size:12px;font-weight:600;padding:1px 4px;border-radius:4px;}
   .yt-meta{display:flex;gap:10px;margin-top:10px;}
   .yt-av{flex:0 0 36px;height:36px;border-radius:50%;background:#be1f24 url('assets/logo.svg') center/26px auto no-repeat;}
   .yt-ttl{font-size:15px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
   .yt-sub{font-size:13px;color:var(--yt-sub);margin-top:3px;line-height:1.4;}
-  .yt-skel .yt-thumb{background:var(--yt-skel);}
-  .yt-skel .yt-av{background:var(--yt-skel);}
-  .yt-bone{height:12px;border-radius:6px;background:var(--yt-skel);margin-top:4px;}
   .yt-side .yt-item{display:flex;gap:9px;margin-bottom:12px;}
   .yt-side .yt-thumb{flex:0 0 168px;border-radius:8px;}
   .yt-side .yt-ttl{font-size:14px;}
@@ -192,8 +189,14 @@ into Success</textarea>
                 <div class="yt-thumb"><canvas class="yt-live"></canvas><span class="yt-dur">12:34</span></div>
                 <div class="yt-meta"><span class="yt-av"></span><div><div class="yt-ttl yt-live-title"></div><div class="yt-sub">Christian Hope Center<br>1.2K views • 2 hours ago</div></div></div>
               </div>
-              <div class="yt-skel"><div class="yt-thumb"></div><div class="yt-meta"><span class="yt-av"></span><div style="flex:1"><div class="yt-bone" style="width:90%"></div><div class="yt-bone" style="width:60%"></div><div class="yt-bone" style="width:40%"></div></div></div></div>
-              <div class="yt-skel"><div class="yt-thumb"></div><div class="yt-meta"><span class="yt-av"></span><div style="flex:1"><div class="yt-bone" style="width:85%"></div><div class="yt-bone" style="width:55%"></div><div class="yt-bone" style="width:45%"></div></div></div></div>
+              <div>
+                <div class="yt-thumb"><img src="assets/mock/video1.jpg" alt=""><span class="yt-dur">8:47</span></div>
+                <div class="yt-meta"><span class="yt-av"></span><div><div class="yt-ttl">A Story of Hope Through Hardship</div><div class="yt-sub">Christian Hope Center<br>3.4K views • 1 week ago</div></div></div>
+              </div>
+              <div>
+                <div class="yt-thumb"><img src="assets/mock/video2.jpg" alt=""><span class="yt-dur">6:12</span></div>
+                <div class="yt-meta"><span class="yt-av"></span><div><div class="yt-ttl">A Village Reborn After Fire</div><div class="yt-sub">Christian Hope Center<br>5.1K views • 3 weeks ago</div></div></div>
+              </div>
             </div>
           </div>
           <div class="yt-side">
@@ -202,8 +205,14 @@ into Success</textarea>
               <div class="yt-thumb"><canvas class="yt-live"></canvas><span class="yt-dur">12:34</span></div>
               <div><div class="yt-ttl yt-live-title"></div><div class="yt-sub">Christian Hope Center<br>1.2K views • 2 hours ago</div></div>
             </div>
-            <div class="yt-item yt-skel"><div class="yt-thumb"></div><div style="flex:1"><div class="yt-bone" style="width:95%"></div><div class="yt-bone" style="width:70%"></div><div class="yt-bone" style="width:45%"></div></div></div>
-            <div class="yt-item yt-skel"><div class="yt-thumb"></div><div style="flex:1"><div class="yt-bone" style="width:90%"></div><div class="yt-bone" style="width:60%"></div><div class="yt-bone" style="width:50%"></div></div></div>
+            <div class="yt-item">
+              <div class="yt-thumb"><img src="assets/mock/video3.jpg" alt=""><span class="yt-dur">10:05</span></div>
+              <div><div class="yt-ttl">Breathing Life Back Into the Stones &amp; Souls</div><div class="yt-sub">Christian Hope Center<br>2.8K views • 1 month ago</div></div>
+            </div>
+            <div class="yt-item">
+              <div class="yt-thumb"><img src="assets/mock/video4.jpg" alt=""><span class="yt-dur">4:38</span></div>
+              <div><div class="yt-ttl">Children University Robotics</div><div class="yt-sub">Christian Hope Center<br>1.9K views • 2 months ago</div></div>
+            </div>
           </div>
         </div>
       </div>
