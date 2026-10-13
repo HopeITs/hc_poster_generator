@@ -1116,6 +1116,11 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <span class="role-badge" id="lpRoleBadge"></span>
     </div>
     <div class="panel-body">
+      <div class="field"><label>المحافظة</label>
+        <select id="lpCity">
+          <option value="حمص" selected>حمص</option>
+          <option value="حلب">حلب</option>
+        </select></div>
       <div class="sec-divider">الترويسة</div>
       <div class="field"><label>السطر التعريفي</label><input type="text" id="lpCenter" value="مركز الرجاء المسيحي في سوريا"></div>
       <div class="field"><label>نص الدعوة <span class="hint">سطر لكل صف</span></label>
@@ -2947,6 +2952,11 @@ $("hcExportBtn").onclick=hcExport;
   function lpRender(){ var w=$("lpSvg"); if(!w) return; w.innerHTML=lpSVG(false); lpFit(); }
   window.addEventListener("resize",function(){ if($("lpApp")&&$("lpApp").classList.contains("on")) lpFit(); });
   ["lpCenter","lpInvite","lpDesc","lpQuoteTitle","lpQuote","lpDeadline","lpPhone","lpAddress","lpBar"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",lpRender); });
+  /* المحافظة: fills the address line and names the export (HMS/ALP). Homs keeps
+     the designer's kashida so the default still matches the file. */
+  var LP_CITY={"حمص":{code:"HMS",addr:"الحميدية - مقابل قصـــر جوليـــا."},"حلب":{code:"ALP",addr:"الفيلات - جانب كنيسة مار الياس."}};
+  function lpCityCode(){ var c=LP_CITY[val("lpCity")]; return c?c.code:"HMS"; }
+  if($("lpCity")) $("lpCity").addEventListener("change",function(){ var c=LP_CITY[this.value]; if(c&&$("lpAddress")) $("lpAddress").value=c.addr; lpRender(); });
 
   function lpSetQr(src){
     LP.qrUser=src||null;
@@ -2969,7 +2979,7 @@ $("hcExportBtn").onclick=hcExport;
         var im=new Image();
         im.onload=function(){
           var c=document.createElement("canvas"); c.width=W; c.height=H; c.getContext("2d").drawImage(im,0,0,W,H); URL.revokeObjectURL(url);
-          var a=document.createElement("a"); a.download="LEAP_HMS_"+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
+          var a=document.createElement("a"); a.download="LEAP_"+lpCityCode()+"_"+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
           done();
         };
         im.onerror=function(){ URL.revokeObjectURL(url); alert("خطأ بالتصدير (SVG)"); done(); };
@@ -2979,7 +2989,7 @@ $("hcExportBtn").onclick=hcExport;
   }
   if($("lpExportBtn")) $("lpExportBtn").onclick=lpExport;
 
-  var LP_FIELDS={center:"lpCenter",invite:"lpInvite",desc:"lpDesc",quoteTitle:"lpQuoteTitle",quote:"lpQuote",deadline:"lpDeadline",phone:"lpPhone",address:"lpAddress",bar:"lpBar"};
+  var LP_FIELDS={city:"lpCity",center:"lpCenter",invite:"lpInvite",desc:"lpDesc",quoteTitle:"lpQuoteTitle",quote:"lpQuote",deadline:"lpDeadline",phone:"lpPhone",address:"lpAddress",bar:"lpBar"};
   function lpCollect(){ var d={app:"leap",v:1}; for(var k in LP_FIELDS) d[k]=val(LP_FIELDS[k]); d.qr=LP.qrUser||null; return d; }
   function lpLoad(d){
     if(!d||typeof d!=="object"||d.app!=="leap"){ alert("بنية غير صحيحة"); return; }
@@ -2988,7 +2998,7 @@ $("hcExportBtn").onclick=hcExport;
   }
   if($("lpSaveBtn")) $("lpSaveBtn").onclick=function(){
     var blob=new Blob([JSON.stringify(lpCollect(),null,2)],{type:"application/json"});
-    var a=document.createElement("a"); a.download="LEAP_HMS_"+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
+    var a=document.createElement("a"); a.download="LEAP_"+lpCityCode()+"_"+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
   };
   if($("lpProjFile")) $("lpProjFile").addEventListener("change",function(e){
     var f=e.target.files[0]; if(!f) return; var r=new FileReader();
