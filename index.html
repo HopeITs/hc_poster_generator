@@ -1088,6 +1088,79 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
   </div>
 </div>
 </div>
+<!-- ===== LEAP generator (leap_v1) =====
+     Same shell as Children University (.app/.panel/.stage + account menu). The
+     poster is one 2048×2048 SVG built with native <text>, laid out from the
+     designer's "LEAP Homs" Illustrator file: every baseline, size, weight and
+     colour below comes from that PDF, so the default content reproduces it. -->
+<style>
+.lp-app{display:none;}
+.lp-app.on{display:block;}
+.lp-app .panel{display:flex;flex-direction:column;overflow:hidden;}
+.lp-app .panel-body{flex:1 1 auto;min-height:0;overflow-y:auto;}
+.lp-svg svg{display:block;}
+.lp-row{display:flex;gap:6px;}
+.lp-row .field{flex:1;min-width:0;}
+.lp-reset{background:none;border:none;color:#6d6e71;font-family:'Somar Sans';font-weight:700;font-size:12px;cursor:pointer;padding:0 4px;text-decoration:underline;}
+</style>
+<div class="lp-app" id="lpApp">
+<div class="app">
+  <div class="panel">
+    <div class="panel-head">
+      <h1><span class="wm" style="direction:ltr">LEAP</span></h1>
+      <p>ادخل المحتوى، التصميم مقفول بمعايير ثابتة</p>
+    </div>
+    <div class="user-bar">
+      <button id="lpBackToProjects">← المشاريع</button>
+      <span class="who" id="lpWhoami"></span>
+      <span class="role-badge" id="lpRoleBadge"></span>
+    </div>
+    <div class="panel-body">
+      <div class="sec-divider">الترويسة</div>
+      <div class="field"><label>السطر التعريفي</label><input type="text" id="lpCenter" value="مركز الرجاء المسيحي في سوريا"></div>
+      <div class="field"><label>نص الدعوة <span class="hint">سطر لكل صف</span></label>
+        <textarea id="lpInvite" rows="2">سواء كنت قائد فريق أم تتطلع للقيادة بفعالية أكبر أنت مدعو
+للانضمام للمجموعة الأولى من برنامج LEAP</textarea></div>
+      <div class="field"><label>وصف البرنامج <span class="hint">سطر لكل صف</span></label>
+        <textarea id="lpDesc" rows="2">وهو برنامج تدريبي تفاعلي مبتكر يهدف إلى تطوير وتمكين
+ مهارات القيـادة الشخصية والروحية.</textarea></div>
+      <div class="sec-divider">العبارة</div>
+      <div class="field"><label>العنوان</label><input type="text" id="lpQuoteTitle" value="القادة الحقيقيون"></div>
+      <div class="field"><label>النص</label><input type="text" id="lpQuote" value=" هم الذين يُظهرون القوة في الأوقات الصعبة"></div>
+      <div class="sec-divider">التقديم</div>
+      <div class="field"><label>رمز QR <span class="hint">صورة مربّعة</span> <button type="button" class="lp-reset" id="lpQrReset" style="display:none">استعادة الافتراضي</button></label>
+        <label class="upload has" id="lpQrUp">✓ رمز QR الافتراضي<input type="file" accept="image/*" id="lpQrFile"></label></div>
+      <div class="lp-row">
+        <div class="field"><label>الموعد النهائي</label><input type="text" id="lpDeadline" value="2025/3/25" dir="ltr"></div>
+        <div class="field"><label>رقم التواصل</label><input type="text" id="lpPhone" value="0950018463" dir="ltr"></div>
+      </div>
+      <div class="field"><label>العنوان</label><input type="text" id="lpAddress" value="الحميدية - مقابل قصـــر جوليـــا."></div>
+      <div class="sec-divider">الشريط السفلي</div>
+      <div class="field"><label>النص <span class="hint">**نص** = عريض</span></label>
+        <textarea id="lpBar" rows="3">فإذا كان عمرك بين الــ **21** والــ **30** عام وتسعى لتطويـر مهاراتك القيادية ندعوك للتقديـم من خلال الــ **QR Code**</textarea></div>
+    </div>
+    <div class="export-bar">
+      <div class="proj-row">
+        <button class="btn-proj" id="lpSaveBtn">حفظ مشروع</button>
+        <label class="btn-proj" id="lpLoadBtn">فتح مشروع<input type="file" accept=".json,application/json" id="lpProjFile" style="display:none"></label>
+      </div>
+      <button class="btn-export" id="lpExportBtn">DOWNLOAD</button>
+    </div>
+  </div>
+  <div class="preview"><div class="stage" id="lpStage">
+    <div class="lp-svg" id="lpSvg"></div>
+  </div></div>
+</div>
+<div class="acct">
+  <button class="acct-av" id="lpAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="acctShadowLp" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="acctClipLp"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#acctShadowLp)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#acctClipLp)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
+  <img class="acct-photo" id="lpAvatarPhoto" alt="">
+  <div class="acct-menu" id="lpAcctMenu">
+    <button id="lpPhotoBtn">تغيير الصورة الشخصية</button>
+    <button id="lpMgmtToggle" style="display:none">إدارة المستخدمين</button>
+    <button id="lpLogout">تسجيل خروج</button>
+  </div>
+</div>
+</div>
 <script>
 /* Local-dev safety net. This app needs the PHP API, which only exists over the
    web server; the API path is derived from location.pathname. If the page is
@@ -1865,7 +1938,7 @@ wireAcct("pgAvatar","pgAcctMenu");
    follows the user across devices and browsers. */
 var ACCT_PHOTO_PX=256;
 function acctApplyPhoto(src){
-  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"],["cuAvatarPhoto","cuAvatar"],["pgAvatarPhoto","pgAvatar"]];
+  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"],["cuAvatarPhoto","cuAvatar"],["lpAvatarPhoto","lpAvatar"],["pgAvatarPhoto","pgAvatar"]];
   for(var i=0;i<ids.length;i++){
     var img=$(ids[i][0]), av=$(ids[i][1]);
     if(!img||!av) continue;
@@ -2137,6 +2210,7 @@ async function afterAuth(){
 function openProject(p){
   if(p && p.template_type==="hopecenter_v1"){ openHopeCenter(p); }
   else if(p && (p.template_type==="mixed_v1" || p.slug==="children-university") && typeof window.openChildrenUniversity==="function"){ window.openChildrenUniversity(p); }
+  else if(p && (p.template_type==="leap_v1" || p.slug==="leap") && typeof window.openLeap==="function"){ window.openLeap(p); }
   else { try{ Auth.applyBrand(p); }catch(e){} try{ document.title="HC GENERATOR"; }catch(e){} startApp(); }
 }
 // Wired here rather than as an inline onclick: CSP cannot allow inline event
@@ -2144,7 +2218,7 @@ function openProject(p){
 if($("backToProjects")) $("backToProjects").onclick=showProjectPicker;
 // Per-project hover colour for the project cards (card fills with the brand
 // colour, text turns white on hover). Falls back to navy for unlisted slugs.
-var PROJ_HOVER={"study-zone":"#003c54","hope-center":"#be1f24","children-university":"#f99d1c"};
+var PROJ_HOVER={"study-zone":"#003c54","hope-center":"#be1f24","children-university":"#f99d1c","leap":"#39a4ae"};
 async function showProjectPicker(){
   $("loginGate").style.display="none";
   $("appRoot").style.display="none";
@@ -2710,6 +2784,239 @@ $("hcExportBtn").onclick=hcExport;
 })();
 </script>
 <script>
+/* ===== LEAP generator (leap_v1) =====
+   Self-contained like the Children University block: shares the globals ($,
+   Auth, wireAcct, acctLoadPhoto, openUserMgmt, showProjectPicker) and keeps its
+   own state. The poster is a single 2048×2048 SVG with native <text>, so the
+   Arabic shapes correctly everywhere and the export rasterises the SVG itself
+   (no html2canvas). Every number in LP_LAY is taken from "LEAP Homs.pdf":
+   by = baseline, sz = font size (design units), cx = horizontal centre. */
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var W=2048, H=2048;
+  var LP_COL={navy:"#053c54",teal:"#39a4ae",gray:"#6d6e70",glow:"#fffefd",white:"#ffffff"};
+  var LP_LAY={
+    logo:{x:96.8,y:88.8,w:487.52,h:175.06},
+    wordmark:{x:1312.8,y:156,w:637.81,h:79.76},
+    glow:{y:450.4,h:1017.6},
+    chess:{x:0,y:832.55,w:2048,h:519.83},
+    qr:{x:898.43,y:1506.43,w:251.07,h:251.07},
+    bar:{y:1940,h:108},
+    center:{cx:1024,by:385.27,sz:47},
+    invite:{cx:1024,by:494.57,lead:85.97,sz:50.96},
+    desc:{cx:1024,by:706.78,lead:84.41,sz:47},
+    qtitle:{cx:1024,by:1359.51,sz:54},
+    quote:{cx:1024,by:1446.5,sz:54},
+    date:{cx:1024,by:1830.49,sz:44.96,numSz:46},
+    /* gap = text end → pin origin; cx centres text+pin. Both calibrated against
+       the PDF render so the default line lands on the file's pixels. */
+    addr:{cx:1025.4,by:1891.12,sz:44,gap:31.43},
+    barText:{cx:1024,by:2006.07,sz:42,boldSz:40}
+  };
+  var LP_MAXW=1848, LP_BAR_MAXW=1880;   // shrink-to-fit limits (the designer's own lines all fit)
+  /* Location pin, copied from the PDF (a 36×47 path drawn around its own origin).
+     Placed with a y-flip because PDF space is y-up. */
+  var LP_PIN={d:"M0 0C-.015 4.447-3.618 8.045-8.039 8.027C-12.504 8.01-16.068 4.411-16.056-.067C-16.044-4.471-12.399-8.05-7.95-8.027C-3.578-8.004.015-4.376 0 0ZM-7.755-29.196L-8.302-29.196C-8.465-29.042-8.632-28.892-8.791-28.734C-12.14-25.409-15.22-21.851-17.982-18.023C-20.352-14.739-22.45-11.298-23.946-7.516C-25.419-3.791-26.101.034-25.071 3.981C-23.303 10.757-19.001 15.101-12.252 16.978C-11.266 17.252-10.228 17.343-9.215 17.519L-6.842 17.519C-6.574 17.483-6.306 17.448-6.038 17.411C-.501 16.66 3.83 13.97 6.821 9.249C9.026 5.767 9.863 1.938 9.327-2.167C8.967-4.923 8.011-7.491 6.811-9.974C4.958-13.808 2.58-17.308-.051-20.642C-2.433-23.66-4.975-26.536-7.755-29.196Z",
+    left:-26.101, right:9.863};
+  var LP={project:null,assets:{},ready:false,qrUser:null};
+  var LP_ASSETS={logo:"assets/leap/logo.svg",wordmark:"assets/leap/wordmark.svg",chess:"assets/leap/chess.svg",qr:"assets/leap/qr.svg"};
+
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function val(id){ var e=$(id); return e?String(e.value||""):""; }
+  function lines(id){ return val(id).split(/\r?\n/).filter(function(l){ return l.trim()!==""; }); }
+  function todayMMDDYYYY(){ var d=new Date(); function p(n){return(n<10?"0":"")+n;} return p(d.getMonth()+1)+p(d.getDate())+d.getFullYear(); }
+
+  /* Assets are inlined as data: URIs: an SVG rasterised through <img> cannot
+     load external files, and the preview reuses the same markup. */
+  function lpLoadAssets(cb){
+    if(LP.ready){ cb&&cb(); return; }
+    var keys=Object.keys(LP_ASSETS), todo=keys.length;
+    keys.forEach(function(k){
+      fetch(LP_ASSETS[k]).then(function(r){ return r.text(); }).then(function(t){
+        LP.assets[k]="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(t)));
+      }).catch(function(){ LP.assets[k]=LP_ASSETS[k]; }).then(function(){ if(--todo===0){ LP.ready=true; cb&&cb(); } });
+    });
+  }
+  /* Somar Sans Medium/SemiBold/Bold + Black, pulled from the page's own
+     @font-face rules so the exported SVG carries them. */
+  var _lpFonts=null;
+  function lpFontCSS(){
+    if(_lpFonts!=null) return _lpFonts;
+    var out="", want={"somar sans|500":1,"somar sans|600":1,"somar sans|700":1,"somar sans black|900":1};
+    for(var i=0;i<document.styleSheets.length;i++){
+      var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+      if(!rules) continue;
+      for(var j=0;j<rules.length;j++){
+        var r=rules[j]; if(r.type!==5) continue;
+        var fam=(r.style.getPropertyValue("font-family")||"").replace(/['"]/g,"").toLowerCase().trim();
+        var key=fam+"|"+(r.style.getPropertyValue("font-weight")||"400").trim();
+        if(want[key]){ out+=r.cssText; want[key]=0; }
+      }
+    }
+    _lpFonts=out; return out;
+  }
+  /* Width of a run list [{t,w,sz,fam}] — used to shrink a line that would
+     overflow the poster and to centre the address line with its pin. */
+  var _lpCtx=null;
+  function runWidth(runs){
+    if(!_lpCtx) _lpCtx=document.createElement("canvas").getContext("2d");
+    var sum=0;
+    runs.forEach(function(r){ _lpCtx.font=r.w+" "+r.sz+"px '"+(r.fam||"Somar Sans")+"'"; sum+=_lpCtx.measureText(r.t).width; });
+    return sum;
+  }
+  function fitScale(runs,maxW){ var w=runWidth(runs); return (w>maxW&&w>0)?maxW/w:1; }
+  /* One centred RTL line built from runs; each run may override weight/size/fill/family. */
+  function textLine(cx,by,runs,base,anchor){
+    // xml:space="preserve": a leading/trailing space counts toward centring, as it does in Illustrator.
+    var s='<text xml:space="preserve" x="'+cx.toFixed(2)+'" y="'+by.toFixed(2)+'" text-anchor="'+(anchor||"middle")+'" direction="rtl" font-family="'+(base.fam||"Somar Sans")+'" font-weight="'+base.w+'" font-size="'+base.sz.toFixed(2)+'" fill="'+base.fill+'">';
+    runs.forEach(function(r){
+      var a="";
+      if(r.fam&&r.fam!==base.fam) a+=' font-family="'+r.fam+'"';
+      if(r.w!==base.w) a+=' font-weight="'+r.w+'"';
+      if(r.sz!==base.sz) a+=' font-size="'+r.sz.toFixed(2)+'"';
+      if(r.fill&&r.fill!==base.fill) a+=' fill="'+r.fill+'"';
+      s+=a?'<tspan'+a+'>'+esc(r.t)+'</tspan>':esc(r.t);
+    });
+    return s+'</text>';
+  }
+  function scaleRuns(runs,k){ return runs.map(function(r){ return {t:r.t,w:r.w,sz:r.sz*k,fill:r.fill,fam:r.fam}; }); }
+  /* A multi-line block: the design's lines sit at by, by+lead, …; any other
+     line count is centred on the same midpoint so the block keeps its place. */
+  function block(o,ls,w,fill){
+    var n=ls.length; if(!n) return "";
+    var designN=2, mid=o.by+o.lead*(designN-1)/2, first=mid-o.lead*(n-1)/2, out="";
+    ls.forEach(function(l,i){
+      var runs=[{t:l,w:w,sz:o.sz,fill:fill}], k=fitScale(runs,LP_MAXW);
+      out+=textLine(o.cx,first+o.lead*i,scaleRuns(runs,k),{w:w,sz:o.sz*k,fill:fill});
+    });
+    return out;
+  }
+  function single(o,txt,w,fill,fam){
+    if(!txt.trim()) return "";
+    var runs=[{t:txt,w:w,sz:o.sz,fill:fill,fam:fam}], k=fitScale(runs,LP_MAXW);
+    return textLine(o.cx,o.by,scaleRuns(runs,k),{w:w,sz:o.sz*k,fill:fill,fam:fam});
+  }
+  /* **bold** markup for the footer bar: plain text is Medium 42, bold runs Bold 40 (as designed). */
+  function barRuns(t){
+    var p=String(t||"").split("**"), out=[], L=LP_LAY.barText;
+    for(var i=0;i<p.length;i++){ if(p[i]==="") continue; out.push(i%2?{t:p[i],w:700,sz:L.boldSz,fill:LP_COL.white}:{t:p[i],w:500,sz:L.sz,fill:LP_COL.white}); }
+    return out;
+  }
+  function img(src,b){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+b.x+'" y="'+b.y+'" width="'+b.w+'" height="'+b.h+'" preserveAspectRatio="xMidYMid meet"/>'; }
+
+  function lpSVG(withFonts){
+    var L=LP_LAY, C=LP_COL, A=LP.assets;
+    var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'">';
+    if(withFonts) s+='<defs><style>'+lpFontCSS()+'</style></defs>';
+    s+='<rect width="'+W+'" height="'+H+'" fill="'+C.white+'"/>';
+    s+='<rect y="'+L.glow.y+'" width="'+W+'" height="'+L.glow.h+'" fill="'+C.glow+'"/>';
+    s+=img(A.chess||LP_ASSETS.chess,L.chess);
+    s+=img(A.logo||LP_ASSETS.logo,L.logo);
+    s+=img(A.wordmark||LP_ASSETS.wordmark,L.wordmark);
+    s+=single(L.center,val("lpCenter"),700,C.gray);
+    s+=block(L.invite,lines("lpInvite"),700,C.navy);
+    s+=block(L.desc,lines("lpDesc"),600,C.gray);
+    s+=single(L.qtitle,val("lpQuoteTitle"),900,C.navy,"Somar Sans Black");
+    s+=single(L.quote,val("lpQuote"),600,C.navy);
+    s+=img(LP.qrUser||A.qr||LP_ASSETS.qr,L.qr);
+    // الموعد + التواصل: one Bold navy line, the phone a touch larger (46 vs 45) as in the file.
+    var dl=val("lpDeadline").trim(), ph=val("lpPhone").trim(), dr=[];
+    if(dl) dr.push({t:"الموعد النهائي للتقديم: "+dl+(ph?", ":""),w:700,sz:L.date.sz,fill:C.navy});
+    if(ph) dr.push({t:"للاستفسار والتواصل: ",w:700,sz:L.date.sz,fill:C.navy},{t:ph,w:700,sz:L.date.numSz,fill:C.navy});
+    if(dr.length){ var dk=fitScale(dr,LP_MAXW); s+=textLine(L.date.cx,L.date.by,scaleRuns(dr,dk),{w:700,sz:L.date.sz*dk,fill:C.navy}); }
+    // العنوان: pin + "العنوان: …" (Bold navy, one run in the file), centred as one group.
+    var ad=val("lpAddress").trim();
+    if(ad){
+      var ar=[{t:"العنوان: "+ad,w:700,sz:L.addr.sz,fill:C.navy}];
+      var pinR=L.addr.gap+LP_PIN.right, tw=runWidth(ar), k=Math.min(1,LP_MAXW/(tw+pinR));
+      tw*=k; var left=L.addr.cx-(tw+pinR*k)/2, textRight=left+tw;
+      s+=textLine(textRight,L.addr.by,scaleRuns(ar,k),{w:700,sz:L.addr.sz*k,fill:C.navy},"start");
+      var px=textRight+L.addr.gap*k, py=L.addr.by+(1869.78-1891.12)*k;
+      s+='<path fill="'+C.teal+'" fill-rule="evenodd" transform="matrix('+k+' 0 0 '+(-k)+' '+px.toFixed(2)+' '+py.toFixed(2)+')" d="'+LP_PIN.d+'"/>';
+    }
+    s+='<rect y="'+L.bar.y+'" width="'+W+'" height="'+L.bar.h+'" fill="'+C.navy+'"/>';
+    var br=barRuns(val("lpBar"));
+    if(br.length){ var bk=fitScale(br,LP_BAR_MAXW); s+=textLine(L.barText.cx,L.barText.by,scaleRuns(br,bk),{w:500,sz:L.barText.sz*bk,fill:C.white}); }
+    return s+'</svg>';
+  }
+  function lpFit(){
+    var st=$("lpStage"); if(!st) return; var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return;
+    var sc=Math.min((pv.clientWidth-60)/W,(pv.clientHeight-60)/H,1);
+    st.style.width=W+"px"; st.style.height=H+"px"; st.style.transform="scale("+sc+")";
+  }
+  function lpRender(){ var w=$("lpSvg"); if(!w) return; w.innerHTML=lpSVG(false); lpFit(); }
+  window.addEventListener("resize",function(){ if($("lpApp")&&$("lpApp").classList.contains("on")) lpFit(); });
+  ["lpCenter","lpInvite","lpDesc","lpQuoteTitle","lpQuote","lpDeadline","lpPhone","lpAddress","lpBar"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",lpRender); });
+
+  function lpSetQr(src){
+    LP.qrUser=src||null;
+    var up=$("lpQrUp"); if(up) up.childNodes[0].nodeValue=src?"✓ تم رفع رمز QR":"✓ رمز QR الافتراضي";
+    var rs=$("lpQrReset"); if(rs) rs.style.display=src?"":"none";
+    lpRender();
+  }
+  if($("lpQrFile")) $("lpQrFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ lpSetQr(r.result); }; r.readAsDataURL(f); e.target.value="";
+  });
+  if($("lpQrReset")) $("lpQrReset").onclick=function(e){ e.preventDefault(); lpSetQr(null); };
+
+  function lpExport(){
+    var btn=$("lpExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
+    function done(){ btn.disabled=false; btn.textContent="DOWNLOAD"; }
+    lpLoadAssets(function(){
+      (document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(function(){
+        var url=URL.createObjectURL(new Blob([lpSVG(true)],{type:"image/svg+xml;charset=utf-8"}));
+        var im=new Image();
+        im.onload=function(){
+          var c=document.createElement("canvas"); c.width=W; c.height=H; c.getContext("2d").drawImage(im,0,0,W,H); URL.revokeObjectURL(url);
+          var a=document.createElement("a"); a.download="LEAP_HMS_"+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
+          done();
+        };
+        im.onerror=function(){ URL.revokeObjectURL(url); alert("خطأ بالتصدير (SVG)"); done(); };
+        im.src=url;
+      });
+    });
+  }
+  if($("lpExportBtn")) $("lpExportBtn").onclick=lpExport;
+
+  var LP_FIELDS={center:"lpCenter",invite:"lpInvite",desc:"lpDesc",quoteTitle:"lpQuoteTitle",quote:"lpQuote",deadline:"lpDeadline",phone:"lpPhone",address:"lpAddress",bar:"lpBar"};
+  function lpCollect(){ var d={app:"leap",v:1}; for(var k in LP_FIELDS) d[k]=val(LP_FIELDS[k]); d.qr=LP.qrUser||null; return d; }
+  function lpLoad(d){
+    if(!d||typeof d!=="object"||d.app!=="leap"){ alert("بنية غير صحيحة"); return; }
+    for(var k in LP_FIELDS){ var e=$(LP_FIELDS[k]); if(e&&typeof d[k]==="string") e.value=d[k]; }
+    lpSetQr(d.qr||null);
+  }
+  if($("lpSaveBtn")) $("lpSaveBtn").onclick=function(){
+    var blob=new Blob([JSON.stringify(lpCollect(),null,2)],{type:"application/json"});
+    var a=document.createElement("a"); a.download="LEAP_HMS_"+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
+  };
+  if($("lpProjFile")) $("lpProjFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ try{ lpLoad(JSON.parse(r.result)); }catch(err){ alert("ملف غير صالح"); } };
+    r.readAsText(f); e.target.value="";
+  });
+
+  if($("lpBackToProjects")) $("lpBackToProjects").onclick=function(){ $("lpApp").classList.remove("on"); if(typeof showProjectPicker==="function") showProjectPicker(); };
+  function lpShowUserBar(){ try{ var u=Auth.current(); if(!u) return; $("lpWhoami").textContent=u.email; $("lpRoleBadge").textContent=(window.ROLE_LABEL&&ROLE_LABEL[u.role])||u.role; if(typeof acctLoadPhoto==="function") acctLoadPhoto(); if($("lpMgmtToggle")&&Auth.can) $("lpMgmtToggle").style.display=Auth.can("manage_users")?"":"none"; }catch(e){} }
+  try{ if(typeof wireAcct==="function") wireAcct("lpAvatar","lpAcctMenu"); }catch(e){}
+  if($("lpPhotoBtn")) $("lpPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
+  if($("lpMgmtToggle")&&typeof openUserMgmt==="function") $("lpMgmtToggle").onclick=openUserMgmt;
+  if($("lpLogout")) $("lpLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("lpApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  window.openLeap=function(p){
+    LP.project=p||LP.project;
+    $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
+    var um=$("userMgmtPage"); if(um) um.style.display="none";
+    ["hcApp","cuApp"].forEach(function(id){ var x=$(id); if(x) x.classList.remove("on"); });
+    $("lpApp").classList.add("on");
+    lpShowUserBar();
+    try{ document.title="HC GENERATOR"; }catch(e){}
+    lpRender();
+    lpLoadAssets(lpRender);
+    if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(lpRender); }
+  };
+})();
+</script>
+<script>
 /* ===== سكرول مخصّص (NewScroll.svg) لكل لوحات التمرير =====
    يبني لكل حاوية قابلة للتمرير طبقةً ثابتة (position:fixed) تحتوي مسارًا محاطًا
    وحبّة متمركزة، مُزاحين 5px عن الحافة (يسار في RTL / يمين في LTR). يتتبّع موضع
@@ -2905,7 +3212,7 @@ $("hcExportBtn").onclick=hcExport;
     wrap.appendChild(btn); wrap.appendChild(status); container.appendChild(wrap);
     btn.onclick=function(){ run(btn,container,status); };
   }
-  function scan(){ ["#cuApp .panel-body","#appRoot > .panel > .panel-body",".hc-pbody"].forEach(function(sel){ var c=document.querySelector(sel); if(c) addButton(c); }); }
+  function scan(){ ["#cuApp .panel-body","#lpApp .panel-body","#appRoot > .panel > .panel-body",".hc-pbody"].forEach(function(sel){ var c=document.querySelector(sel); if(c) addButton(c); }); }
   if(document.readyState!=="loading") scan(); else document.addEventListener("DOMContentLoaded",scan);
 })();
 </script>
