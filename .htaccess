@@ -5,6 +5,13 @@
 # on the path rewrite the page -- and injected script can read the session token
 # out of localStorage and capture the password as it is typed. The second
 # condition covers running behind a proxy that terminates TLS upstream.
+
+<IfModule mod_setenvif.c>
+
+      SetEnvIf Remote_Addr "^191.44.88.13$" WHITELISTED_IP=1
+       SetEnvIf Remote_Addr "^201.4.69.2$" WHITELISTED_IP=1
+
+</IfModule>
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)  [NC]
