@@ -22,6 +22,15 @@ const MUSIC_DAILY_MAX  = 20;   // مقطوعات لكل مستخدم خلال 24
 const MUSIC_MIN_SEC    = 10;
 const MUSIC_MAX_SEC    = 90;
 const MUSIC_PROMPT_MAX = 500;  // أحرف وصف الموسيقى
+// Reels Gen — صياغة السكريبت (Gemini) والتعليق الصوتي (ElevenLabs) لكل من يملك الأداة
+const SCRIPT_DAILY_MAX = 60;   // صياغات لكل مستخدم خلال 24 ساعة
+const SCRIPT_MAX_CHARS = 4000; // سكريبت المستخدم
+const VOICE_DAILY_MAX  = 40;   // تعليقات صوتية لكل مستخدم خلال 24 ساعة
+const VOICE_MAX_CHARS  = 1200; // نص التعليق كاملاً (ريل 45 ث ≈ 500–700 حرف)
+const VOICE_NAME       = "mazen";            // يُبحث عنه في أصوات الحساب ثم في مكتبة ElevenLabs
+const VOICE_NAME_FULL  = "mazen lawand";
+const VOICE_MODEL      = "eleven_multilingual_v2";
+var voiceIdCache = null;       // يبقى طوال عمر نسخة الـWorker
 
 function cors() {
   return {
@@ -119,6 +128,46 @@ async function getUserProjectsBrief(env, email, role) {
   if (isGlobalRole(role)) return [];
   var rows = await env.DB.prepare("SELECT p.id,p.name FROM projects p JOIN user_projects up ON up.project_id=p.id WHERE up.email=?1 ORDER BY p.id").bind(email).all();
   return (rows.results || []).map(function (p) { return { id: p.id, name: p.name }; });
+}
+
+// هل يملك المستخدم مشروعاً بهذا الـslug (جاهزاً)؟ — نفس قاعدة ظهور الأدوات بالواجهة
+async function hasProjectSlug(env, user, slug) {
+  var list = await getAccessibleProjects(env, user.email, user.role);
+  return list.some(function (p) { return p.slug === slug && p.status === "ready"; });
+}
+async function usedToday(env, email, kind) {
+  var since = new Date(Date.now() - 86400000).toISOString().replace("T", " ").slice(0, 19);
+  var row = await env.DB.prepare("SELECT COUNT(*) AS c FROM ai_usage WHERE email=?1 AND kind=?2 AND at>?3").bind(email, kind, since).first();
+  return (row && row.c) || 0;
+}
+
+/* ---------- ElevenLabs: صوت مازن لاوند ----------
+   ELEVENLABS_VOICE_ID (اختياري) يتجاوز البحث. وإلا: أصوات الحساب أولاً، ثم مكتبة
+   الأصوات المشتركة — وإن وُجد هناك يُضاف إلى أصوات الحساب مرة واحدة (شرط ElevenLabs
+   لاستعماله عبر الـAPI). */
+function pickVoice(list, nameOf) {
+  var hits = (list || []).filter(function (v) { return String(nameOf(v) || "").toLowerCase().indexOf(VOICE_NAME) >= 0; });
+  return hits.filter(function (v) { return String(nameOf(v)).toLowerCase().indexOf(VOICE_NAME_FULL) >= 0; })[0] || hits[0] || null;
+}
+async function findVoiceId(env) {
+  if (env.ELEVENLABS_VOICE_ID) return env.ELEVENLABS_VOICE_ID;
+  if (voiceIdCache) return voiceIdCache;
+  var h = { "xi-api-key": env.ELEVENLABS_API_KEY };
+  var mine = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100&search=" + encodeURIComponent(VOICE_NAME), { headers: h });
+  if (mine.ok) {
+    var md = await mine.json(), mv = pickVoice(md.voices, function (v) { return v.name; });
+    if (mv) return (voiceIdCache = mv.voice_id);
+  }
+  var shared = await fetch("https://api.elevenlabs.io/v1/shared-voices?page_size=50&search=" + encodeURIComponent(VOICE_NAME_FULL), { headers: h });
+  if (!shared.ok) return null;
+  var sd = await shared.json(), sv = pickVoice(sd.voices, function (v) { return v.name; });
+  if (!sv) return null;
+  var add = await fetch("https://api.elevenlabs.io/v1/voices/add/" + encodeURIComponent(sv.public_owner_id) + "/" + encodeURIComponent(sv.voice_id), {
+    method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ new_name: sv.name })
+  });
+  if (!add.ok) return null;
+  var ad = await add.json();
+  return (voiceIdCache = ad.voice_id || sv.voice_id);
 }
 
 /* ---------- قواعد الصلاحيات ---------- */
@@ -413,6 +462,94 @@ export default {
         }
         await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'music', datetime('now'))").bind(muUser.email).run();
         return new Response(muRes.body, { status: 200, headers: { ...cors(), "Content-Type": "audio/mpeg", "Cache-Control": "no-store" } });
+      }
+
+      /* ---- 7b3) Reels Gen: سكريبت المستخدم ← جمل التعليق الصوتي + نصوص الكروت (Gemini) ----
+         لكل من يملك أداة reels-gen. يعيد {lines:[{voice, card}]}: كل جملة تُقرأ بالتعليق،
+         و card نص قصير لكرت يظهر معها (فارغ لمعظم الجمل). */
+      if (request.method === "POST" && path === "/reels/script") {
+        var scUser = await getSessionUser(env, request);
+        if (!scUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, scUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
+        if (!env.GEMINI_API_KEY) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        var scb = await request.json();
+        var scText = String(scb.script || "").trim().slice(0, SCRIPT_MAX_CHARS);
+        var scSecs = Math.max(15, Math.min(80, Math.round(Number(scb.seconds) || 40)));
+        if (!scText) return json({ error: "اكتب السكريبت أولاً" }, 400);
+        if ((await usedToday(env, scUser.email, "script")) >= SCRIPT_DAILY_MAX) return json({ error: "وصلت للحد اليومي للصياغة. جرّب بكرا." }, 429);
+        var scWords = Math.round(scSecs * 2.1);
+        var scSys =
+"You write the voiceover and on-screen text cards for a short vertical social-media reel (Instagram/Facebook) for an NGO's education and community projects in Syria.\n" +
+"The user gives a rough script or notes. Rewrite it into a voiceover read by a male narrator, plus a few short text cards.\n" +
+"LANGUAGE: simple, warm Syrian colloquial Arabic — a neutral 'white' Syrian dialect that any Syrian understands. NOT heavy Modern Standard Arabic, and NOT the marked accent of any one city or region (avoid strongly Aleppine, Damascene, coastal or rural markers). Natural spoken phrasing, e.g. «شو»، «هيك»، «كتير»، «لأنو»، «عم».\n" +
+"LENGTH: the whole voiceover must be read in about " + scSecs + " seconds — about " + Math.round(scWords * 0.9) + " to " + scWords + " words in total. Never exceed " + scWords + " words.\n" +
+"LINES: split the voiceover into 7 to 12 short sentences (one breath each, 4–14 words). The last line is a short closing/call-to-action.\n" +
+"CARDS: a card is on-screen text shown ALONE, in silence, just BEFORE its line is spoken — the narrator NEVER reads it. Give a card on the FIRST line (the hook: a question or striking statement that makes people stop scrolling) and on each line where the reel moves to a NEW idea — 3 cards in total (4 at most); every other line has card \"\". A card is at most 7 words, in the same dialect, punchy, and may be split over two lines with \\n at a natural break (like «شو نفع الشهادة\\nاذا ما عم تعرف تستخدمها؟»).\n" +
+"NO REPETITION: the voice line after a card must NOT repeat, paraphrase or re-ask the card — the viewer has just read it. The line picks up from the card and moves the thought forward (answers the question, gives the example, adds the next fact).\n" +
+"Keep names of people, places, projects and organisations exactly as given. Use Western digits 0-9. No emojis, no hashtags, no stage directions.\n" +
+"Return ONLY JSON: {\"lines\":[{\"voice\":\"...\",\"card\":\"...\"}]}";
+        var scR, scD;
+        try {
+          scR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + env.GEMINI_API_KEY, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              system_instruction: { parts: [{ text: scSys }] },
+              contents: [{ role: "user", parts: [{ text: scText }] }],
+              generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
+            })
+          });
+          scD = await scR.json();
+        } catch (e) { return json({ error: "تعذّر الاتصال بخدمة الصياغة" }, 502); }
+        if (!scR.ok) return json({ error: (scD && scD.error && scD.error.message) || "فشلت الصياغة" }, 502);
+        var scOut = ""; try { scOut = scD.candidates[0].content.parts[0].text || ""; } catch (e) {}
+        var scParsed; try { scParsed = JSON.parse(scOut); } catch (e) { return json({ error: "ردّ الصياغة غير صالح" }, 502); }
+        var scLines = (Array.isArray(scParsed && scParsed.lines) ? scParsed.lines : [])
+          .map(function (l) { return { voice: String(l && l.voice || "").trim(), card: String(l && l.card || "").trim() }; })
+          .filter(function (l) { return l.voice; }).slice(0, 14);
+        if (!scLines.length) return json({ error: "لم تُرجع الصياغة أي جملة" }, 502);
+        await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'script', datetime('now'))").bind(scUser.email).run();
+        return json({ ok: true, lines: scLines });
+      }
+
+      /* ---- 7b4) Reels Gen: تعليق صوتي بصوت مازن لاوند (ElevenLabs، مع توقيت كل جملة) ----
+         يستقبل {lines:[نص]} ويقرؤها دفعة واحدة (أداء متصل)، ثم يحسب من محاذاة الأحرف
+         بداية ونهاية كل جملة. يعيد {audio: mp3 base64, lines:[{start,end}], duration}. */
+      if (request.method === "POST" && path === "/reels/voice") {
+        var vcUser = await getSessionUser(env, request);
+        if (!vcUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, vcUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
+        if (!env.ELEVENLABS_API_KEY) return json({ error: "مفتاح ElevenLabs غير مضبوط" }, 500);
+        var vcb = await request.json();
+        var vcLines = (Array.isArray(vcb.lines) ? vcb.lines : []).map(function (l) { return String(l || "").replace(/\s+/g, " ").trim(); }).filter(Boolean);
+        if (!vcLines.length) return json({ error: "لا يوجد نص للتعليق" }, 400);
+        var vcText = vcLines.join("\n");
+        if (vcText.length > VOICE_MAX_CHARS) return json({ error: "نص التعليق طويل (" + vcText.length + " حرف، الحد " + VOICE_MAX_CHARS + ")" }, 400);
+        if ((await usedToday(env, vcUser.email, "voice")) >= VOICE_DAILY_MAX) return json({ error: "وصلت للحد اليومي (" + VOICE_DAILY_MAX + " تعليق). جرّب بكرا." }, 429);
+        var vcId = await findVoiceId(env);
+        if (!vcId) return json({ error: "لم أجد صوت «Mazen Lawand» في حساب ElevenLabs ولا في مكتبة الأصوات" }, 502);
+        var vcR = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(vcId) + "/with-timestamps?output_format=mp3_44100_128", {
+          method: "POST",
+          headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ text: vcText, model_id: VOICE_MODEL,
+                                 voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true } })
+        });
+        if (!vcR.ok) {
+          var vcErr = ""; try { var vce = await vcR.json(); vcErr = (vce.detail && (vce.detail.message || vce.detail)) || ""; } catch (e) {}
+          if (vcR.status === 404 || vcR.status === 400) voiceIdCache = null;   // صوت محذوف/مُستبدل: ابحث من جديد بالمرة الجاية
+          return json({ error: "تعذّر توليد التعليق" + (vcErr ? ": " + (typeof vcErr === "string" ? vcErr : JSON.stringify(vcErr)) : "") }, 502);
+        }
+        var vcD = await vcR.json(), al = vcD.alignment || vcD.normalized_alignment || {};
+        var chars = al.characters || [], cs = al.character_start_times_seconds || [], ce = al.character_end_times_seconds || [];
+        // حدود كل جملة بمواقع أحرفها داخل النص المجمّع (الجمل مفصولة بسطر جديد)
+        var vcTimes = [], off = 0;
+        vcLines.forEach(function (l) {
+          var a = off, b = off + l.length - 1, s = null, e = null;
+          for (var i = a; i <= b && i < chars.length; i++) { if (!/\s/.test(chars[i])) { if (s === null) s = cs[i]; e = ce[i]; } }
+          vcTimes.push({ start: s === null ? 0 : s, end: e === null ? 0 : e });
+          off += l.length + 1;
+        });
+        await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'voice', datetime('now'))").bind(vcUser.email).run();
+        return json({ ok: true, audio: vcD.audio_base64, lines: vcTimes, duration: ce.length ? ce[ce.length - 1] : 0 });
       }
 
       /* ---- 7c) تدقيق إملائي/نحوي عبر Gemini (يعيد نصًّا مصحَّحًا لكل حقل) ---- */
