@@ -58,7 +58,7 @@
 
   /* ---------- timeline ---------- */
   function recipe() { return RECIPES[S.recipe] || RECIPES.questions; }
-  function ready() { return S.items.filter(function (it) { return !it.missing && !it.off; }); }
+  function ready() { return S.items.filter(function (it) { return !it.missing && !it.off && !it.skip; }); }
   /* Everything on the timeline in order: shots, text cards, then the end card. */
   function segs() { var l = ready(); return l.length ? l.concat([{ kind: "end", len: S.endLen || recipe().end }]) : []; }
   function total() { return segs().reduce(function (s, x) { return s + x.len; }, 0); }
@@ -192,15 +192,15 @@
 
   /* ---------- clip cards ---------- */
   function countText() {
-    var cards = S.items.filter(function (it) { return it.kind === "card"; }).length, off = S.items.filter(function (it) { return it.off; }).length, shots = S.items.length - cards - off;
-    return S.items.length ? "· " + shots + " لقطة" + (cards ? " · " + cards + " كرت نص" : "") + (off ? " · " + off + " خارج الريل" : "") + " · " + fmt(total()) : "";
+    var cards = S.items.filter(function (it) { return it.kind === "card"; }).length, off = S.items.filter(function (it) { return it.off && !it.skip; }).length, skip = S.items.filter(function (it) { return it.skip; }).length, shots = S.items.length - cards - off - skip;
+    return S.items.length ? "· " + shots + " لقطة" + (cards ? " · " + cards + " كرت نص" : "") + (off ? " · " + off + " خارج الريل" : "") + (skip ? " · " + skip + " مستبعدة" : "") + " · " + fmt(total()) : "";
   }
   function renderClips() {
     var box = $("rgClips"); box.innerHTML = "";
     $("rgCount").textContent = countText(); musicNote();
     if (!S.items.length) { box.innerHTML = '<div class="no-clips">لا لقطات بعد — ابدأ بإضافة المواد من اليمين</div>'; }
     S.items.forEach(function (it, i) {
-      var c = document.createElement("div"); c.className = "clip" + (it.missing ? " missing" : "") + (it.off ? " off" : "") + (it.kind === "card" ? " is-card" : "");
+      var c = document.createElement("div"); c.className = "clip" + (it.missing ? " missing" : "") + (it.off || it.skip ? " off" : "") + (it.kind === "card" ? " is-card" : "");
       var lenField = '<div style="flex:1"><label class="l">المدة (ث)</label><input type="number" data-f="len" min="1" max="15" step="0.5" value="' + (+it.len.toFixed(2)) + '"></div>';
       var moveDel = '<button type="button" data-a="up" title="تقديم">→</button><button type="button" data-a="down" title="تأخير">←</button><button type="button" data-a="del" title="حذف">✕</button>';
       if (it.missing) {
@@ -219,8 +219,10 @@
           (it.kind === "video" ? '<div style="flex:1"><label class="l">البداية (ث)</label><input type="number" data-f="start" min="0" step="0.5" value="' + it.start.toFixed(1) + '"></div>' : "") + '</div>' +
           '<div class="row"><label class="chk"><input type="checkbox" data-f="tint"' + (it.tint ? " checked" : "") + '> طبقة كحلية</label>' +
           (it.kind === "video" ? '<label class="chk"><input type="checkbox" data-f="sound"' + (it.sound ? " checked" : "") + '> الصوت الأصلي</label>' : "") + '</div>' +
-          (it.off ? '<div class="hint" style="color:var(--red)">خارج الريل — الوقت ما بيكفي</div>' : "") +
-          '<div class="tools"><button type="button" data-a="card" title="كرت نص قبل هذه اللقطة">+ نص</button><button type="button" data-a="rot" title="تدوير 90°">↻</button>' + moveDel + '</div>';
+          (it.skip ? '<div class="hint" style="color:var(--red)">مستبعدة' + (it.why ? " — " + esc(it.why) : "") + '</div>'
+                   : it.off ? '<div class="hint" style="color:var(--red)">خارج الريل — الوقت ما بيكفي</div>' : "") +
+          '<div class="tools"><button type="button" data-a="card" title="كرت نص قبل هذه اللقطة">+ نص</button><button type="button" data-a="rot" title="تدوير 90°">↻</button>' +
+          '<button type="button" data-a="skip" title="' + (it.skip ? "إرجاع للريل" : "استبعاد من الريل") + '">' + (it.skip ? "↺" : "⊘") + '</button>' + moveDel + '</div>';
       }
       if (!it.missing) {
         [].forEach.call(c.querySelectorAll("input[data-f]"), function (inp) {
@@ -237,6 +239,7 @@
         var a = e.target.dataset && e.target.dataset.a; if (!a) return;
         var j = S.items.indexOf(it);
         if (a === "rot") { it.rot = (it.rot + 90) % 360; thumb(it, c); drawAt(S.t); return; }
+        if (a === "skip") { it.skip = !it.skip; it.why = ""; relayout(); return; }
         if (a === "card") { S.items.splice(j, 0, newCard()); if (!voiceReady()) relayout(); else { stop(); renderClips(); } var ta2 = box.children[j] && box.children[j].querySelector("textarea"); if (ta2) ta2.focus(); return; }
         if (a === "del") {
           if (it.kind === "card" && it.line != null && S.lines[it.line]) { S.lines[it.line].card = ""; renderLines(); }   // otherwise the next layout would bring it back
@@ -249,6 +252,7 @@
       box.appendChild(c);
     });
     $("rgExport").disabled = !ready().length || S.items.some(function (x) { return x.missing; });
+    $("rgCover").disabled = !ready().length;
     $("rgEmpty").hidden = !!ready().length;
   }
   var thumbQueue = Promise.resolve();
@@ -264,7 +268,7 @@
   function drawAt(t) {
     if (!ready().length) { g.fillStyle = "#111"; g.fillRect(0, 0, cv.width, cv.height); updateTime(); return; }
     var loc = locate(t), seq = ++S.seq;
-    seekLoc(loc).then(function () { if (seq === S.seq || S.playing) frame(g, cv.width, cv.height, loc); });
+    seekLoc(loc).then(function () { if (seq === S.seq || S.playing) { frame(g, cv.width, cv.height, loc); gridGuide(g, cv.width, cv.height); } });
     updateTime();
   }
   function updateTime() { var T = total(); $("rgTime").textContent = fmt(S.t) + " / " + fmt(T); $("rgSeek").value = T ? Math.round(S.t / T * 1000) : 0; }
@@ -298,7 +302,7 @@
         if (vp.paused || Math.abs(vp.currentTime - want) > 0.25) { vp.currentTime = want; if (vp.paused) vp.play().catch(function () {}); }
       } else if (!vp.paused) vp.pause();
     }
-    frame(g, cv.width, cv.height, loc); updateTime();
+    frame(g, cv.width, cv.height, loc); gridGuide(g, cv.width, cv.height); updateTime();
     requestAnimationFrame(tick);
   }
   function stop() {
@@ -607,7 +611,7 @@
     if (!S.voice) return;
     if (S.items.some(function (it) { return it.missing; })) { voiceSt("أضف الملفات الناقصة أولاً", true); return; }
     if (S.voice.times.length !== S.lines.length) { voiceSt("عدد الجمل تغيّر — أعد توليد الصوت أولاً", true); return; }
-    var shots = S.items.filter(function (it) { return it.kind !== "card"; });
+    var shots = S.items.filter(function (it) { return it.kind !== "card" && !it.skip; }), skipped = S.items.filter(function (it) { return it.skip; });
     var C = REEL_LEN - recipe().end, blocks = voiceBlocks(), wins = [], gaps = [], t = 0;
     function lead(b) { return b.card ? VO_GAP : b.a === 0 ? VO_OFFSET : 0.3; }
     var need = blocks.reduce(function (s, b) { return s + (b.card ? cardLen(b.card) : 0) + lead(b) + b.dur; }, 0), slack = C - need;
@@ -639,7 +643,7 @@
     pieces.sort(function (a, b) { return a.s - b.s; });
     var off = pool;
     off.forEach(function (it) { it.off = true; }); use.forEach(function (it) { it.off = false; });
-    S.items = [].concat.apply([], pieces.map(function (p) { return p.items; })).concat(off);
+    S.items = [].concat.apply([], pieces.map(function (p) { return p.items; })).concat(off, skipped);
     S.endLen = REEL_LEN - S.items.filter(function (it) { return !it.off; }).reduce(function (s, it) { return s + it.len; }, 0);
     var synced = $("rgBeatSync").checked && snapToBeats();
     stop(); S.t = 0; renderClips(); drawAt(0);
@@ -665,15 +669,16 @@
      length and the shots share the rest in their order (at least 1.5 s each;
      shots that do not fit wait at the end, marked "خارج الريل"). */
   function fitReel() {
-    var shots = S.items.filter(function (it) { return !it.missing && it.kind !== "card"; });
+    var shots = S.items.filter(function (it) { return !it.missing && !it.skip && it.kind !== "card"; });
     var cards = S.items.filter(function (it) { return !it.missing && it.kind === "card"; });
+    var skipped = S.items.filter(function (it) { return it.skip; });
     if (!shots.length) { S.endLen = null; return 0; }
     var room = Math.max(1.5, REEL_LEN - recipe().end - cards.reduce(function (s, c) { return s + c.len; }, 0));
     var n = Math.max(1, Math.min(shots.length, Math.floor(room / 1.5))), use = shots.slice(0, n), pool = shots.slice(n);
     var sh = fill(room, use);
     while (sh > 0.05 && pool.length) { use.push(pool.shift()); sh = fill(room, use); }
     use.forEach(function (it) { it.off = false; }); pool.forEach(function (it) { it.off = true; });
-    S.items = S.items.filter(function (it) { return !it.off; }).concat(pool);
+    S.items = S.items.filter(function (it) { return !it.off && !it.skip; }).concat(pool, skipped);
     S.endLen = REEL_LEN - ready().reduce(function (s, it) { return s + it.len; }, 0);
     return sh;
   }
@@ -685,6 +690,120 @@
     fitReel();
     if ($("rgBeatSync").checked) snapToBeats();
     stop(); renderClips(); S.t = Math.min(S.t, total()); drawAt(S.t);
+  }
+
+  /* ---------- shot picker ----------
+     Looks at every shot on the device (nothing is uploaded): sharpness (the
+     variance of the Laplacian on a small grey copy — shaky or out-of-focus
+     footage scores low), exposure, and a 64-bit difference hash to spot
+     look-alikes. It keeps the best of each look-alike group, sets aside
+     blurred and badly lit shots, and keeps as many of the strongest as fit the
+     minute at ~2.4 s each, in the user's order. Set-aside shots stay in the
+     list and come back with ↺. */
+  var PICK_W = 192, PICK_SHOT = 2.4;
+  function seekTo(el, t) {
+    return new Promise(function (r) {
+      if (Math.abs(el.currentTime - t) < 0.001 && el.readyState >= 2) { r(); return; }
+      el.addEventListener("seeked", r, { once: true }); el.currentTime = t;
+    });
+  }
+  function measure(el, sw, sh) {
+    var w = PICK_W, h = Math.max(8, Math.round(PICK_W * sh / sw)), i;
+    var x = new OffscreenCanvas(w, h).getContext("2d", { willReadFrequently: true });
+    x.drawImage(el, 0, 0, w, h);
+    var d = x.getImageData(0, 0, w, h).data, gy = new Float32Array(w * h), sum = 0;
+    for (i = 0; i < w * h; i++) { gy[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; sum += gy[i]; }
+    var n = 0, m = 0, m2 = 0;
+    for (var y = 1; y < h - 1; y++) for (var c = 1; c < w - 1; c++) {
+      var k = y * w + c, lap = 4 * gy[k] - gy[k - 1] - gy[k + 1] - gy[k - w] - gy[k + w];
+      n++; m += lap; m2 += lap * lap;
+    }
+    var hx = new OffscreenCanvas(9, 8).getContext("2d", { willReadFrequently: true });
+    hx.drawImage(el, 0, 0, 9, 8);
+    var hd = hx.getImageData(0, 0, 9, 8).data, bits = [];
+    for (var r = 0; r < 8; r++) for (var q = 0; q < 8; q++) { var a = (r * 9 + q) * 4, b = a + 4; bits.push(hd[a] + hd[a + 1] + hd[a + 2] > hd[b] + hd[b + 1] + hd[b + 2] ? 1 : 0); }
+    return { sharp: n ? m2 / n - (m / n) * (m / n) : 0, bright: sum / (w * h), hash: bits };
+  }
+  /* A clip is judged by its sharpest of three moments (one soft frame should
+     not sink a good clip); its look-alike hash comes from the middle one. */
+  function analyse(it) {
+    if (it.kind !== "video") return Promise.resolve(measure(it.el, it.w, it.h));
+    var res = [];
+    return [0.2, 0.5, 0.8].reduce(function (p, f) {
+      return p.then(function () { return seekTo(it.el, Math.min(it.srcDur - 0.05, it.srcDur * f)); })
+              .then(function () { res.push(measure(it.el, it.w, it.h)); });
+    }, Promise.resolve()).then(function () {
+      var best = res.slice().sort(function (a, b) { return b.sharp - a.sharp; })[0];
+      return { sharp: best.sharp, bright: best.bright, hash: res[1].hash };
+    });
+  }
+  function hamming(a, b) { var d = 0; for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) d++; return d; }
+  function pickShots() {
+    var shots = S.items.filter(function (it) { return !it.missing && it.kind !== "card"; }), btn = $("rgPick"), done = 0;
+    if (shots.length < 2) { status("أضف لقطات أولاً", true); return; }
+    stop(); btn.disabled = true;
+    thumbQueue = thumbQueue.catch(function () {}).then(function () {   // shares the queue with thumbnails: one seek per video at a time
+      return shots.reduce(function (p, it) {
+        return p.then(function () { return analyse(it); }).then(function (q) { it.q = q; status("…جارٍ فحص اللقطات " + (++done) + " / " + shots.length); });
+      }, Promise.resolve());
+    });
+    thumbQueue.then(function () { decide(shots); }, function () { status("تعذّر فحص اللقطات", true); })
+      .then(function () { btn.disabled = false; });
+  }
+  function decide(shots) {
+    var sharp = shots.map(function (it) { return it.q.sharp; }).sort(function (a, b) { return a - b; }), med = sharp[Math.floor(sharp.length / 2)] || 1;
+    shots.forEach(function (it) {
+      var q = it.q; it.why = "";
+      q.score = Math.min(2, q.sharp / med) - (q.bright < 40 || q.bright > 220 ? 0.6 : 0);
+      if (q.bright < 40) it.why = "معتمة";   // before sharpness: a dark frame also has little detail
+      else if (q.bright > 220) it.why = "فاتحة كتير";
+      else if (q.sharp < 0.35 * med) it.why = "ضبابية أو مهزوزة";
+    });
+    var groups = [];
+    shots.forEach(function (it) {
+      var gr = groups.filter(function (x) { return hamming(x[0].q.hash, it.q.hash) <= 10; })[0];
+      if (gr) gr.push(it); else groups.push([it]);
+    });
+    groups.forEach(function (gr) {
+      gr.slice().sort(function (a, b) { return b.q.score - a.q.score; }).slice(1).forEach(function (it) { if (!it.why) it.why = "بتشبه لقطة أوضح منها"; });
+    });
+    var cardTime = voiceReady() ? voiceBlocks().reduce(function (s, b) { return s + (b.card ? cardLen(b.card) : 0); }, 0)
+                                : S.items.filter(function (it) { return it.kind === "card"; }).reduce(function (s, c) { return s + c.len; }, 0);
+    var N = Math.max(1, Math.round((REEL_LEN - recipe().end - cardTime) / PICK_SHOT));
+    var good = shots.filter(function (it) { return !it.why; }).sort(function (a, b) { return b.q.score - a.q.score; });
+    good.slice(N).forEach(function (it) { it.why = "أضعف من غيرها"; });
+    shots.forEach(function (it) { it.skip = !!it.why; });
+    relayout();
+    var count = function (w) { return shots.filter(function (it) { return it.why === w; }).length; };
+    var kept = shots.length - shots.filter(function (it) { return it.skip; }).length;
+    var parts = [["ضبابية", count("ضبابية أو مهزوزة")], ["متشابهة", count("بتشبه لقطة أوضح منها")], ["إضاءة", count("معتمة") + count("فاتحة كتير")], ["أضعف", count("أضعف من غيرها")]]
+      .filter(function (p) { return p[1]; }).map(function (p) { return p[1] + " " + p[0]; });
+    status("✓ اخترت " + kept + " من " + shots.length + " لقطة" + (parts.length ? " · استبعدت: " + parts.join("، ") : "") + " — ↺ بيرجّع أي لقطة");
+  }
+
+  /* ---------- cover ----------
+     The frame under the playhead, full size, as a JPEG for the reel's cover.
+     The optional guide darkens what Instagram's 3:4 profile grid crops off. */
+  function gridGuide(g, w, h) {
+    if (!$("rgGrid").checked) return;
+    var band = (h - w * 4 / 3) / 2;
+    g.save(); g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, 0, w, band); g.fillRect(0, h - band, w, band);
+    g.strokeStyle = "rgba(255,255,255,.85)"; g.setLineDash([6, 5]); g.lineWidth = 1.5;
+    g.strokeRect(0.75, band, w - 1.5, h - 2 * band); g.restore();
+  }
+  function exportCover() {
+    if (!ready().length) return;
+    stop(); var loc = locate(S.t), oc = new OffscreenCanvas(W, H), og = oc.getContext("2d");
+    seekLoc(loc).then(function () {
+      frame(og, W, H, loc);
+      return oc.convertToBlob({ type: "image/jpeg", quality: 0.92 });
+    }).then(function (blob) {
+      var a = document.createElement("a");
+      a.download = fileName().replace(/^Reel_/, "Cover_").replace(/\.mp4$/, ".jpg"); a.href = URL.createObjectURL(blob); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+      status("✓ تم حفظ صورة الغلاف من الثانية " + S.t.toFixed(1));
+      drawAt(S.t);
+    }).catch(function (e) { status("تعذّر حفظ الغلاف: " + (e && e.message || e), true); });
   }
 
   /* ---------- export ---------- */
@@ -785,7 +904,7 @@
               voice: S.voice ? { data: S.voice.data, times: S.voice.times, dur: S.voice.dur } : null,   // the paid-for voiceover travels with the project
               items: S.items.map(function (it) {
                 return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
-                                          : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, off: !!it.off };
+                                          : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, off: !!it.off, skip: !!it.skip, why: it.why || "" };
               }) };
     var a = document.createElement("a"); a.download = "Reel_project_" + ($("rgEndText").value || "reel") + ".json";
     a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: "application/json" })); a.click();
@@ -799,7 +918,7 @@
     d.items.forEach(function (x) {
       if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; S.items.push(c); return; }
       if (d.v === 1 && x.text && String(x.text).trim()) S.items.push(newCard(String(x.text)));   // v1 captions sat on the shot; they become a card before it
-      S.items.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, off: !!x.off, missing: true });
+      S.items.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true });
     });
     $("rgBeatSync").checked = d.beatSync !== false; S.endLen = +d.endLen || null;
     $("rgScript").value = d.script || ""; S.lines = Array.isArray(d.lines) ? d.lines.map(function (l) { return { voice: String(l.voice || ""), card: String(l.card || "") }; }) : [];
@@ -862,6 +981,9 @@
     $("rgLogoFile").addEventListener("change", function (e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { setLogo(r.result); }; r.readAsDataURL(f); e.target.value = ""; });
     $("rgLogoClear").onclick = function () { setLogo(null); };
     $("rgExport").onclick = exportMp4;
+    $("rgCover").onclick = exportCover;
+    $("rgGrid").addEventListener("change", function () { drawAt(S.t); });
+    $("rgPick").onclick = pickShots;
     $("rgBench").onclick = bench;
     $("rgSave").onclick = saveProject;
     $("rgOpen").addEventListener("change", function (e) {

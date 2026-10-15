@@ -188,6 +188,7 @@
               <label class="btn-line">فتح مشروع<input type="file" id="rgOpen" accept=".json,application/json"></label>
             </div>
             <button class="btn" id="rgExport" disabled>تصدير الفيديو MP4</button>
+            <button type="button" class="btn-line wide" id="rgCover" title="الصورة اللي تحت المؤشر بالمعاينة">حفظ صورة الغلاف (JPG)</button>
             <div class="bar" id="rgBar" hidden><i id="rgBarFill"></i></div>
             <div class="status" id="rgStatus"></div>
             <div style="text-align:center;margin-top:4px"><button type="button" class="btn-line" id="rgBench" style="border:none;font-size:11px;color:var(--muted);text-decoration:underline;padding:2px">اختبار سرعة الجهاز</button></div>
@@ -204,13 +205,15 @@
             <input type="range" id="rgSeek" min="0" max="1000" value="0">
             <span class="t" id="rgTime">0:00 / 0:00</span>
           </div>
+          <label class="chk"><input type="checkbox" id="rgGrid"> قصّ الغلاف بشبكة البروفايل (3:4)</label>
         </div>
       </div>
 
       <div class="card">
         <div class="clips-head">
           <div class="sec" style="margin:0">اللقطات <span class="hint" id="rgCount"></span></div>
-          <div class="row"><span class="hint">كروت النص للجذب وللانتقال بين الأفكار فقط · «+ نص» يضيف كرتاً قبل اللقطة · ↻ لتدوير المقاطع العمودية</span>
+          <div class="row"><span class="hint">كروت النص للجذب وللانتقال بين الأفكار فقط · «+ نص» يضيف كرتاً قبل اللقطة · ↻ تدوير · ⊘ استبعاد</span>
+          <button type="button" class="btn-line" id="rgPick" title="بيفحص اللقطات على جهازك ويستبعد الضبابية والمتشابهة">اختيار أفضل اللقطات</button>
           <button type="button" class="btn-line" id="rgAddCard">+ كرت نص</button></div>
         </div>
         <div class="clips" id="rgClips"><div class="no-clips">لا لقطات بعد — ابدأ بإضافة المواد من اليمين</div></div>
