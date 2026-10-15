@@ -1,8 +1,9 @@
 <?php
 /**
  * Reels Gen (Beta) — vertical reels from photos and video clips, edited and
- * encoded entirely in the browser (WebCodecs + mp4-muxer). Nothing is uploaded:
- * only the music request goes to the auth Worker (ElevenLabs key stays there).
+ * encoded entirely in the browser (WebCodecs + mp4-muxer). Media is never
+ * uploaded: only the script text, the voiceover lines and the music request go
+ * to the auth Worker (the Gemini and ElevenLabs keys stay there).
  * Strict CSP applies (no inline script); access is checked by app.js against the
  * user's projects ("reels-gen"), like Thumbnail Gen.
  */
@@ -91,6 +92,20 @@
   .clip .tools button:hover{border-color:var(--red);color:var(--red);}
   .chk{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;}
   .chk input{accent-color:var(--navy);width:15px;height:15px;margin:0;}
+  .btn-line.wide{width:100%;margin-top:6px;}
+  #rgScript{resize:vertical;line-height:1.6;font-size:13px;}
+  .lines{margin-top:8px;max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-inline-end:2px;}
+  .line{display:flex;gap:6px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:7px;background:var(--fill);}
+  .line .n{flex:0 0 auto;width:20px;height:20px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:4px;}
+  .line .f{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;}
+  .line textarea{resize:none;font-size:13px;line-height:1.5;padding:6px 8px;}
+  .line textarea.card-in{background:#ebeaf0;color:#105063;font-weight:700;}
+  .line button{flex:0 0 auto;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:4px;}
+  .line button:hover{color:var(--red);}
+  .line-tools{margin-top:6px;justify-content:space-between;}
+  .clip.off{opacity:.5;}
+  .clip.is-card{background:#f7f7fa;border-color:#c9d6dd;}
+  .clips-head .row{gap:12px;}
   .no-clips{padding:26px;text-align:center;color:var(--muted);font-size:14px;border:2px dashed var(--line);border-radius:14px;}
 
   .gate{max-width:520px;margin:60px auto;text-align:center;}
@@ -127,6 +142,20 @@
             </label>
           </div>
           <div class="field">
+            <div class="sec">السكريبت والتعليق الصوتي <span class="hint">ريل دقيقة · صوت مازن لاوند</span></div>
+            <textarea id="rgScript" rows="5" placeholder="اكتب فكرة الريل أو السكريبت بكلماتك — الأداة بتصيغه بلهجة سورية بسيطة وبتطلّع منه نصوص الكروت"></textarea>
+            <button type="button" class="btn-line wide" id="rgDraft">صياغة النص</button>
+            <div class="lines" id="rgLines" hidden></div>
+            <div class="row line-tools" id="rgLineTools" hidden>
+              <button type="button" class="btn-line" id="rgAddLine">+ جملة</button>
+              <span class="hint" id="rgLineStat"></span>
+            </div>
+            <button type="button" class="btn-line wide" id="rgVoiceGen" hidden>توليد التعليق الصوتي</button>
+            <audio id="rgVoicePlayer" controls hidden></audio>
+            <button type="button" class="btn-line wide" id="rgArrange" hidden>توزيع على اللقطات</button>
+            <div class="music-st" id="rgVoiceSt"></div>
+          </div>
+          <div class="field">
             <div class="sec">الموسيقى</div>
             <div class="row">
               <select id="rgMood">
@@ -141,6 +170,7 @@
               <button type="button" class="btn-line" id="rgNoMusic">بدون</button>
             </div>
             <audio id="rgMusicPlayer" controls hidden></audio>
+            <label class="chk" style="margin-top:8px"><input type="checkbox" id="rgBeatSync" checked> قصّ اللقطات على إيقاع الموسيقى</label>
             <div class="music-st" id="rgMusicSt">لا موسيقى بعد</div>
           </div>
           <div class="field">
@@ -180,7 +210,8 @@
       <div class="card">
         <div class="clips-head">
           <div class="sec" style="margin:0">اللقطات <span class="hint" id="rgCount"></span></div>
-          <span class="hint">النص: سطر أو سطران · المقاطع المصوّرة عمودياً: استخدم ↻ لتدويرها</span>
+          <div class="row"><span class="hint">كروت النص للجذب وللانتقال بين الأفكار فقط · «+ نص» يضيف كرتاً قبل اللقطة · ↻ لتدوير المقاطع العمودية</span>
+          <button type="button" class="btn-line" id="rgAddCard">+ كرت نص</button></div>
         </div>
         <div class="clips" id="rgClips"><div class="no-clips">لا لقطات بعد — ابدأ بإضافة المواد من اليمين</div></div>
       </div>
