@@ -488,19 +488,28 @@ export default {
 "NO REPETITION: the voice line after a card must NOT repeat, paraphrase or re-ask the card — the viewer has just read it. The line picks up from the card and moves the thought forward (answers the question, gives the example, adds the next fact).\n" +
 "Keep names of people, places, projects and organisations exactly as given. Use Western digits 0-9. No emojis, no hashtags, no stage directions.\n" +
 "Return ONLY JSON: {\"lines\":[{\"voice\":\"...\",\"card\":\"...\"}]}";
-        var scR, scD;
-        try {
-          scR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + env.GEMINI_API_KEY, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              system_instruction: { parts: [{ text: scSys }] },
-              contents: [{ role: "user", parts: [{ text: scText }] }],
-              generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
-            })
-          });
-          scD = await scR.json();
-        } catch (e) { return json({ error: "تعذّر الاتصال بخدمة الصياغة" }, 502); }
-        if (!scR.ok) return json({ error: (scD && scD.error && scD.error.message) || "فشلت الصياغة" }, 502);
+        // Gemini answers 503/429 ("high demand") at busy times: retry, then fall back to the lighter model
+        var scBody = JSON.stringify({
+          system_instruction: { parts: [{ text: scSys }] },
+          contents: [{ role: "user", parts: [{ text: scText }] }],
+          generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
+        });
+        var scTries = ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"];
+        var scR = null, scD = null;
+        for (var sci = 0; sci < scTries.length; sci++) {
+          if (sci) await new Promise(function (r) { setTimeout(r, 800 * sci); });
+          try {
+            scR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + scTries[sci] + ":generateContent?key=" + env.GEMINI_API_KEY,
+              { method: "POST", headers: { "Content-Type": "application/json" }, body: scBody });
+            scD = await scR.json();
+          } catch (e) { scR = null; scD = null; continue; }
+          if (scR.ok || (scR.status !== 503 && scR.status !== 429 && scR.status !== 500)) break;
+        }
+        if (!scR) return json({ error: "تعذّر الاتصال بخدمة الصياغة" }, 502);
+        if (!scR.ok) {
+          var scBusy = scR.status === 503 || scR.status === 429;
+          return json({ error: scBusy ? "خدمة الصياغة (Gemini) مضغوطة حالياً — جرّب بعد دقيقة" : ((scD && scD.error && scD.error.message) || "فشلت الصياغة") }, 502);
+        }
         var scOut = ""; try { scOut = scD.candidates[0].content.parts[0].text || ""; } catch (e) {}
         var scParsed; try { scParsed = JSON.parse(scOut); } catch (e) { return json({ error: "ردّ الصياغة غير صالح" }, 502); }
         var scLines = (Array.isArray(scParsed && scParsed.lines) ? scParsed.lines : [])
