@@ -17,6 +17,12 @@ const LOGIN_WINDOW_MIN = 15;   // نافذة الحساب بالدقائق
 const LOGIN_MAX_EMAIL  = 5;    // فشل متتالٍ لنفس الإيميل قبل الحجب
 const LOGIN_MAX_IP     = 20;   // فشل من نفس الـIP عبر أي حساب (يمنع العدّ على الحسابات)
 
+// Reels Gen — موسيقى ElevenLabs (جدول ai_usage)
+const MUSIC_DAILY_MAX  = 20;   // مقطوعات لكل مستخدم خلال 24 ساعة
+const MUSIC_MIN_SEC    = 10;
+const MUSIC_MAX_SEC    = 90;
+const MUSIC_PROMPT_MAX = 500;  // أحرف وصف الموسيقى
+
 function cors() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -378,6 +384,35 @@ export default {
         var pwHash = await hashPassword(pwPass);
         await env.DB.prepare("UPDATE users SET password=?1 WHERE email=?2").bind(pwHash, pwEmail).run();
         return json({ ok: true });
+      }
+
+      /* ---- 7b2) Reels Gen: موسيقى خلفية عبر ElevenLabs Music ----
+         المفتاح سرّ بالـ Worker (ELEVENLABS_API_KEY) ولا يصل للمتصفح. مرحلة التجربة:
+         owner و comms فقط، وحد يومي لكل مستخدم (جدول ai_usage). يعيد ملف mp3. */
+      if (request.method === "POST" && path === "/reels/music") {
+        var muUser = await getSessionUser(env, request);
+        if (!muUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!isGlobalRole(muUser.role)) return json({ error: "لا صلاحية" }, 403);
+        if (!env.ELEVENLABS_API_KEY) return json({ error: "مفتاح ElevenLabs غير مضبوط" }, 500);
+        var mub = await request.json();
+        var muPrompt = String(mub.prompt || "").trim().slice(0, MUSIC_PROMPT_MAX);
+        var muSecs = Math.round(Number(mub.seconds) || 0);
+        if (!muPrompt) return json({ error: "اكتب وصف الموسيقى" }, 400);
+        if (muSecs < MUSIC_MIN_SEC || muSecs > MUSIC_MAX_SEC) return json({ error: "المدة بين " + MUSIC_MIN_SEC + " و" + MUSIC_MAX_SEC + " ثانية" }, 400);
+        var muSince = new Date(Date.now() - 86400000).toISOString().replace("T", " ").slice(0, 19);
+        var muUsed = await env.DB.prepare("SELECT COUNT(*) AS c FROM ai_usage WHERE email=?1 AND kind='music' AND at>?2").bind(muUser.email, muSince).first();
+        if (muUsed && muUsed.c >= MUSIC_DAILY_MAX) return json({ error: "وصلت للحد اليومي (" + MUSIC_DAILY_MAX + " مقطوعة). جرّب بكرا." }, 429);
+        var muRes = await fetch("https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128", {
+          method: "POST",
+          headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: muPrompt, music_length_ms: muSecs * 1000, force_instrumental: mub.instrumental !== false })
+        });
+        if (!muRes.ok) {
+          var muErr = ""; try { var mue = await muRes.json(); muErr = (mue.detail && (mue.detail.message || mue.detail)) || ""; } catch (e) {}
+          return json({ error: "تعذّر توليد الموسيقى" + (muErr ? ": " + (typeof muErr === "string" ? muErr : JSON.stringify(muErr)) : "") }, 502);
+        }
+        await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'music', datetime('now'))").bind(muUser.email).run();
+        return new Response(muRes.body, { status: 200, headers: { ...cors(), "Content-Type": "audio/mpeg", "Cache-Control": "no-store" } });
       }
 
       /* ---- 7c) تدقيق إملائي/نحوي عبر Gemini (يعيد نصًّا مصحَّحًا لكل حقل) ---- */
