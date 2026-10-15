@@ -505,6 +505,9 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
       <a class="proj-card" id="pgThumbGen" href="thumbnail-gen/" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Thumbnail Gen <span class="proj-badge new">NEW</span></span>
       </a>
+      <a class="proj-card" id="pgReelsGen" href="reels-gen/" style="--pc-hover:#be1f24;display:none">
+        <span class="proj-name">Reels Gen <span class="proj-badge new">BETA</span></span>
+      </a>
     </div>
   </div>
   <div class="acct">
@@ -2220,9 +2223,10 @@ async function afterAuth(){
     else { startApp(); }
   }catch(e){ startApp(); }
 }
-var THUMBGEN_SLUG="thumbnail-gen";
+var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen";
+var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/"};   // standalone tool pages
 function openProject(p){
-  if(p && p.slug===THUMBGEN_SLUG){ location.href="thumbnail-gen/"; return; }   // standalone page
+  if(p && TOOL_PAGES[p.slug]){ location.href=TOOL_PAGES[p.slug]; return; }
   if(p && p.template_type==="hopecenter_v1"){ openHopeCenter(p); }
   else if(p && (p.template_type==="mixed_v1" || p.slug==="children-university") && typeof window.openChildrenUniversity==="function"){ window.openChildrenUniversity(p); }
   else if(p && (p.template_type==="leap_v1" || p.slug==="leap") && typeof window.openLeap==="function"){ window.openLeap(p); }
@@ -2244,11 +2248,13 @@ async function showProjectPicker(){
   var res=await Auth.projects();
   if(!res.ok){ grid.innerHTML='<div class="proj-msg">تعذّر تحميل المشاريع: '+esc(res.error||"")+'</div>'; return; }
   grid.innerHTML="";
-  // Thumbnail Gen is a project for access control, but it lives in the tools box
-  // under Guidelines Assistant rather than in the project list.
-  var tg=(res.projects||[]).filter(function(p){ return p.slug===THUMBGEN_SLUG; })[0];
-  if($("pgThumbGen")) $("pgThumbGen").style.display=(tg&&tg.status==="ready")?"":"none";
-  (res.projects||[]).filter(function(p){ return p.slug!==THUMBGEN_SLUG; }).forEach(function(p){
+  // Thumbnail Gen and Reels Gen are projects for access control, but they live
+  // in the tools box under Guidelines Assistant rather than in the project list.
+  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"]].forEach(function(t){
+    var p=(res.projects||[]).filter(function(x){ return x.slug===t[0]; })[0];
+    if($(t[1])) $(t[1]).style.display=(p&&p.status==="ready")?"":"none";
+  });
+  (res.projects||[]).filter(function(p){ return TOOL_PAGES[p.slug]===undefined; }).forEach(function(p){
     var ready=(p.status==="ready");
     var card=document.createElement("button");
     card.type="button";
