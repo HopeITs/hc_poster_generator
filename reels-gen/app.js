@@ -310,7 +310,10 @@
     seekLoc(loc).then(function () { if (seq === S.seq || S.playing) { frame(g, cv.width, cv.height, loc); gridGuide(g, cv.width, cv.height); } });
     updateTime();
   }
-  function updateTime() { var T = total(); $("rgTime").textContent = fmt(S.t) + " / " + fmt(T); $("rgSeek").value = T ? Math.round(S.t / T * 1000) : 0; }
+  function updateTime() {
+    var T = total(), sk = $("rgSeek"); $("rgTime").textContent = fmt(S.t) + " / " + fmt(T);
+    sk.value = T ? Math.round(S.t / T * 1000) : 0; sk.style.setProperty("--p", sk.value / 10 + "%");
+  }
   /* Real-time playback: videos play natively, the canvas copies their frames;
      the music player is ducked under the voiceover and under shots that keep
      their own sound, as in the export. */

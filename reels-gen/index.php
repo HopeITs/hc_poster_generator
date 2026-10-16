@@ -72,7 +72,14 @@
   .screen .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#aaa;font-size:14px;padding:30px;line-height:1.7;}
   .transport{display:flex;align-items:center;gap:10px;width:min(100%,420px);}
   .transport button{width:40px;height:40px;border-radius:50%;border:none;background:var(--navy);color:#fff;font-size:16px;cursor:pointer;flex:0 0 auto;}
-  .transport input[type=range]{flex:1;accent-color:var(--red);}
+  /* Seek bar: a thin K50 grey line (K50 = #939598); the played part fills from the
+     right (RTL) up to --p, which app.js keeps in step with the playhead. */
+  .transport input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:999px;cursor:pointer;
+    background:linear-gradient(to left,#939598 var(--p,0%),#dcdcde var(--p,0%));}
+  .transport input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#939598;border:none;}
+  .transport input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#939598;border:none;}
+  .transport input[type=range]:focus{outline:none;}
+  .transport input[type=range]:focus-visible{outline:2px solid #939598;outline-offset:4px;}
   .transport .t{font-size:12px;font-weight:700;color:var(--ink);direction:ltr;min-width:84px;text-align:center;font-variant-numeric:tabular-nums;}
 
   /* clip list */
