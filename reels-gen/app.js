@@ -214,7 +214,7 @@
     S.items.forEach(function (it, i) {
       var c = document.createElement("div"); c.className = "clip" + (it.missing ? " missing" : "") + (it.off || it.skip ? " off" : "") + (it.kind === "card" ? " is-card" : "");
       var lenField = '<div style="flex:1"><label class="l">المدة (ث)</label><input type="number" data-f="len" min="1" max="15" step="0.5" value="' + (+it.len.toFixed(2)) + '"></div>';
-      var moveDel = '<button type="button" data-a="up" title="تقديم">→</button><button type="button" data-a="down" title="تأخير">←</button><button type="button" data-a="del" title="حذف">✕</button>';
+      var moveDel = '<button type="button" data-a="del" title="حذف">✕</button>';
       if (it.missing) {
         c.innerHTML = '<div class="thumb" style="display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;padding:10px;text-align:center">بانتظار الملف:<br>' + esc(it.name) + '</div>' +
           '<div class="hint">أضف هذا الملف من «المواد» ليُربط تلقائياً</div><div class="tools"><button type="button" data-a="del" title="حذف">✕</button></div>';
@@ -257,16 +257,43 @@
           if (it.kind === "card" && it.line != null && S.lines[it.line]) { S.lines[it.line].card = ""; renderLines(); }   // otherwise the next layout would bring it back
           S.items.splice(j, 1); relayout(); return;
         }
-        if (a === "up" && j > 0) S.items.splice(j - 1, 0, S.items.splice(j, 1)[0]);
-        if (a === "down" && j < S.items.length - 1) S.items.splice(j + 1, 0, S.items.splice(j, 1)[0]);
-        stop(); renderClips(); S.t = Math.min(S.t, total()); drawAt(S.t);
       });
+      dragCard(c, it);
       box.appendChild(c);
     });
     $("rgExport").disabled = !ready().length || S.items.some(function (x) { return x.missing; });
     $("rgCover").disabled = !ready().length;
     $("rgEmpty").hidden = !!ready().length;
   }
+  /* Reorder by dragging a card onto another: it lands before or after that
+     card depending on which half the pointer is over (the grid runs right to
+     left). Dragging never starts from a field or button, so text can still be
+     selected and edited. */
+  var dragged = null;
+  function dragCard(c, it) {
+    c.draggable = true;
+    c.addEventListener("mousedown", function (e) { c.draggable = !e.target.closest("textarea, input, button, select, label"); });
+    c.addEventListener("dragstart", function (e) {
+      dragged = it; c.classList.add("dragging"); stop();
+      e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", "");
+    });
+    c.addEventListener("dragend", function () { dragged = null; c.classList.remove("dragging"); clearDrop(); });
+    c.addEventListener("dragover", function (e) {
+      if (!dragged || dragged === it) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = "move";
+      var after = afterHalf(c, e); clearDrop(); c.classList.add(after ? "drop-after" : "drop-before");
+    });
+    c.addEventListener("dragleave", function (e) { if (!c.contains(e.relatedTarget)) c.classList.remove("drop-before", "drop-after"); });
+    c.addEventListener("drop", function (e) {
+      e.preventDefault(); if (!dragged || dragged === it) return;
+      var after = afterHalf(c, e), from = S.items.indexOf(dragged);
+      S.items.splice(from, 1);
+      S.items.splice(S.items.indexOf(it) + (after ? 1 : 0), 0, dragged);
+      dragged = null; renderClips(); S.t = Math.min(S.t, total()); drawAt(S.t);
+    });
+  }
+  function afterHalf(c, e) { var r = c.getBoundingClientRect(), mid = r.left + r.width / 2; return getComputedStyle(c).direction === "rtl" ? e.clientX < mid : e.clientX > mid; }
+  function clearDrop() { [].forEach.call(document.querySelectorAll(".clip.drop-before, .clip.drop-after"), function (x) { x.classList.remove("drop-before", "drop-after"); }); }
   var thumbQueue = Promise.resolve();
   function thumb(it, card) {   // serialised: one video element must not seek for two jobs at once
     thumbQueue = thumbQueue.then(function () {

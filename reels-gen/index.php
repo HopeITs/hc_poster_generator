@@ -104,6 +104,10 @@
   .line button:hover{color:var(--red);}
   .line-tools{margin-top:6px;justify-content:space-between;}
   .clip.off{opacity:.5;}
+  .clip[draggable="true"]{cursor:grab;}
+  .clip.dragging{opacity:.35;}
+  .clip.drop-before{box-shadow:inset -4px 0 0 var(--red);}
+  .clip.drop-after{box-shadow:inset 4px 0 0 var(--red);}
   .clip.is-card{background:#f7f7fa;border-color:#c9d6dd;}
   .clips-head .row{gap:12px;}
   .no-clips{padding:26px;text-align:center;color:var(--muted);font-size:14px;border:2px dashed var(--line);border-radius:14px;}
@@ -212,7 +216,7 @@
       <div class="card">
         <div class="clips-head">
           <div class="sec" style="margin:0">اللقطات <span class="hint" id="rgCount"></span></div>
-          <div class="row"><span class="hint">كروت النص للجذب وللانتقال بين الأفكار فقط · «+ نص» يضيف كرتاً قبل اللقطة · ↻ تدوير · ⊘ استبعاد</span>
+          <div class="row"><span class="hint">كروت النص للجذب وللانتقال بين الأفكار فقط · اسحب أي لقطة أو كرت لتغيير الترتيب · «+ نص» يضيف كرتاً قبل اللقطة · ↻ تدوير · ⊘ استبعاد</span>
           <button type="button" class="btn-line" id="rgPick" title="بيفحص اللقطات على جهازك ويستبعد الضبابية والمتشابهة">اختيار أفضل اللقطات</button>
           <button type="button" class="btn-line" id="rgAddCard">+ كرت نص</button></div>
         </div>
