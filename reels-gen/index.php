@@ -161,7 +161,8 @@
               <input type="file" id="rgFiles" accept="image/*,video/*" multiple>
             </label>
           </div>
-          <div class="field">
+          <!-- Hidden for now; the script/voiceover code still runs and comes back by removing "hidden". -->
+          <div class="field" id="rgVoiceField" hidden>
             <div class="sec">السكريبت والتعليق الصوتي <span class="hint">ريل دقيقة · صوت مازن لاوند</span></div>
             <textarea id="rgScript" rows="5" placeholder="اكتب فكرة الريل أو السكريبت بكلماتك — الأداة بتصيغه بلهجة سورية بسيطة وبتطلّع منه نصوص الكروت"></textarea>
             <button type="button" class="btn-line wide" id="rgDraft">صياغة النص</button>
