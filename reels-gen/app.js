@@ -89,13 +89,14 @@
     g.save(); g.translate(w / 2, h / 2); if (it.rot) g.rotate(it.rot * Math.PI / 180);
     g.drawImage(el, -sw * s / 2, -sh * s / 2, sw * s, sh * s); g.restore();
   }
-  /* Each project's logo in two colourings: one for footage and the navy end
-     card, one for the light text cards. */
+  /* Each project's logo in two colourings — one for footage and the navy end
+     card, one for the light text cards — and its accent, which stands in for red
+     everywhere on the page. */
   var PROJECTS = {
-    sz:   { name: "Study Zone",          onDark: "assets/sz-logo.svg",   onLight: "assets/sz-logo-navy.svg" },
-    leap: { name: "LEAP",                onDark: "assets/leap-logo.svg", onLight: "assets/leap-logo-navy.svg" },
-    disc: { name: "DISC",                onDark: "assets/disc-logo.svg", onLight: "assets/disc-logo-navy.svg" },
-    cu:   { name: "Children University", onDark: "assets/cu-logo.svg",   onLight: "assets/cu-logo-navy.svg" }
+    sz:   { name: "Study Zone",          accent: "#f99d1c", onDark: "assets/sz-logo.svg",   onLight: "assets/sz-logo-navy.svg" },
+    leap: { name: "LEAP",                accent: "#3aa5af", onDark: "assets/leap-logo.svg", onLight: "assets/leap-logo-navy.svg" },
+    disc: { name: "DISC",                accent: "#f99d1c", onDark: "assets/disc-logo.svg", onLight: "assets/disc-logo-navy.svg" },
+    cu:   { name: "Children University", accent: "#f99d1c", onDark: "assets/cu-logo.svg",   onLight: "assets/cu-logo-navy.svg" }
   };
   function project() { return PROJECTS[S.project] || PROJECTS.disc; }
   /* Scale a logo to fit a box, whatever its shape (wide DISC, tall CU). */
@@ -231,8 +232,8 @@
           (it.kind === "video" ? '<div style="flex:1"><label class="l">البداية (ث)</label><input type="number" data-f="start" min="0" step="0.5" value="' + it.start.toFixed(1) + '"></div>' : "") + '</div>' +
           '<div class="row"><label class="chk"><input type="checkbox" data-f="tint"' + (it.tint ? " checked" : "") + '> طبقة كحلية</label>' +
           (it.kind === "video" ? '<label class="chk"><input type="checkbox" data-f="sound"' + (it.sound ? " checked" : "") + '> الصوت الأصلي</label>' : "") + '</div>' +
-          (it.skip ? '<div class="hint" style="color:var(--red)">مستبعدة' + (it.why ? " — " + esc(it.why) : "") + '</div>'
-                   : it.off ? '<div class="hint" style="color:var(--red)">خارج الريل — الوقت ما بيكفي</div>' : "") +
+          (it.skip ? '<div class="hint" style="color:var(--accent)">مستبعدة' + (it.why ? " — " + esc(it.why) : "") + '</div>'
+                   : it.off ? '<div class="hint" style="color:var(--accent)">خارج الريل — الوقت ما بيكفي</div>' : "") +
           '<div class="tools"><button type="button" data-a="card" title="كرت نص قبل هذه اللقطة">+ نص</button><button type="button" data-a="rot" title="تدوير 90°">↻</button>' +
           '<button type="button" data-a="skip" title="' + (it.skip ? "إرجاع للريل" : "استبعاد من الريل") + '">' + (it.skip ? "↺" : "⊘") + '</button>' + moveDel + '</div>';
       }
@@ -455,7 +456,7 @@
     var short = S.music.duration + 0.3 < total();
     $("rgMusicSt").textContent = "✓ " + S.musicLabel + " · " + S.music.duration.toFixed(1) + " ث · " + Math.round(S.bpm) + " BPM" +
       (short ? " — أقصر من الريل (" + total().toFixed(1) + " ث)، أعد التوليد" : $("rgBeatSync").checked ? " · القطع على الإيقاع" : "");
-    $("rgMusicSt").style.color = short ? "var(--red)" : "";
+    $("rgMusicSt").style.color = short ? "var(--accent)" : "";
   }
   function genMusic() {
     var secs = REEL_LEN + 1, btn = $("rgGenMusic");   // the reel is always REEL_LEN; +1 s so the music never runs out early
@@ -539,12 +540,12 @@
 
   /* ---------- script → voiceover lines and cards ---------- */
   function voiceBudget() { return REEL_LEN - recipe().end - 3 * (2.8 + VO_GAP) - 1.5; }   // room left for speech beside ~3 silent cards
-  function voiceSt(t, err) { var e = $("rgVoiceSt"); e.textContent = t || ""; e.style.color = err ? "var(--red)" : ""; }
+  function voiceSt(t, err) { var e = $("rgVoiceSt"); e.textContent = t || ""; e.style.color = err ? "var(--accent)" : ""; }
   function lineStat() {
     var words = S.lines.reduce(function (s, l) { return s + (l.voice.trim() ? l.voice.trim().split(/\s+/).length : 0); }, 0);
     var est = words / 2.1, el = $("rgLineStat");
     el.textContent = words + " كلمة · ≈ " + Math.round(est) + " ث من " + Math.round(voiceBudget());
-    el.style.color = est > voiceBudget() ? "var(--red)" : "";
+    el.style.color = est > voiceBudget() ? "var(--accent)" : "";
   }
   function renderLines() {
     var box = $("rgLines"); box.innerHTML = "";
@@ -988,6 +989,7 @@
   function setProject(key) {
     S.project = key; $("rgProject").value = key; S.logo = null; S.logoNavy = null;
     var p = project();
+    document.documentElement.style.setProperty("--accent", p.accent);
     [["logo", p.onDark], ["logoNavy", p.onLight]].forEach(function (x) {
       var im = new Image();
       im.onload = function () { if (S.project !== key) return; S[x[0]] = im; if (cv) { renderClips(); drawAt(S.t); } };
