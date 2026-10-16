@@ -34,7 +34,7 @@
     upbeat:  "Upbeat playful modern pop instrumental for a lively social media reel, bright synth plucks, claps and light bass, energetic but friendly, 118 BPM, clear button ending."
   };
 
-  var S = { items: [], recipe: "questions", logo: null, logoData: null, logoNavy: null,
+  var S = { items: [], recipe: "questions", project: "disc", logo: null, logoNavy: null,
             music: null, musicBlob: null, musicLabel: "", beats: null,
             lines: [], voice: null, endLen: null, regs: [], plan: [],
             t: 0, playing: false, clock: 0, seq: 0, exporting: false };
@@ -89,13 +89,25 @@
     g.save(); g.translate(w / 2, h / 2); if (it.rot) g.rotate(it.rot * Math.PI / 180);
     g.drawImage(el, -sw * s / 2, -sh * s / 2, sw * s, sh * s); g.restore();
   }
-  /* Logo top-centre, sized and placed as in the approved DISC reels: white on
-     shots, navy on the light cards (an uploaded logo is used on both). */
+  /* Each project's logo in two colourings: one for footage and the navy end
+     card, one for the light text cards. */
+  var PROJECTS = {
+    sz:   { name: "Study Zone",          onDark: "assets/sz-logo.svg",   onLight: "assets/sz-logo-navy.svg" },
+    leap: { name: "LEAP",                onDark: "assets/leap-logo.svg", onLight: "assets/leap-logo-navy.svg" },
+    disc: { name: "DISC",                onDark: "assets/disc-logo.svg", onLight: "assets/disc-logo-navy.svg" },
+    cu:   { name: "Children University", onDark: "assets/cu-logo.svg",   onLight: "assets/cu-logo-navy.svg" }
+  };
+  function project() { return PROJECTS[S.project] || PROJECTS.disc; }
+  /* Scale a logo to fit a box, whatever its shape (wide DISC, tall CU). */
+  function fitBox(im, bw, bh) { var s = Math.min(bw / im.naturalWidth, bh / im.naturalHeight); return { w: im.naturalWidth * s, h: im.naturalHeight * s }; }
+  /* Logo top-centre: the box is the DISC logo of the approved reels (22.5 % wide,
+     top edge at 4.8 %), taller than DISC needs so upright logos get about the
+     same area. */
   function logo(g, w, h, onLight) {
-    var im = onLight && S.logoNavy ? S.logoNavy : S.logo;
-    if (!im || !$("rgWatermark").checked) return;
-    var lw = w * 0.225, lh = lw * im.naturalHeight / im.naturalWidth;
-    g.drawImage(im, (w - lw) / 2, h * 0.081 - lh / 2, lw, lh);
+    var im = onLight ? S.logoNavy : S.logo;
+    if (!im) return;
+    var b = fitBox(im, w * 0.225, h * 0.09);
+    g.drawImage(im, (w - b.w) / 2, h * 0.048, b.w, b.h);
   }
   /* Split the card text into lines that fit: the user's own line breaks first,
      then words wrapped to the safe width. */
@@ -125,8 +137,8 @@
   function endCard(g, w, h) {
     var k = w / W;
     g.fillStyle = NAVY; g.fillRect(0, 0, w, h);
-    if (S.logo) { var lw = w * 0.42, lh = lw * S.logo.naturalHeight / S.logo.naturalWidth; g.drawImage(S.logo, (w - lw) / 2, (h - lh) / 2, lw, lh); }
-    else { g.save(); g.fillStyle = "#fff"; g.font = "700 " + (150 * k) + "px 'Somar Sans'"; g.textAlign = "center"; g.direction = "rtl"; g.fillText($("rgEndText").value || "", w / 2, h / 2 + 50 * k); g.restore(); }
+    if (S.logo) { var b = fitBox(S.logo, w * 0.42, h * 0.28); g.drawImage(S.logo, (w - b.w) / 2, (h - b.h) / 2, b.w, b.h); }
+    else { g.save(); g.fillStyle = "#fff"; g.font = "700 " + (150 * k) + "px 'Somar Sans'"; g.textAlign = "center"; g.direction = "rtl"; g.fillText(project().name, w / 2, h / 2 + 50 * k); g.restore(); }
   }
   function drawSeg(g, w, h, seg, local) {
     if (seg.kind === "end") return endCard(g, w, h);
@@ -875,7 +887,7 @@
   function yieldTask() { return new Promise(function (r) { yq.push(r); ych.port2.postMessage(0); }); }
   function fileName() {
     var first = (ready().filter(function (it) { return it.kind === "card" && it.text.trim(); })[0] || {}).text || "";
-    var title = (($("rgEndText").value || "Reel") + " " + first.replace(/\s+/g, " ")).trim().replace(/[\\/:*?"<>|؟?]/g, "").slice(0, 60);
+    var title = (project().name + " " + first.replace(/\s+/g, " ")).trim().replace(/[\\/:*?"<>|؟?]/g, "").slice(0, 60);
     var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
     return "Reel_" + title + "_" + p(d.getMonth() + 1) + p(d.getDate()) + d.getFullYear() + ".mp4";
   }
@@ -899,21 +911,21 @@
 
   /* ---------- projects (settings only; media is re-linked by file name) ---------- */
   function saveProject() {
-    var d = { app: "reels-gen", v: 3, recipe: S.recipe, endText: $("rgEndText").value, watermark: $("rgWatermark").checked, logo: S.logoData,
+    var d = { app: "reels-gen", v: 3, recipe: S.recipe, project: S.project,
               beatSync: $("rgBeatSync").checked, endLen: S.endLen, script: $("rgScript").value, lines: S.lines,
               voice: S.voice ? { data: S.voice.data, times: S.voice.times, dur: S.voice.dur } : null,   // the paid-for voiceover travels with the project
               items: S.items.map(function (it) {
                 return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
                                           : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, off: !!it.off, skip: !!it.skip, why: it.why || "" };
               }) };
-    var a = document.createElement("a"); a.download = "Reel_project_" + ($("rgEndText").value || "reel") + ".json";
+    var a = document.createElement("a"); a.download = "Reel_project_" + project().name + ".json";
     a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: "application/json" })); a.click();
     status("✓ تم حفظ المشروع (الإعدادات والنصوص — الملفات تُضاف من جهازك عند الفتح)");
   }
   function openProject(d) {
     if (!d || d.app !== "reels-gen" || !Array.isArray(d.items)) { status("الملف ليس مشروع Reels Gen", true); return; }
     stop(); S.recipe = RECIPES[d.recipe] ? d.recipe : "questions"; $("rgRecipe").value = S.recipe;
-    $("rgEndText").value = d.endText || ""; $("rgWatermark").checked = d.watermark !== false;
+    setProject(PROJECTS[d.project] ? d.project : "disc");   // projects saved before the picker were DISC reels
     S.items = [];
     d.items.forEach(function (x) {
       if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; S.items.push(c); return; }
@@ -924,26 +936,19 @@
     $("rgScript").value = d.script || ""; S.lines = Array.isArray(d.lines) ? d.lines.map(function (l) { return { voice: String(l.voice || ""), card: String(l.card || "") }; }) : [];
     renderLines(); S.voice = null; $("rgVoicePlayer").hidden = true; $("rgArrange").hidden = true; voiceSt("");
     if (d.voice && d.voice.data) setVoice(d.voice.data, d.voice.times || [], d.voice.dur).then(function () { voiceSt("✓ تعليق صوتي · " + S.voice.dur.toFixed(1) + " ث"); }, function () { voiceSt("تعذّرت قراءة التعليق المحفوظ", true); });
-    setLogo(d.logo === undefined ? DEFAULT_LOGO : d.logo);   // null = the user had removed it
     S.t = 0; renderClips(); drawAt(0);
     status("✓ تم فتح المشروع — أضف الملفات (" + S.items.length + ") من «المواد» وستُربط بأسمائها");
   }
 
-  /* The DISC logo is the default: white + orange on shots and the navy end card,
-     navy + orange on the light text cards. An uploaded logo replaces both for
-     other projects; "إزالة" falls back to the end-card text. */
-  var DEFAULT_LOGO = "assets/disc-logo.svg", DEFAULT_LOGO_NAVY = "assets/disc-logo-navy.svg";
-  function setLogo(src) {
-    S.logoNavy = null; S.logoSrc = src;
-    if (!src) { S.logo = null; S.logoData = null; $("rgLogoClear").hidden = true; $("rgLogoLbl").firstChild.nodeValue = "رفع الشعار (PNG)"; if (cv) drawAt(S.t); return; }
-    if (src === DEFAULT_LOGO) { var nv = new Image(); nv.onload = function () { if (S.logoSrc === DEFAULT_LOGO) { S.logoNavy = nv; if (cv) { renderClips(); drawAt(S.t); } } }; nv.src = DEFAULT_LOGO_NAVY; }
-    var im = new Image();
-    im.onload = function () {
-      S.logo = im; S.logoData = src; $("rgLogoClear").hidden = false;
-      $("rgLogoLbl").firstChild.nodeValue = src === DEFAULT_LOGO ? "✓ شعار DISC — اضغط للتبديل" : "✓ تم رفع الشعار";
-      if (cv) drawAt(S.t);
-    };
-    im.src = src;
+  /* Load both logos of the chosen project; a late load from an earlier pick is dropped. */
+  function setProject(key) {
+    S.project = key; $("rgProject").value = key; S.logo = null; S.logoNavy = null;
+    var p = project();
+    [["logo", p.onDark], ["logoNavy", p.onLight]].forEach(function (x) {
+      var im = new Image();
+      im.onload = function () { if (S.project !== key) return; S[x[0]] = im; if (cv) { renderClips(); drawAt(S.t); } };
+      im.src = x[1];
+    });
   }
 
   /* ---------- wiring ---------- */
@@ -976,10 +981,7 @@
     $("rgGenMusic").onclick = genMusic;
     $("rgMusicFile").addEventListener("change", function (e) { var f = e.target.files[0]; if (f) setMusic(f, f.name); e.target.value = ""; });
     $("rgNoMusic").onclick = function () { setMusic(null); };
-    $("rgEndText").addEventListener("input", function () { drawAt(S.t); });
-    $("rgWatermark").addEventListener("change", function () { drawAt(S.t); });
-    $("rgLogoFile").addEventListener("change", function (e) { var f = e.target.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { setLogo(r.result); }; r.readAsDataURL(f); e.target.value = ""; });
-    $("rgLogoClear").onclick = function () { setLogo(null); };
+    $("rgProject").addEventListener("change", function () { setProject(this.value); });
     $("rgExport").onclick = exportMp4;
     $("rgCover").onclick = exportCover;
     $("rgGrid").addEventListener("change", function () { drawAt(S.t); });
@@ -992,7 +994,7 @@
       r.readAsText(f); e.target.value = "";
     });
     window.addEventListener("beforeunload", function (e) { if (S.exporting) { e.preventDefault(); e.returnValue = ""; } });
-    setLogo(DEFAULT_LOGO);
+    setProject($("rgProject").value);
     renderClips(); drawAt(0);
   }
 

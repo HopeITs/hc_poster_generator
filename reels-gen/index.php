@@ -127,6 +127,15 @@
       <div class="layout">
         <div class="card side">
           <div class="field">
+            <div class="sec">اسم المشروع</div>
+            <select id="rgProject">
+              <option value="sz">Study Zone</option>
+              <option value="leap">LEAP</option>
+              <option value="disc" selected>DISC</option>
+              <option value="cu">Children University</option>
+            </select>
+          </div>
+          <div class="field">
             <div class="sec">الأسلوب</div>
             <select id="rgRecipe">
               <option value="questions">مونتاج بأسئلة — 4 ثوانٍ لكل لقطة</option>
@@ -172,15 +181,6 @@
             <audio id="rgMusicPlayer" controls hidden></audio>
             <label class="chk" style="margin-top:8px"><input type="checkbox" id="rgBeatSync" checked> قصّ اللقطات على إيقاع الموسيقى</label>
             <div class="music-st" id="rgMusicSt">لا موسيقى بعد</div>
-          </div>
-          <div class="field">
-            <div class="sec">الشعار والنهاية</div>
-            <input type="text" id="rgEndText" value="DISC" placeholder="نص كرت النهاية">
-            <div class="row" style="margin-top:6px">
-              <label class="btn-line" style="flex:1" id="rgLogoLbl">رفع الشعار (PNG)<input type="file" id="rgLogoFile" accept="image/png,image/svg+xml,image/webp"></label>
-              <button type="button" class="btn-line" id="rgLogoClear" hidden>إزالة</button>
-            </div>
-            <label class="chk" style="margin-top:8px"><input type="checkbox" id="rgWatermark" checked> الشعار ظاهر طول الفيديو</label>
           </div>
           <div class="actions">
             <div class="proj-row">
