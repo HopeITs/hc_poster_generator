@@ -821,8 +821,11 @@
   }
 
   /* ---------- cover ----------
-     The frame under the playhead, full size, as a JPEG for the reel's cover.
-     The optional guide darkens what Instagram's 3:4 profile grid crops off. */
+     A clean picture for the reel's cover: the shot under the playhead at full
+     size, with no logo and no text (Instagram puts its own title on it). On a
+     text card or the end card it takes the next shot, else the one before; in
+     a dissolve, whichever shot shows more. The optional guide darkens what
+     Instagram's 3:4 profile grid crops off. */
   function gridGuide(g, w, h) {
     if (!$("rgGrid").checked) return;
     var band = (h - w * 4 / 3) / 2;
@@ -830,17 +833,28 @@
     g.strokeStyle = "rgba(255,255,255,.85)"; g.setLineDash([6, 5]); g.lineWidth = 1.5;
     g.strokeRect(0.75, band, w - 1.5, h - 2 * band); g.restore();
   }
+  function coverShot() {
+    var loc = locate(S.t), x = loc.b && loc.b.alpha > 0.5 ? loc.b : loc.a;
+    if (x.seg.kind === "image" || x.seg.kind === "video") return { it: x.seg, local: x.local };
+    var list = ready(), i = list.indexOf(x.seg); if (i < 0) i = list.length;
+    var shots = list.filter(function (it) { return it.kind !== "card"; });
+    var it = list.slice(i + 1).filter(function (it) { return it.kind !== "card"; })[0] || shots[shots.length - 1];
+    return it ? { it: it, local: 0 } : null;
+  }
   function exportCover() {
-    if (!ready().length) return;
-    stop(); var loc = locate(S.t), oc = new OffscreenCanvas(W, H), og = oc.getContext("2d");
-    seekLoc(loc).then(function () {
-      frame(og, W, H, loc);
+    var c = coverShot();
+    if (!c) { status("ما في لقطة للغلاف — أضف صورة أو مقطع", true); return; }
+    stop(); var oc = new OffscreenCanvas(W, H), og = oc.getContext("2d"), it = c.it;
+    seekEl(it, c.local).then(function () {
+      og.fillStyle = "#000"; og.fillRect(0, 0, W, H);
+      drawMedia(og, W, H, it, Math.max(0, Math.min(1, (c.local + XF / 2) / (it.len + XF))));
+      if (it.tint) { og.fillStyle = TINT; og.fillRect(0, 0, W, H); }
       return oc.convertToBlob({ type: "image/jpeg", quality: 0.92 });
     }).then(function (blob) {
       var a = document.createElement("a");
       a.download = fileName().replace(/^Reel_/, "Cover_").replace(/\.mp4$/, ".jpg"); a.href = URL.createObjectURL(blob); a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
-      status("✓ تم حفظ صورة الغلاف من الثانية " + S.t.toFixed(1));
+      status("✓ تم حفظ صورة الغلاف من اللقطة " + (S.items.indexOf(it) + 1) + " — بدون شعار ولا نص");
       drawAt(S.t);
     }).catch(function (e) { status("تعذّر حفظ الغلاف: " + (e && e.message || e), true); });
   }

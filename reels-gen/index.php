@@ -192,7 +192,7 @@
               <label class="btn-line">فتح مشروع<input type="file" id="rgOpen" accept=".json,application/json"></label>
             </div>
             <button class="btn" id="rgExport" disabled>تصدير الفيديو MP4</button>
-            <button type="button" class="btn-line wide" id="rgCover" title="الصورة اللي تحت المؤشر بالمعاينة">حفظ صورة الغلاف (JPG)</button>
+            <button type="button" class="btn-line wide" id="rgCover" title="اللقطة اللي تحت المؤشر بالمعاينة، بدون شعار ولا نص">حفظ صورة الغلاف (JPG)</button>
             <div class="bar" id="rgBar" hidden><i id="rgBarFill"></i></div>
             <div class="status" id="rgStatus"></div>
             <div style="text-align:center;margin-top:4px"><button type="button" class="btn-line" id="rgBench" style="border:none;font-size:11px;color:var(--muted);text-decoration:underline;padding:2px">اختبار سرعة الجهاز</button></div>
