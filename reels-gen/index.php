@@ -50,7 +50,7 @@
   .drop .t{font-weight:700;color:var(--ink);font-size:14px;} .drop .h{font-size:11px;color:var(--muted);margin-top:3px;}
   .drop input{display:none;}
 
-  .btn{width:100%;background:var(--red);color:#fff;border:none;border-radius:12px;padding:13px 18px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;}
+  .btn{width:100%;background:var(--navy);color:#fff;border:none;border-radius:12px;padding:13px 18px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;}
   .btn:disabled{opacity:.55;cursor:not-allowed;}
   .btn-line{background:#fff;color:var(--ink);border:1.5px solid var(--line);border-radius:9px;padding:9px 12px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;text-align:center;}
   .btn-line:hover{border-color:var(--red);color:var(--red);}
