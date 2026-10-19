@@ -152,10 +152,8 @@
           </div>
           <div class="field">
             <div class="sec">الأسلوب</div>
-            <select id="rgRecipe">
-              <option value="questions">مونتاج بأسئلة — 4 ثوانٍ لكل لقطة</option>
-              <option value="ad">إعلان قصير — 3 ثوانٍ لكل لقطة</option>
-            </select>
+            <select id="rgRecipe"></select>
+            <div class="hint" id="rgStyleHint" style="margin-top:6px"></div>
           </div>
           <div class="field">
             <div class="sec">المواد <span class="hint">صور ومقاطع فيديو</span></div>
@@ -187,6 +185,12 @@
                 <option value="hopeful">ملهمة ومتفائلة</option>
                 <option value="warm">هادئة ودافئة (للمقابلات)</option>
                 <option value="upbeat">حيوية ومرحة</option>
+                <option value="energetic">حماسية شبابية</option>
+                <option value="documentary">وثائقية هادئة</option>
+                <option value="cinematic">سينمائية</option>
+                <option value="nostalgic">حنين (لو-فاي)</option>
+                <option value="playful">مرحة للأطفال</option>
+                <option value="corporate">عملية خفيفة</option>
               </select>
               <button type="button" class="btn-line" id="rgGenMusic">توليد</button>
             </div>

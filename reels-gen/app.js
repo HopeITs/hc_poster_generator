@@ -1,7 +1,9 @@
 /* Reels Gen (Beta) — vertical reels (1080×1920, 25 fps) from photos and video
    clips, edited and encoded in the browser. Visual language follows the DISC
    reels: raw shots with the logo on top, a few light text cards between them
-   (the hook, and each change of idea), soft dissolves, and a navy end card.
+   (the hook, and each change of idea), and a navy end card. One of ten editing
+   styles sets the pace, transitions, clip speeds, colour, motion and card
+   animation.
    The user's script becomes voiceover lines and card texts (/reels/script,
    Gemini), read by Mazen Lawand (/reels/voice, ElevenLabs); the lines are laid
    over the shots for a one-minute reel (the voice pauses on each text card) and
@@ -17,24 +19,68 @@
   var W = 1080, H = 1920, FPS = 25, VIDEO_BPS = 14000000;
   var NAVY = "#0a3c55", TINT = "rgba(10,60,85,.45)";
   var CARD_BG = "#ebeaf0", CARD_INK = "#105063", CARD_LEN = 3;   // measured from an approved DISC reel
-  var XF = 0.5;   // dissolve length (s), centred on each cut; never changes the reel's length
   var SR = 44100, REEL_LEN = 60;   // every reel is one minute
   var VO_OFFSET = 0.4;             // a voiceover that opens without a card starts this far in
   var VO_GAP = 0.35;               // after a card the voice resumes this long past the cut, once the dissolve is over
   var CARD_MAX = 3.5;   // longest a silent card stays on screen (s)
   var MUSIC_BASE = 0.85, DUCK_VOICE = 0.2, DUCK_SOUND = 0.12, RAMP = 0.3;   // music gain, ducked levels, ramp (s)
-  /* Recipes set the defaults for new shots: seconds per shot and the end-card length. */
+  /* Editing styles. Each one is a recipe the timeline applies on its own:
+       len    target seconds per shot (how many shots fit the minute)
+       every  cut on every Nth beat of the music
+       end    end-card seconds
+       trans  transition at each cut, xf its length (s, centred on the cut)
+       speed  automatic clip speed: none | fast (every other clip ×1.6) | light (×1.25)
+              | gentle (slight slow-motion) | slow (½ speed on 50/60 fps footage) | ramp (2× then 1×)
+       grade  colour look (GRADES), push slow push-in, punch zoom pulse on beats, wiggle tiny sway
+       card   how text cards come in, mood the default music
+       bars   cinema bars top and bottom */
   var RECIPES = {
-    questions: { len: 4, end: 3.5 },
-    ad:        { len: 3, end: 3 }
+    youth:    { name: "شبابي حيوي",      hint: "رتم سريع على الإيقاع، تكبير قافز على الضربات، وتسريع لبعض المقاطع",
+                len: 1.4, every: 2, end: 2.5, trans: "zoom",     xf: 0.25, speed: "fast",   grade: "vivid",   push: 0.04, punch: 0.05, card: "pop",      mood: "energetic" },
+    doc:      { name: "وثائقي هادئ",     hint: "لقطات طويلة، تلاشي ناعم، تبطيء خفيف وألوان دافية",
+                len: 5,   every: 4, end: 3.5, trans: "dissolve", xf: 1.0,  speed: "gentle", grade: "warm",    push: 0.08,              card: "fade",     mood: "documentary" },
+    story:    { name: "شهادة وقصة نجاح", hint: "رتم هادئ يترك مساحة للحكي، وكروت بشكل اقتباس",
+                len: 4,   every: 4, end: 3.5, trans: "dissolve", xf: 0.35, speed: "none",   grade: "natural", push: 0.05,              card: "quote",    mood: "warm" },
+    promo:    { name: "إعلان تسجيل",     hint: "وميض أبيض على الضربات، خط عريض، وكرت نهاية أطول",
+                len: 2.2, every: 2, end: 4,   trans: "flash",    xf: 0.3,  speed: "light",  grade: "punchy",  push: 0.05,              card: "big",      mood: "upbeat" },
+    cine:     { name: "سينمائي",         hint: "تبطيء، تعتيم للأسود، حبيبات وأشرطة سينمائية",
+                len: 4.5, every: 4, end: 3.5, trans: "black",    xf: 0.8,  speed: "slow",   grade: "cine",    push: 0.1,               card: "type",     mood: "cinematic", bars: true },
+    memory:   { name: "ذكريات وحنين",    hint: "ألوان باهتة دافية، وميض ضوئي وحركة بطيئة",
+                len: 3.5, every: 4, end: 3.5, trans: "leak",     xf: 0.7,  speed: "gentle", grade: "faded",   push: 0.07,              card: "fade",     mood: "nostalgic" },
+    event:    { name: "ملخّص فعالية",    hint: "قطع على كل ضربة، سحب جانبي، وتسريع متدرّج",
+                len: 1.2, every: 1, end: 2.5, trans: "slide",    xf: 0.3,  speed: "ramp",   grade: "vivid",   push: 0.04, punch: 0.04, card: "slide",    mood: "energetic" },
+    question: { name: "أسئلة جذب",       hint: "سؤال كبير يجذب الانتباه، وتلاشي متوسط",
+                len: 3,   every: 2, end: 3.5, trans: "dissolve", xf: 0.5,  speed: "none",   grade: "natural", push: 0.06,              card: "question", mood: "hopeful" },
+    steps:    { name: "خطوة بخطوة",      hint: "كروت مرقّمة 1، 2، 3 وانزلاق بين الخطوات",
+                len: 3,   every: 2, end: 3.5, trans: "slide",    xf: 0.4,  speed: "none",   grade: "natural", push: 0.05,              card: "step",     mood: "corporate" },
+    kids:     { name: "مرح للأطفال",     hint: "ألوان زاهية، قفزات مرحة وحركة خفيفة",
+                len: 2,   every: 2, end: 3,   trans: "pop",      xf: 0.35, speed: "light",  grade: "bright",  push: 0.05, wiggle: true, card: "bounce",  mood: "playful" }
   };
+  var OLD_RECIPES = { questions: "question", ad: "promo" };   // keys saved before the styles
+  /* Colour looks: a canvas filter on the footage, then optional overlays. */
+  var GRADES = {
+    natural: {},
+    vivid:   { filter: "saturate(1.35) contrast(1.08)" },
+    warm:    { filter: "saturate(1.05) sepia(0.12) brightness(1.03)", wash: "rgba(255,190,120,0.06)" },
+    punchy:  { filter: "contrast(1.18) saturate(1.15)" },
+    cine:    { filter: "contrast(1.12) saturate(0.8) brightness(0.97)", wash: "rgba(0,90,110,0.10)", vignette: 0.45, grain: 0.07 },
+    faded:   { filter: "sepia(0.28) contrast(0.86) saturate(0.85) brightness(1.06)", wash: "rgba(255,225,190,0.08)", vignette: 0.35, grain: 0.05 },
+    bright:  { filter: "saturate(1.4) brightness(1.06)" }
+  };
+  var RAMP_PART = 0.5;   // a ramped clip runs at 2× for this share of its time, then at normal speed
   var MOODS = {
     hopeful: "Uplifting, hopeful modern background music for a vertical social media reel: soft piano, light plucked strings, gentle modern percussion from 6 seconds, warm and inspiring, steady 100 BPM, clear ending.",
     warm:    "Warm, calm acoustic guitar and soft pads, subtle background music under spoken interviews, low energy, no strong drums, sincere and encouraging, 85 BPM, gentle fade at the end.",
-    upbeat:  "Upbeat playful modern pop instrumental for a lively social media reel, bright synth plucks, claps and light bass, energetic but friendly, 118 BPM, clear button ending."
+    upbeat:  "Upbeat playful modern pop instrumental for a lively social media reel, bright synth plucks, claps and light bass, energetic but friendly, 118 BPM, clear button ending.",
+    energetic:   "High-energy modern hip-hop pop instrumental for a youth social media reel: punchy drums, deep bass, crisp claps, catchy synth hook, strong steady beat throughout, 124 BPM, clean ending.",
+    documentary: "Calm documentary underscore: soft piano and warm ambient pads, light strings, reflective and sincere, no drums, slow 80 BPM pulse, gentle swell and soft ending.",
+    cinematic:   "Cinematic emotional score: sustained strings, deep piano notes, soft low percussion pulses, slow build to a hopeful climax, 90 BPM, epic but restrained, clear ending.",
+    nostalgic:   "Nostalgic warm lo-fi instrumental: mellow electric piano, soft vinyl texture, gentle brushed drums, tender and bittersweet, 82 BPM, gentle fade at the end.",
+    playful:     "Playful cheerful children's instrumental: ukulele, glockenspiel, hand claps and a whistled melody, bouncy and happy, 112 BPM, clear button ending.",
+    corporate:   "Light modern corporate instrumental: clean plucked guitar, soft piano, light percussion and claps, positive and clear, steady 105 BPM, clear ending."
   };
 
-  var S = { items: [], recipe: "questions", project: "disc", logo: null, logoNavy: null,
+  var S = { items: [], recipe: "question", project: "disc", logo: null, logoNavy: null,
             music: null, musicBlob: null, musicLabel: "", beats: null,
             lines: [], voice: null, endLen: null, regs: [], plan: [],
             t: 0, playing: false, clock: 0, seq: 0, exporting: false };
@@ -57,13 +103,14 @@
   }
 
   /* ---------- timeline ---------- */
-  function recipe() { return RECIPES[S.recipe] || RECIPES.questions; }
+  function recipe() { return RECIPES[S.recipe] || RECIPES.question; }
+  function xf() { return recipe().xf; }
   function ready() { return S.items.filter(function (it) { return !it.missing && !it.off && !it.skip; }); }
   /* Everything on the timeline in order: shots, text cards, then the end card. */
   function segs() { var l = ready(); return l.length ? l.concat([{ kind: "end", len: S.endLen || recipe().end }]) : []; }
   function total() { return segs().reduce(function (s, x) { return s + x.len; }, 0); }
   function ease(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
-  function half(a, b) { return Math.min(XF / 2, a.len / 3, b.len / 3); }   // half a dissolve; short shots get a shorter one
+  function half(a, b) { return Math.min(xf() / 2, a.len / 3, b.len / 3); }   // half a transition; short shots get a shorter one
   /* What is on screen at time t: segment a, and during a dissolve also segment
      b drawn over it with b.alpha. Around a cut the outgoing shot runs a little
      past its end and the incoming one starts a little before its in-point, so
@@ -72,7 +119,7 @@
     var list = segs(), acc = 0, i = 0, h;
     while (i < list.length - 1 && t >= acc + list[i].len) { acc += list[i].len; i++; }
     var it = list[i], local = t - acc;
-    var loc = { item: it.kind === "end" ? null : it, idx: i, local: local, a: { seg: it, local: local }, b: null };
+    var loc = { t: t, item: it.kind === "end" ? null : it, idx: i, local: local, a: { seg: it, local: local }, b: null };
     if (i > 0 && local < (h = half(list[i - 1], it))) {
       loc.a = { seg: list[i - 1], local: local + list[i - 1].len };
       loc.b = { seg: it, local: local, alpha: ease((local + h) / (2 * h)) };
@@ -83,20 +130,64 @@
   }
 
   /* ---------- drawing (shared by preview, thumbnails and export) ---------- */
-  function drawMedia(g, w, h, it, p) {
+  /* Cover the frame with the shot, scaled by zoom (≥ 1) and turned by sway degrees. */
+  function drawMedia(g, w, h, it, zoom, sway) {
     var el = it.el, sw = it.w, sh = it.h, rot = it.rot % 180 !== 0;
-    var rw = rot ? sh : sw, rh = rot ? sw : sh, s = Math.max(w / rw, h / rh) * (1 + 0.06 * p);  // cover + slow push-in
-    g.save(); g.translate(w / 2, h / 2); if (it.rot) g.rotate(it.rot * Math.PI / 180);
+    var rw = rot ? sh : sw, rh = rot ? sw : sh, s = Math.max(w / rw, h / rh) * zoom;
+    g.save(); g.translate(w / 2, h / 2); g.rotate(((it.rot || 0) + (sway || 0)) * Math.PI / 180);
     g.drawImage(el, -sw * s / 2, -sh * s / 2, sw * s, sh * s); g.restore();
   }
+  /* A shot as the style shows it: graded, pushed in, pulsing on the beat, with
+     the style's overlays. No logo (that is a layer of its own). */
+  function mediaLayer(g, w, h, it, local, t) {
+    var st = recipe(), gr = GRADES[st.grade] || {}, p = Math.max(0, Math.min(1, (local + xf() / 2) / (it.len + xf())));
+    var zoom = 1 + st.push * p + (st.punch ? st.punch * beatPulse(t) : 0) + (st.wiggle ? 0.03 : 0);
+    g.save(); if (gr.filter) g.filter = gr.filter;
+    drawMedia(g, w, h, it, zoom, st.wiggle ? 0.6 * Math.sin(t * 2.2) : 0);
+    g.restore();
+    if (it.tint) { g.fillStyle = TINT; g.fillRect(0, 0, w, h); }
+    if (gr.wash) { g.fillStyle = gr.wash; g.fillRect(0, 0, w, h); }
+    if (gr.vignette) {
+      var v = g.createRadialGradient(w / 2, h / 2, h * 0.25, w / 2, h / 2, h * 0.75);
+      v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0," + gr.vignette + ")");
+      g.fillStyle = v; g.fillRect(0, 0, w, h);
+    }
+    if (gr.grain) grain(g, w, h, gr.grain);
+  }
+  var noiseTile = null;
+  function grain(g, w, h, amount) {
+    if (!noiseTile) {
+      noiseTile = new OffscreenCanvas(160, 160);
+      var x = noiseTile.getContext("2d"), d = x.createImageData(160, 160);
+      for (var i = 0; i < d.data.length; i += 4) { var n = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = n; d.data[i + 3] = 255; }
+      x.putImageData(d, 0, 0);
+    }
+    g.save(); g.globalAlpha = amount; g.globalCompositeOperation = "overlay";
+    var k = w / W; g.translate(Math.random() * 160 * k, Math.random() * 160 * k); g.scale(k * 1.6, k * 1.6);
+    g.fillStyle = g.createPattern(noiseTile, "repeat"); g.fillRect(-160, -160, w / (k * 1.6) + 320, h / (k * 1.6) + 320);
+    g.restore();
+  }
+  /* 1 right on every other beat of the music, fading within ~0.3 s; 0 without music. */
+  function beatPulse(t) {
+    var b = S.beats; if (!b || !b.length) return 0;
+    var lo = 0, hi = b.length - 1, k = -1;
+    while (lo <= hi) { var mid = (lo + hi) >> 1; if (b[mid] <= t) { k = mid; lo = mid + 1; } else hi = mid - 1; }
+    if (k < 0) return 0; if (k % 2) k--;
+    var d = t - b[k]; return d < 0.3 ? Math.exp(-d / 0.09) : 0;
+  }
+  function backOut(x) { x = Math.max(0, Math.min(1, x)); var c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
+  /* Draw a segment moved or scaled as one frame-sized picture. Footage is drawn
+     larger than the frame (cover), so each is clipped to its own frame first. */
+  function scaled(g, w, h, k, fn) { g.save(); g.translate(w / 2, h / 2); g.scale(k, k); g.translate(-w / 2, -h / 2); g.beginPath(); g.rect(0, 0, w, h); g.clip(); fn(); g.restore(); }
+  function shifted(g, w, h, dx, fn) { g.save(); g.translate(dx, 0); g.beginPath(); g.rect(0, 0, w, h); g.clip(); fn(); g.restore(); }
   /* Each project's logo in two colourings — one for footage and the navy end
      card, one for the light text cards — and its accent, which stands in for red
      everywhere on the page. */
   var PROJECTS = {
-    sz:   { name: "Study Zone",          accent: "#f99d1c", onDark: "assets/sz-logo.svg",   onLight: "assets/sz-logo-navy.svg" },
-    leap: { name: "LEAP",                accent: "#3aa5af", onDark: "assets/leap-logo.svg", onLight: "assets/leap-logo-navy.svg" },
-    disc: { name: "DISC",                accent: "#f99d1c", onDark: "assets/disc-logo.svg", onLight: "assets/disc-logo-navy.svg" },
-    cu:   { name: "Children University", accent: "#f99d1c", onDark: "assets/cu-logo.svg",   onLight: "assets/cu-logo-navy.svg" }
+    sz:   { name: "Study Zone",          accent: "#f99d1c", style: "question", onDark: "assets/sz-logo.svg",   onLight: "assets/sz-logo-navy.svg" },
+    leap: { name: "LEAP",                accent: "#3aa5af", style: "doc", onDark: "assets/leap-logo.svg", onLight: "assets/leap-logo-navy.svg" },
+    disc: { name: "DISC",                accent: "#f99d1c", style: "youth", onDark: "assets/disc-logo.svg", onLight: "assets/disc-logo-navy.svg" },
+    cu:   { name: "Children University", accent: "#f99d1c", style: "kids", onDark: "assets/cu-logo.svg",   onLight: "assets/cu-logo-navy.svg" }
   };
   function project() { return PROJECTS[S.project] || PROJECTS.disc; }
   /* Scale a logo to fit a box, whatever its shape (wide DISC, tall CU). */
@@ -124,15 +215,37 @@
     });
     return out.slice(0, 5);
   }
+  /* A light text card. The style decides how the text comes in: fade (rises
+     into place), pop / bounce (springs from small), slide (from the left),
+     type (letter by letter), quote (with a large quote mark), step (numbered
+     1, 2, 3…), question (bigger), big (heavy, with an accent bar). */
   function textCard(g, w, h, it, local) {
-    var k = w / W, a = ease((local - 0.05) / 0.45);   // the text settles in once the card has dissolved in
+    var st = recipe(), kind = st.card, k = w / W, t = local - 0.05;
     g.fillStyle = CARD_BG; g.fillRect(0, 0, w, h);
-    logo(g, w, h, true);
     if (!it.text || !it.text.trim()) return;
-    g.save(); g.globalAlpha *= a; g.fillStyle = CARD_INK; g.font = "700 " + (77 * k) + "px 'Somar Sans'";
+    var size = kind === "big" ? 96 : kind === "question" ? 88 : 77;
+    g.save(); g.fillStyle = CARD_INK; g.font = (kind === "big" ? "900 " : "700 ") + (size * k) + "px 'Somar Sans'";
     g.textAlign = "center"; g.direction = "rtl";
-    var lines = wrap(g, it.text, w * 0.84), lh = 136 * k, y0 = h * 0.5 - (lines.length - 1) * lh / 2 + 18 * k + (1 - a) * 26 * k;
-    lines.forEach(function (l, i) { g.fillText(l, w / 2, y0 + i * lh); });
+    var lines = wrap(g, it.text, w * 0.84), lh = size * 1.77 * k, y0 = h * 0.5 - (lines.length - 1) * lh / 2 + 18 * k;
+    var a = ease(t / 0.45), dx = 0, dy = 0, sc = 1, rot = 0;
+    if (kind === "pop" || kind === "big" || kind === "bounce") { a = Math.min(1, Math.max(0, t / 0.18)); sc = 0.6 + 0.4 * backOut(t / 0.42); if (kind === "bounce") rot = (1 - backOut(t / 0.5)) * 8; }
+    else if (kind === "slide" || kind === "step") { a = ease(t / 0.4); dx = -(1 - a) * 90 * k; }
+    else if (kind === "type") a = t > 0 ? 1 : 0;
+    else dy = (1 - a) * 26 * k;
+    g.globalAlpha *= a;
+    g.translate(w / 2 + dx, h / 2 + dy); g.rotate(rot * Math.PI / 180); g.scale(sc, sc); g.translate(-w / 2, -h / 2);
+    if (kind === "quote") { g.save(); g.fillStyle = project().accent; g.font = "900 " + (230 * k) + "px 'Somar Sans'"; g.fillText("”", w / 2, y0 - lh * 0.45); g.restore(); }
+    if (kind === "step") {
+      var n = ready().filter(function (x) { return x.kind === "card"; }).indexOf(it) + 1, cy = y0 - lh - 30 * k;
+      g.save(); g.fillStyle = NAVY; g.beginPath(); g.arc(w / 2, cy, 50 * k, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#fff"; g.font = "900 " + (58 * k) + "px 'Somar Sans'"; g.textBaseline = "middle"; g.fillText(String(Math.max(1, n)), w / 2, cy + 3 * k); g.restore();
+    }
+    var shown = kind === "type" ? Math.floor(Math.max(0, t) / 0.045) : Infinity;
+    lines.forEach(function (l, i) {
+      if (shown <= 0) return;
+      g.fillText(shown >= l.length ? l : l.slice(0, shown), w / 2, y0 + i * lh); shown -= l.length;
+    });
+    if (kind === "big") { g.fillStyle = project().accent; g.fillRect(w / 2 - 110 * k, y0 + (lines.length - 1) * lh + 50 * k, 220 * k, 12 * k); }
     g.restore();
   }
   function endCard(g, w, h) {
@@ -141,20 +254,76 @@
     if (S.logo) { var b = fitBox(S.logo, w * 0.42, h * 0.28); g.drawImage(S.logo, (w - b.w) / 2, (h - b.h) / 2, b.w, b.h); }
     else { g.save(); g.fillStyle = "#fff"; g.font = "700 " + (150 * k) + "px 'Somar Sans'"; g.textAlign = "center"; g.direction = "rtl"; g.fillText(project().name, w / 2, h / 2 + 50 * k); g.restore(); }
   }
-  function drawSeg(g, w, h, seg, local) {
+  function drawSeg(g, w, h, seg, local, t) {
     if (seg.kind === "end") return endCard(g, w, h);
     if (seg.kind === "card") return textCard(g, w, h, seg, local);
-    drawMedia(g, w, h, seg, Math.max(0, Math.min(1, (local + XF / 2) / (seg.len + XF))));
-    if (seg.tint) { g.fillStyle = TINT; g.fillRect(0, 0, w, h); }
-    logo(g, w, h, false);
+    mediaLayer(g, w, h, seg, local, t || 0);
   }
-  /* One frame. The media elements must already show the right moments. */
+  /* One frame. The media elements must already show the right moments.
+     Segment a is going out and b coming in, b.alpha of the way through. */
   function frame(g, w, h, loc) {
+    var st = recipe(), b = loc.b, t = loc.t || 0;
+    var A = function () { drawSeg(g, w, h, loc.a.seg, loc.a.local, t); }, B = function () { drawSeg(g, w, h, b.seg, b.local, t); };
     g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
-    drawSeg(g, w, h, loc.a.seg, loc.a.local);
-    if (loc.b) { g.save(); g.globalAlpha = loc.b.alpha; drawSeg(g, w, h, loc.b.seg, loc.b.local); g.restore(); }
+    if (!b) A();
+    else {
+      var m = b.alpha;
+      if (st.trans === "flash" || st.trans === "black" || st.trans === "leak") {   // dip through a colour, switching at the peak
+        (m < 0.5 ? A : B)();
+        var k = 1 - Math.abs(2 * m - 1);
+        g.save(); g.globalAlpha = st.trans === "leak" ? 0.85 * k : k;
+        if (st.trans === "leak") {
+          var lg = g.createRadialGradient(w * 0.15, h * 0.2, 0, w * 0.15, h * 0.2, h * 0.9);
+          lg.addColorStop(0, "rgba(255,236,200,1)"); lg.addColorStop(0.5, "rgba(255,170,90,0.75)"); lg.addColorStop(1, "rgba(255,120,60,0.1)");
+          g.fillStyle = lg;
+        } else g.fillStyle = st.trans === "flash" ? "#fff" : "#000";
+        g.fillRect(0, 0, w, h); g.restore();
+      } else if (st.trans === "zoom") {   // the old shot rushes in, the new one lands from slightly large
+        scaled(g, w, h, 1 + 0.15 * m, A);
+        g.save(); g.globalAlpha = m; scaled(g, w, h, 1.15 - 0.15 * m, B); g.restore();
+      } else if (st.trans === "slide") {   // push: the new shot comes from the left (reading runs right to left)
+        shifted(g, w, h, m * w, A); shifted(g, w, h, -(1 - m) * w, B);
+      } else if (st.trans === "pop") {
+        A(); g.save(); g.globalAlpha = Math.min(1, m * 2.2); scaled(g, w, h, 0.82 + 0.18 * backOut(m), B); g.restore();
+      } else { A(); g.save(); g.globalAlpha = m; B(); g.restore(); }   // dissolve
+    }
+    if (st.bars) { var bh = h * 0.07; g.fillStyle = "#000"; g.fillRect(0, 0, w, bh); g.fillRect(0, h - bh, w, bh); }
+    logoLayer(g, w, h, loc);
   }
-  function vTime(it, local) { return Math.max(0, Math.min(it.srcDur - 0.04, it.start + local)); }
+  /* The logo sits above every transition, so it never zooms or slides; between
+     a shot and a card the two colourings cross-fade. */
+  function logoKind(seg) { return seg.kind === "end" ? null : seg.kind === "card" ? "light" : "dark"; }
+  function logoLayer(g, w, h, loc) {
+    var A = logoKind(loc.a.seg), B = loc.b ? logoKind(loc.b.seg) : A, m = loc.b ? loc.b.alpha : 0;
+    if (A === B) { if (A) logo(g, w, h, A === "light"); return; }
+    g.save();
+    if (A) { g.globalAlpha = 1 - m; logo(g, w, h, A === "light"); }
+    if (B) { g.globalAlpha = m; logo(g, w, h, B === "light"); }
+    g.restore();
+  }
+  /* Automatic speed. A clip carries speed (×) or ramp (2× for the first
+     RAMP_PART of its time, then 1×); span() maps reel seconds to source seconds. */
+  function rateOf(it) { return it.kind !== "video" ? 1 : it.ramp ? 1 + RAMP_PART : (it.speed || 1); }
+  function rateAt(it, local) { return it.ramp ? (local < RAMP_PART * it.len ? 2 : 1) : (it.speed || 1); }
+  function span(it, local) {
+    if (!it.ramp) return local * (it.speed || 1);
+    var r = RAMP_PART * it.len; return local <= r ? 2 * local : 2 * r + (local - r);
+  }
+  function assignSpeeds(shots) {
+    var mode = recipe().speed, vi = 0;
+    shots.forEach(function (it) {
+      it.speed = 1; it.ramp = false;
+      if (it.kind !== "video") return;
+      var hi = (it.fps || 30) >= 48;   // 50/60 fps footage slows down cleanly at our 25 fps
+      if (mode === "fast") it.speed = vi % 2 ? 1.6 : 1;
+      else if (mode === "light") it.speed = 1.25;
+      else if (mode === "gentle") it.speed = hi ? 0.7 : 0.85;
+      else if (mode === "slow") it.speed = hi ? 0.5 : 0.8;
+      else if (mode === "ramp") it.ramp = vi % 2 === 0;
+      vi++;
+    });
+  }
+  function vTime(it, local) { return Math.max(0, Math.min(it.srcDur - 0.04, it.start + span(it, local))); }
   function seekEl(it, local) {   // resolves once a video shows start+local (images and cards: at once)
     if (it.kind !== "video") return Promise.resolve();
     var target = vTime(it, local);
@@ -165,15 +334,62 @@
 
   /* ---------- media ---------- */
   var nextId = 1;
+  /* Frame rate of an MP4/MOV, read from its header (the first video track's
+     timescale ÷ sample duration) without loading the clip. null if unknown. */
+  function parseFps(file) {
+    var size = file.size;
+    function head(off) {
+      if (off + 8 > size) return Promise.resolve(null);
+      return file.slice(off, off + 16).arrayBuffer().then(function (b) {
+        var d = new DataView(b), s = d.getUint32(0), h = 8, t = String.fromCharCode(d.getUint8(4), d.getUint8(5), d.getUint8(6), d.getUint8(7));
+        if (s === 1 && b.byteLength >= 16) { s = d.getUint32(8) * 4294967296 + d.getUint32(12); h = 16; } else if (s === 0) s = size - off;
+        return { s: s, h: h, t: t };
+      });
+    }
+    function scan(off) {
+      return head(off).then(function (x) {
+        if (!x || x.s < 8) return null;
+        if (x.t === "moov") return x.s > 64e6 ? null : file.slice(off + x.h, off + x.s).arrayBuffer();
+        return scan(off + x.s);
+      });
+    }
+    return scan(0).then(function (buf) {
+      if (!buf) return null;
+      var d = new DataView(buf), fps = null;
+      function boxes(o, e, cb) {
+        while (o + 8 <= e) {
+          var s = d.getUint32(o), h = 8, t = String.fromCharCode(d.getUint8(o + 4), d.getUint8(o + 5), d.getUint8(o + 6), d.getUint8(o + 7));
+          if (s === 1) { s = d.getUint32(o + 8) * 4294967296 + d.getUint32(o + 12); h = 16; }
+          if (s < 8 || o + s > e) return;
+          cb(t, o + h, o + s); o += s;
+        }
+      }
+      boxes(0, buf.byteLength, function (t, c, e) {
+        if (t !== "trak" || fps) return;
+        var ts = 0, vide = false, delta = 0;
+        (function inner(c, e) {
+          boxes(c, e, function (t2, c2, e2) {
+            if (t2 === "mdia" || t2 === "minf" || t2 === "stbl") inner(c2, e2);
+            else if (t2 === "mdhd") ts = d.getUint8(c2) === 1 ? d.getUint32(c2 + 20) : d.getUint32(c2 + 12);
+            else if (t2 === "hdlr") vide = String.fromCharCode(d.getUint8(c2 + 8), d.getUint8(c2 + 9), d.getUint8(c2 + 10), d.getUint8(c2 + 11)) === "vide";
+            else if (t2 === "stts" && d.getUint32(c2 + 4) > 0) delta = d.getUint32(c2 + 12);
+          });
+        })(c, e);
+        if (vide && ts && delta) fps = ts / delta;
+      });
+      return fps;
+    }).catch(function () { return null; });
+  }
   function loadMedia(file) {
     var url = URL.createObjectURL(file), isVideo = /^video\//.test(file.type) || /\.(mp4|mov|m4v|webm)$/i.test(file.name);
     if (!isVideo) return new Promise(function (res, rej) {
       var im = new Image(); im.onload = function () { res({ kind: "image", el: im, url: url, file: file, w: im.naturalWidth, h: im.naturalHeight, srcDur: Infinity }); };
       im.onerror = function () { rej(new Error(file.name)); }; im.src = url; });
-    return new Promise(function (res, rej) {
+    return Promise.all([new Promise(function (res, rej) {
       var v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto";
       v.onloadeddata = function () { res({ kind: "video", el: v, url: url, file: file, w: v.videoWidth, h: v.videoHeight, srcDur: v.duration }); };
-      v.onerror = function () { rej(new Error(file.name)); }; v.src = url; });
+      v.onerror = function () { rej(new Error(file.name)); }; v.src = url; }), parseFps(file)])
+      .then(function (r) { r[0].fps = r[1] || 30; return r[0]; });
   }
   function addFiles(files) {
     var list = [].slice.call(files || []); if (!list.length) return;
@@ -200,7 +416,10 @@
   function newCard(text) { return { id: nextId++, kind: "card", text: text || "", len: CARD_LEN, missing: false }; }
   function clampItem(it) {
     it.len = Math.max(1, Math.min(15, +it.len || (it.kind === "card" ? CARD_LEN : recipe().len)));
-    if (it.kind === "video") { it.len = Math.min(it.len, Math.max(1, Math.floor((it.srcDur - 0.1) * 10) / 10)); it.start = Math.max(0, Math.min(+it.start || 0, it.srcDur - it.len - 0.05)); }
+    if (it.kind === "video") {
+      it.len = Math.min(it.len, Math.max(1, Math.floor((it.srcDur - 0.1) / rateOf(it) * 10) / 10));
+      it.start = Math.max(0, Math.min(+it.start || 0, it.srcDur - span(it, it.len) - 0.05));
+    }
   }
 
   /* ---------- clip cards ---------- */
@@ -227,7 +446,7 @@
         var ta = c.querySelector("textarea");
         ta.addEventListener("input", function () { it.text = ta.value; thumb(it, c); drawAt(S.t); });
       } else {
-        c.innerHTML = '<div class="thumb"><canvas width="180" height="320"></canvas><span class="num">' + (i + 1) + '</span><span class="kind">' + (it.kind === "video" ? "VIDEO " + it.srcDur.toFixed(1) + "s" : "PHOTO") + '</span></div>' +
+        c.innerHTML = '<div class="thumb"><canvas width="180" height="320"></canvas><span class="num">' + (i + 1) + '</span><span class="kind">' + (it.kind === "video" ? "VIDEO " + it.srcDur.toFixed(1) + "s" + (it.ramp ? " · RAMP" : it.speed && it.speed !== 1 ? " · ×" + it.speed : "") : "PHOTO") + '</span></div>' +
           '<div class="row">' + lenField +
           (it.kind === "video" ? '<div style="flex:1"><label class="l">البداية (ث)</label><input type="number" data-f="start" min="0" step="0.5" value="' + it.start.toFixed(1) + '"></div>' : "") + '</div>' +
           '<div class="row"><label class="chk"><input type="checkbox" data-f="tint"' + (it.tint ? " checked" : "") + '> طبقة كحلية</label>' +
@@ -322,7 +541,7 @@
     if (!ready().length) return;
     if (S.t >= total() - 0.05) S.t = 0;
     S.playing = true; $("rgPlay").textContent = "❚❚"; $("rgPlay").classList.add("playing"); S.clock = performance.now() - S.t * 1000; S.regs = duckRegions(); S.plan = voicePlan();
-    ready().forEach(function (it) { if (it.kind === "video") it.el.muted = !it.sound; });
+    ready().forEach(function (it) { if (it.kind === "video") it.el.muted = !(it.sound && rateOf(it) === 1); });   // sped-up or slowed clips play silent
     var mp = $("rgMusicPlayer"); if (S.musicBlob) { mp.currentTime = S.t; mp.volume = musicGain(S.t, S.regs); mp.play().catch(function () {}); }
     requestAnimationFrame(tick);
   }
@@ -334,6 +553,7 @@
     ready().forEach(function (it) {   // during a dissolve both videos play; every other one is paused
       if (it.kind !== "video") return;
       var o = on.filter(function (x) { return x.seg === it; })[0];
+      if (o) { var r = rateAt(it, o.local); if (it.el.playbackRate !== r) it.el.playbackRate = r; }
       if (o && it.el.paused) { it.el.currentTime = vTime(it, o.local); it.el.play().catch(function () {}); }
       else if (!o && !it.el.paused) it.el.pause();
     });
@@ -420,7 +640,7 @@
       }
     });
     positions().forEach(function (p) {
-      var it = p.seg; if (!it.sound || !it.audio) return;
+      var it = p.seg; if (!it.sound || !it.audio || rateOf(it) !== 1) return;   // changed speed: the clip stays silent
       any = true;
       var a = it.audio, aL = a.getChannelData(0), aR = a.numberOfChannels > 1 ? a.getChannelData(1) : aL;
       var s0 = Math.max(0, Math.round((p.t0 - p.h0) * SR)), s1 = Math.min(len, Math.round((p.t0 + it.len + p.h1) * SR));
@@ -503,8 +723,8 @@
     for (t = ph; t < n; t += p) { var c = Math.round(t), mx = c; for (k = -3; k <= 3; k++) if ((o[c + k] || 0) > (o[mx] || 0)) mx = c + k; beats.push(mx / fps); }
     return { bpm: 60 * fps / p, beats: beats };
   }
-  function nearestBeat(t, tol) {
-    var b = null; (S.beats || []).forEach(function (x) { if (Math.abs(x - t) <= tol && (b === null || Math.abs(x - t) < Math.abs(b - t))) b = x; });
+  function nearestBeat(t, tol, grid) {
+    var b = null; (grid || S.beats || []).forEach(function (x) { if (Math.abs(x - t) <= tol && (b === null || Math.abs(x - t) < Math.abs(b - t))) b = x; });
     return b;
   }
   /* Move every cut to the nearest beat (the dissolve is centred on the cut, so
@@ -523,19 +743,21 @@
     return true;
   }
   function snapCuts(list, cardTol) {
-    var period = (S.beats[S.beats.length - 1] - S.beats[0]) / Math.max(1, S.beats.length - 1);
+    var period = (S.beats[S.beats.length - 1] - S.beats[0]) / Math.max(1, S.beats.length - 1), st = recipe();
+    var grid = S.beats.filter(function (x, i) { return i % st.every === 0; }), minLen = Math.min(1, st.len * 0.6);   // the style cuts on every Nth beat
     var acc = 0, prev = 0, cuts = [];
     list.forEach(function (it, i) {
       acc += it.len;
       var nextIt = list[i + 1], card = it.kind === "card" || (nextIt && nextIt.kind === "card");
-      var nb = card ? (cardTol ? nearestBeat(acc, cardTol) : null) : nearestBeat(acc, Math.min(0.6, period * 0.55));
-      if (nb === null || nb - prev < 1) nb = acc;
-      if (it.kind === "video" && nb - prev > it.srcDur - 0.15) nb = acc;
+      var nb = card ? (cardTol ? nearestBeat(acc, cardTol, grid) : null) : nearestBeat(acc, Math.min(0.6 * st.every, period * st.every * 0.55), grid);
+      if (nb === null || nb - prev < minLen) nb = acc;
+      if (it.kind === "video" && (nb - prev) * rateOf(it) > it.srcDur - 0.15) nb = acc;
       cuts.push(nb); prev = nb;
     });
     prev = 0;
     list.forEach(function (it, i) { it.len = cuts[i] - prev; prev = cuts[i]; if (it.kind === "video") clampItem(it); });
-    if (S.endLen) S.endLen = Math.max(2, REEL_LEN - cuts[cuts.length - 1]);
+    // a clip that ran out of footage was trimmed above: the end card takes up the difference
+    if (S.endLen) S.endLen = Math.max(2, REEL_LEN - list.reduce(function (s, it) { return s + it.len; }, 0));
   }
 
   /* ---------- script → voiceover lines and cards ---------- */
@@ -620,7 +842,7 @@
      from every line that has a card — and each block plays right after its
      card. The minute is shared: cards, the blocks, and any time left over
      spread evenly after each block, so shots linger before the next card. */
-  function cardLen(text) { var w = text.trim().split(/s+/).length; return Math.max(2.2, Math.min(CARD_MAX, 1.4 + 0.3 * w)); }
+  function cardLen(text) { var w = text.trim().split(/\s+/).length; return Math.max(2.2, Math.min(CARD_MAX, 1.4 + 0.3 * w)); }
   function voiceBlocks() {
     var T = S.voice.times, out = [];
     S.lines.forEach(function (l, i) { if (i === 0 || l.card.trim()) out.push({ a: i, z: i, card: l.card.trim() }); else out[out.length - 1].z = i; });
@@ -666,8 +888,9 @@
     gaps[gaps.length - 1].e = C;
     if (!shots.length) { voiceSt("✓ التعليق جاهز — أضف اللقطات ثم اضغط «توزيع على اللقطات»"); return; }
     if (shots.length < gaps.length) { voiceSt("الريل بحاجة " + gaps.length + " لقطات على الأقل (عندك " + shots.length + ")", true); return; }
+    assignSpeeds(shots);
     var G = gaps.reduce(function (s, x) { return s + x.e - x.s; }, 0);
-    var use = shots.slice(0, Math.max(gaps.length, Math.min(shots.length, Math.floor(G / 1.5))));
+    var use = shots.slice(0, Math.max(gaps.length, Math.min(shots.length, Math.round(G / recipe().len))));
     var counts = gaps.map(function () { return 1; });
     for (var k = gaps.length; k < use.length; k++) {
       var j = 0; gaps.forEach(function (x, gi) { if ((x.e - x.s) / counts[gi] > (gaps[j].e - gaps[j].s) / counts[j]) j = gi; });
@@ -698,7 +921,7 @@
      Returns the time no shot could cover. */
   function fill(len, shots) {
     var free = shots.slice(), rest = len;
-    function cap(it) { return it.kind === "video" ? Math.max(1, it.srcDur - 0.15) : Infinity; }
+    function cap(it) { return it.kind === "video" ? Math.max(1, (it.srcDur - 0.15) / rateOf(it)) : Infinity; }
     while (free.length) {
       var share = rest / free.length, capped = free.filter(function (it) { return cap(it) < share; });
       if (!capped.length) { free.forEach(function (it) { it.len = share; clampItem(it); }); return 0; }
@@ -709,15 +932,16 @@
   }
 
   /* Without a voiceover the reel is still REEL_LEN long: text cards keep their
-     length and the shots share the rest in their order (at least 1.5 s each;
-     shots that do not fit wait at the end, marked "خارج الريل"). */
+     length and the shots share the rest in their order, about the style's shot
+     length each (shots that do not fit wait at the end, marked "خارج الريل"). */
   function fitReel() {
     var shots = S.items.filter(function (it) { return !it.missing && !it.skip && it.kind !== "card"; });
     var cards = S.items.filter(function (it) { return !it.missing && it.kind === "card"; });
     var skipped = S.items.filter(function (it) { return it.skip; });
     if (!shots.length) { S.endLen = null; return 0; }
     var room = Math.max(1.5, REEL_LEN - recipe().end - cards.reduce(function (s, c) { return s + c.len; }, 0));
-    var n = Math.max(1, Math.min(shots.length, Math.floor(room / 1.5))), use = shots.slice(0, n), pool = shots.slice(n);
+    assignSpeeds(shots);
+    var n = Math.max(1, Math.min(shots.length, Math.round(room / recipe().len))), use = shots.slice(0, n), pool = shots.slice(n);
     var sh = fill(room, use);
     while (sh > 0.05 && pool.length) { use.push(pool.shift()); sh = fill(room, use); }
     use.forEach(function (it) { it.off = false; }); pool.forEach(function (it) { it.off = true; });
@@ -741,9 +965,9 @@
      footage scores low), exposure, and a 64-bit difference hash to spot
      look-alikes. It keeps the best of each look-alike group, sets aside
      blurred and badly lit shots, and keeps as many of the strongest as fit the
-     minute at ~2.4 s each, in the user's order. Set-aside shots stay in the
+     minute at the style's shot length, in the user's order. Set-aside shots stay in the
      list and come back with ↺. */
-  var PICK_W = 192, PICK_SHOT = 2.4;
+  var PICK_W = 192;
   function seekTo(el, t) {
     return new Promise(function (r) {
       if (Math.abs(el.currentTime - t) < 0.001 && el.readyState >= 2) { r(); return; }
@@ -812,7 +1036,7 @@
     });
     var cardTime = voiceReady() ? voiceBlocks().reduce(function (s, b) { return s + (b.card ? cardLen(b.card) : 0); }, 0)
                                 : S.items.filter(function (it) { return it.kind === "card"; }).reduce(function (s, c) { return s + c.len; }, 0);
-    var N = Math.max(1, Math.round((REEL_LEN - recipe().end - cardTime) / PICK_SHOT));
+    var N = Math.max(1, Math.round((REEL_LEN - recipe().end - cardTime) / recipe().len));
     var good = shots.filter(function (it) { return !it.why; }).sort(function (a, b) { return b.q.score - a.q.score; });
     good.slice(N).forEach(function (it) { it.why = "أضعف من غيرها"; });
     shots.forEach(function (it) { it.skip = !!it.why; });
@@ -851,8 +1075,7 @@
     stop(); var oc = new OffscreenCanvas(W, H), og = oc.getContext("2d"), it = c.it;
     seekEl(it, c.local).then(function () {
       og.fillStyle = "#000"; og.fillRect(0, 0, W, H);
-      drawMedia(og, W, H, it, Math.max(0, Math.min(1, (c.local + XF / 2) / (it.len + XF))));
-      if (it.tint) { og.fillStyle = TINT; og.fillRect(0, 0, W, H); }
+      mediaLayer(og, W, H, it, c.local, 0);   // the style's look, still without logo or text
       return oc.convertToBlob({ type: "image/jpeg", quality: 0.92 });
     }).then(function (blob) {
       var a = document.createElement("a");
@@ -969,8 +1192,8 @@
   }
   function openProject(d) {
     if (!d || d.app !== "reels-gen" || !Array.isArray(d.items)) { status("الملف ليس مشروع Reels Gen", true); return; }
-    stop(); S.recipe = RECIPES[d.recipe] ? d.recipe : "questions"; $("rgRecipe").value = S.recipe;
-    setProject(PROJECTS[d.project] ? d.project : "disc");   // projects saved before the picker were DISC reels
+    stop(); setProject(PROJECTS[d.project] ? d.project : "disc");   // projects saved before the picker were DISC reels
+    setStyle(RECIPES[d.recipe] ? d.recipe : OLD_RECIPES[d.recipe] || project().style);
     S.items = [];
     d.items.forEach(function (x) {
       if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; S.items.push(c); return; }
@@ -985,6 +1208,11 @@
     status("✓ تم فتح المشروع — أضف الملفات (" + S.items.length + ") من «المواد» وستُربط بأسمائها");
   }
 
+  /* A style sets the music mood too (the music is not regenerated). */
+  function setStyle(key) {
+    S.recipe = RECIPES[key] ? key : "question"; $("rgRecipe").value = S.recipe;
+    $("rgStyleHint").textContent = recipe().hint; $("rgMood").value = recipe().mood;
+  }
   /* Load both logos of the chosen project; a late load from an earlier pick is dropped. */
   function setProject(key) {
     S.project = key; $("rgProject").value = key; S.logo = null; S.logoNavy = null;
@@ -1005,11 +1233,13 @@
     ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
     ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
     drop.addEventListener("drop", function (e) { addFiles(e.dataTransfer.files); });
-    $("rgRecipe").addEventListener("change", function () {
-      S.recipe = this.value; S.endLen = null; var r = recipe();   // re-apply the recipe's shot length (text cards keep theirs)
-      S.items.forEach(function (it) { if (it.kind !== "card") { it.len = r.len; clampItem(it); } });
+    $("rgRecipe").innerHTML = Object.keys(RECIPES).map(function (k, i) { return '<option value="' + k + '">' + (i + 1) + ". " + RECIPES[k].name + "</option>"; }).join("");
+    function applyStyle(key) {   // re-lay the reel for the style's pace and speeds (text cards keep their length)
+      setStyle(key); S.endLen = null;
+      S.items.forEach(function (it) { if (it.kind !== "card") { it.len = recipe().len; clampItem(it); } });
       relayout();
-    });
+    }
+    $("rgRecipe").addEventListener("change", function () { applyStyle(this.value); });
     $("rgDraft").onclick = draft;
     $("rgVoiceGen").onclick = genVoice;
     $("rgArrange").onclick = arrange;
@@ -1027,7 +1257,7 @@
     $("rgGenMusic").onclick = genMusic;
     $("rgMusicFile").addEventListener("change", function (e) { var f = e.target.files[0]; if (f) setMusic(f, f.name); e.target.value = ""; });
     $("rgNoMusic").onclick = function () { setMusic(null); };
-    $("rgProject").addEventListener("change", function () { setProject(this.value); });
+    $("rgProject").addEventListener("change", function () { setProject(this.value); applyStyle(project().style); });
     $("rgExport").onclick = exportMp4;
     $("rgCover").onclick = exportCover;
     $("rgGrid").addEventListener("change", function () { drawAt(S.t); });
@@ -1040,7 +1270,7 @@
       r.readAsText(f); e.target.value = "";
     });
     window.addEventListener("beforeunload", function (e) { if (S.exporting) { e.preventDefault(); e.returnValue = ""; } });
-    setProject($("rgProject").value);
+    setProject($("rgProject").value); setStyle(project().style);
     renderClips(); drawAt(0);
   }
 
