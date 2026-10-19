@@ -41,6 +41,9 @@
   .field{margin-bottom:16px;}
   .hint{font-size:11px;font-weight:500;color:var(--muted);}
   select,input[type=text],textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-family:inherit;font-size:14px;color:var(--ink);background:#fff;}
+  /* Own chevron, 14px in from the left edge (the browser's sits against it); the page is always RTL. */
+  select{-webkit-appearance:none;appearance:none;cursor:pointer;padding-inline-end:38px;
+    background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23414042' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat left 14px center;}
   select:focus,input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
   .row{display:flex;gap:8px;align-items:center;}
   .row > *{min-width:0;}
