@@ -73,18 +73,18 @@
   .screen{position:relative;height:min(640px,72vh);aspect-ratio:9/16;max-width:100%;background:#111;border-radius:14px;overflow:hidden;}
   .screen canvas{display:block;width:100%;height:100%;}
   .screen .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#aaa;font-size:14px;padding:30px;line-height:1.7;}
-  .transport{display:flex;align-items:center;gap:10px;width:min(100%,420px);}
+  .transport{display:flex;flex-direction:row-reverse;align-items:center;gap:10px;width:min(100%,360px,40.5vh);}   /* as wide as .screen (9/16 of its height); reversed in RTL: play on its left edge, time on its right */
   .transport button{width:27px;height:27px;padding:0;border-radius:50%;border:none;background:var(--navy);color:#fff;font-size:11px;line-height:27px;cursor:pointer;flex:0 0 auto;}
   #rgPlay:not(.playing){padding-left:2px;}   /* nudges ▶ 1px right so it looks centred; ❚❚ stays put */
-  /* Seek bar: a thin K50 grey line (K50 = #939598); the played part fills from the
-     right (RTL) up to --p, which app.js keeps in step with the playhead. */
-  .transport input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:999px;cursor:pointer;
-    background:linear-gradient(to left,#939598 var(--p,0%),#dcdcde var(--p,0%));}
+  /* Seek bar: a thin K50 grey line (K50 = #939598) running left to right from the
+     play button; the played part fills up to --p, which app.js keeps in step with the playhead. */
+  .transport input[type=range]{flex:1;direction:ltr;-webkit-appearance:none;appearance:none;height:3px;border-radius:999px;cursor:pointer;
+    background:linear-gradient(to right,#939598 var(--p,0%),#dcdcde var(--p,0%));}
   .transport input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#939598;border:none;}
   .transport input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#939598;border:none;}
   .transport input[type=range]:focus{outline:none;}
   .transport input[type=range]:focus-visible{outline:2px solid #939598;outline-offset:4px;}
-  .transport .t{font-size:12px;font-weight:700;color:var(--ink);direction:ltr;min-width:84px;text-align:center;font-variant-numeric:tabular-nums;}
+  .transport .t{font-size:12px;font-weight:700;color:var(--ink);direction:ltr;min-width:84px;text-align:right;font-variant-numeric:tabular-nums;}
 
   /* clip list */
   .clips-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px;}
