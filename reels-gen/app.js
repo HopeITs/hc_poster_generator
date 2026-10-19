@@ -321,7 +321,7 @@
   function play() {
     if (!ready().length) return;
     if (S.t >= total() - 0.05) S.t = 0;
-    S.playing = true; $("rgPlay").textContent = "❚❚"; S.clock = performance.now() - S.t * 1000; S.regs = duckRegions(); S.plan = voicePlan();
+    S.playing = true; $("rgPlay").textContent = "❚❚"; $("rgPlay").classList.add("playing"); S.clock = performance.now() - S.t * 1000; S.regs = duckRegions(); S.plan = voicePlan();
     ready().forEach(function (it) { if (it.kind === "video") it.el.muted = !it.sound; });
     var mp = $("rgMusicPlayer"); if (S.musicBlob) { mp.currentTime = S.t; mp.volume = musicGain(S.t, S.regs); mp.play().catch(function () {}); }
     requestAnimationFrame(tick);
@@ -349,7 +349,7 @@
     requestAnimationFrame(tick);
   }
   function stop() {
-    S.playing = false; $("rgPlay").textContent = "▶";
+    S.playing = false; $("rgPlay").textContent = "▶"; $("rgPlay").classList.remove("playing");
     ready().forEach(function (it) { if (it.kind === "video") it.el.pause(); });
     $("rgMusicPlayer").pause(); $("rgVoicePlayer").pause();
   }

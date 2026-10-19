@@ -75,6 +75,7 @@
   .screen .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#aaa;font-size:14px;padding:30px;line-height:1.7;}
   .transport{display:flex;align-items:center;gap:10px;width:min(100%,420px);}
   .transport button{width:27px;height:27px;padding:0;border-radius:50%;border:none;background:var(--navy);color:#fff;font-size:11px;line-height:27px;cursor:pointer;flex:0 0 auto;}
+  #rgPlay:not(.playing){padding-left:2px;}   /* nudges ▶ 1px right so it looks centred; ❚❚ stays put */
   /* Seek bar: a thin K50 grey line (K50 = #939598); the played part fills from the
      right (RTL) up to --p, which app.js keeps in step with the playhead. */
   .transport input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:999px;cursor:pointer;
