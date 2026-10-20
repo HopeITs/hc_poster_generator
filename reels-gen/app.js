@@ -28,7 +28,9 @@
        len    target seconds per shot (how many shots fit the minute)
        every  cut on every Nth beat of the music
        end    end-card seconds
-       trans  transition at each cut, xf its length (s, centred on the cut)
+       strong transitions for cuts on a bar start (every 4th beat) — or now and then without music
+       light  transitions for the other shot-to-shot cuts; cardTr the one into and out of text cards
+              (each entry is [type, seconds], centred on the cut; see frame() for the types)
        speed  automatic clip speed: none | fast (every other clip ×1.6) | light (×1.25)
               | gentle (slight slow-motion) | slow (½ speed on 50/60 fps footage) | ramp (2× then 1×)
        grade  colour look (GRADES), push slow push-in, punch zoom pulse on beats, wiggle tiny sway
@@ -36,25 +38,35 @@
        bars   cinema bars top and bottom */
   var RECIPES = {
     youth:    { name: "شبابي حيوي",      hint: "رتم سريع على الإيقاع، تكبير قافز على الضربات، وتسريع لبعض المقاطع",
-                len: 1.4, every: 2, end: 2.5, trans: "zoom",     xf: 0.25, speed: "fast",   grade: "vivid",   push: 0.04, punch: 0.05, card: "pop",      mood: "energetic" },
+                len: 1.4, every: 2, end: 2.5, speed: "fast",   grade: "vivid",   push: 0.04, punch: 0.05, card: "pop",      mood: "energetic",
+                strong: [["zoom", 0.25], ["glitch", 0.2]],   light: [["cut", 0], ["whip", 0.25]],      cardTr: ["pop", 0.35] },
     doc:      { name: "وثائقي هادئ",     hint: "لقطات طويلة، تلاشي ناعم، تبطيء خفيف وألوان دافية",
-                len: 5,   every: 4, end: 3.5, trans: "dissolve", xf: 1.0,  speed: "gentle", grade: "warm",    push: 0.08,              card: "fade",     mood: "documentary" },
+                len: 5,   every: 4, end: 3.5, speed: "gentle", grade: "warm",    push: 0.08,              card: "fade",     mood: "documentary",
+                strong: [["dissolve", 1.0]],                  light: [["dissolve", 0.8], ["blur", 0.6]], cardTr: ["dissolve", 0.8] },
     story:    { name: "شهادة وقصة نجاح", hint: "رتم هادئ يترك مساحة للحكي، وكروت بشكل اقتباس",
-                len: 4,   every: 4, end: 3.5, trans: "dissolve", xf: 0.35, speed: "none",   grade: "natural", push: 0.05,              card: "quote",    mood: "warm" },
+                len: 4,   every: 4, end: 3.5, speed: "none",   grade: "natural", push: 0.05,              card: "quote",    mood: "warm",
+                strong: [["dissolve", 0.5]],                  light: [["cut", 0], ["dissolve", 0.35]],   cardTr: ["dissolve", 0.4] },
     promo:    { name: "إعلان تسجيل",     hint: "وميض أبيض على الضربات، خط عريض، وكرت نهاية أطول",
-                len: 2.2, every: 2, end: 4,   trans: "flash",    xf: 0.3,  speed: "light",  grade: "punchy",  push: 0.05,              card: "big",      mood: "upbeat" },
+                len: 2.2, every: 2, end: 4, speed: "light",  grade: "punchy",  push: 0.05,              card: "big",      mood: "upbeat",
+                strong: [["flash", 0.3], ["zoom", 0.25]],     light: [["cut", 0], ["wipe", 0.35]],       cardTr: ["flash", 0.3] },
     cine:     { name: "سينمائي",         hint: "تبطيء، تعتيم للأسود، حبيبات وأشرطة سينمائية",
-                len: 4.5, every: 4, end: 3.5, trans: "black",    xf: 0.8,  speed: "slow",   grade: "cine",    push: 0.1,               card: "type",     mood: "cinematic", bars: true },
+                len: 4.5, every: 4, end: 3.5, speed: "slow",   grade: "cine",    push: 0.1,               card: "type",     mood: "cinematic", bars: true,
+                strong: [["black", 0.8]],                     light: [["dissolve", 0.9], ["blur", 0.7]], cardTr: ["black", 0.8] },
     memory:   { name: "ذكريات وحنين",    hint: "ألوان باهتة دافية، وميض ضوئي وحركة بطيئة",
-                len: 3.5, every: 4, end: 3.5, trans: "leak",     xf: 0.7,  speed: "gentle", grade: "faded",   push: 0.07,              card: "fade",     mood: "nostalgic" },
+                len: 3.5, every: 4, end: 3.5, speed: "gentle", grade: "faded",   push: 0.07,              card: "fade",     mood: "nostalgic",
+                strong: [["burn", 0.6]],                      light: [["leak", 0.7], ["dissolve", 0.6]], cardTr: ["dissolve", 0.6] },
     event:    { name: "ملخّص فعالية",    hint: "قطع على كل ضربة، سحب جانبي، وتسريع متدرّج",
-                len: 1.2, every: 1, end: 2.5, trans: "slide",    xf: 0.3,  speed: "ramp",   grade: "vivid",   push: 0.04, punch: 0.04, card: "slide",    mood: "energetic" },
+                len: 1.2, every: 1, end: 2.5, speed: "ramp",   grade: "vivid",   push: 0.04, punch: 0.04, card: "slide",    mood: "energetic",
+                strong: [["whip", 0.25], ["glitch", 0.2]],    light: [["cut", 0], ["slide", 0.3]],       cardTr: ["slide", 0.3] },
     question: { name: "أسئلة جذب",       hint: "سؤال كبير يجذب الانتباه، وتلاشي متوسط",
-                len: 3,   every: 2, end: 3.5, trans: "dissolve", xf: 0.5,  speed: "none",   grade: "natural", push: 0.06,              card: "question", mood: "hopeful" },
+                len: 3,   every: 2, end: 3.5, speed: "none",   grade: "natural", push: 0.06,              card: "question", mood: "hopeful",
+                strong: [["zoom", 0.3]],                      light: [["dissolve", 0.5], ["cut", 0]],    cardTr: ["dissolve", 0.5] },
     steps:    { name: "خطوة بخطوة",      hint: "كروت مرقّمة 1، 2، 3 وانزلاق بين الخطوات",
-                len: 3,   every: 2, end: 3.5, trans: "slide",    xf: 0.4,  speed: "none",   grade: "natural", push: 0.05,              card: "step",     mood: "corporate" },
+                len: 3,   every: 2, end: 3.5, speed: "none",   grade: "natural", push: 0.05,              card: "step",     mood: "corporate",
+                strong: [["wipe", 0.4]],                      light: [["slide", 0.35], ["cut", 0]],      cardTr: ["slide", 0.4] },
     kids:     { name: "مرح للأطفال",     hint: "ألوان زاهية، قفزات مرحة وحركة خفيفة",
-                len: 2,   every: 2, end: 3,   trans: "pop",      xf: 0.35, speed: "light",  grade: "bright",  push: 0.05, wiggle: true, card: "bounce",  mood: "playful" }
+                len: 2,   every: 2, end: 3, speed: "light",  grade: "bright",  push: 0.05, wiggle: true, card: "bounce",  mood: "playful",
+                strong: [["iris", 0.5], ["pop", 0.35]],       light: [["slide", 0.35], ["zoomout", 0.3]], cardTr: ["pop", 0.35] }
   };
   var OLD_RECIPES = { questions: "question", ad: "promo" };   // keys saved before the styles
   /* Colour looks: a canvas filter on the footage, then optional overlays. */
@@ -104,27 +116,63 @@
 
   /* ---------- timeline ---------- */
   function recipe() { return RECIPES[S.recipe] || RECIPES.question; }
-  function xf() { return recipe().xf; }
   function ready() { return S.items.filter(function (it) { return !it.missing && !it.off && !it.skip; }); }
   /* Everything on the timeline in order: shots, text cards, then the end card. */
   function segs() { var l = ready(); return l.length ? l.concat([{ kind: "end", len: S.endLen || recipe().end }]) : []; }
   function total() { return segs().reduce(function (s, x) { return s + x.len; }, 0); }
   function ease(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
-  function half(a, b) { return Math.min(xf() / 2, a.len / 3, b.len / 3); }   // half a transition; short shots get a shorter one
+  /* The transition at every cut of the segment list (plan[i] sits between
+     list[i] and list[i + 1]). Cards and the end card take the style's card
+     transition. Between shots: with music, a cut on a bar start (every 4th beat)
+     is strong and the rest light, each pool used in turn; without music the
+     choice is random but seeded by the style and cut number, so the preview and
+     the export agree and a reopened project looks the same. The same type is
+     never used twice in a row. */
+  function cutPlan(list) {
+    var st = recipe(), out = [], acc = 0, prev = null, n = { s: 0, l: 0 }, music = !!(S.beats && S.beats.length);
+    for (var i = 0; i < list.length - 1; i++) {
+      acc += list[i].len;
+      var a = list[i], b = list[i + 1], strong = false, pick;
+      if (a.kind === "card" || b.kind === "card" || b.kind === "end") pick = st.cardTr;
+      else {
+        if (music) { var bi = beatIndex(acc); strong = bi >= 0 && bi % 4 === 0; }
+        else strong = seeded(i, 1) < 0.3 && !(prev && prev.strong);
+        var pool = strong ? st.strong : st.light, key = strong ? "s" : "l";
+        var opts = pool.filter(function (p) { return !prev || p[0] !== prev.type; }); if (!opts.length) opts = pool;
+        pick = music ? opts[n[key]++ % opts.length] : opts[Math.floor(seeded(i, 2) * opts.length)];
+      }
+      prev = { type: pick[0], dur: pick[1], strong: strong }; out.push(prev);
+    }
+    return out;
+  }
+  function beatIndex(t) {   // index of the beat within 0.12 s of t, or -1
+    var b = S.beats, lo = 0, hi = b.length - 1;
+    while (lo < hi) { var mid = (lo + hi) >> 1; if (b[mid] < t) lo = mid + 1; else hi = mid; }
+    var best = lo; if (lo > 0 && Math.abs(b[lo - 1] - t) < Math.abs(b[lo] - t)) best = lo - 1;
+    return Math.abs(b[best] - t) <= 0.12 ? best : -1;
+  }
+  function seeded(i, salt) {   // a stable number in [0, 1) for this style, cut and purpose
+    var h = 2166136261, key = S.recipe + ":" + i + ":" + salt;
+    for (var c = 0; c < key.length; c++) { h ^= key.charCodeAt(c); h = Math.imul(h, 16777619); }
+    h ^= h >>> 13; h = Math.imul(h, 1274126177); h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  // half a transition; short shots get a shorter one
+  function halfAt(list, plan, j) { return Math.min(plan[j].dur / 2, list[j].len / 3, list[j + 1].len / 3); }
   /* What is on screen at time t: segment a, and during a dissolve also segment
      b drawn over it with b.alpha. Around a cut the outgoing shot runs a little
      past its end and the incoming one starts a little before its in-point, so
      neither freezes while they blend. */
   function locate(t) {
-    var list = segs(), acc = 0, i = 0, h;
+    var list = segs(), plan = cutPlan(list), acc = 0, i = 0, h;
     while (i < list.length - 1 && t >= acc + list[i].len) { acc += list[i].len; i++; }
     var it = list[i], local = t - acc;
-    var loc = { t: t, item: it.kind === "end" ? null : it, idx: i, local: local, a: { seg: it, local: local }, b: null };
-    if (i > 0 && local < (h = half(list[i - 1], it))) {
+    var loc = { t: t, item: it.kind === "end" ? null : it, idx: i, local: local, a: { seg: it, local: local }, b: null, tr: null };
+    if (i > 0 && local < (h = halfAt(list, plan, i - 1))) {
       loc.a = { seg: list[i - 1], local: local + list[i - 1].len };
-      loc.b = { seg: it, local: local, alpha: ease((local + h) / (2 * h)) };
-    } else if (i < list.length - 1 && local > it.len - (h = half(it, list[i + 1]))) {
-      loc.b = { seg: list[i + 1], local: local - it.len, alpha: ease((local - it.len + h) / (2 * h)) };
+      loc.b = { seg: it, local: local, alpha: ease((local + h) / (2 * h)) }; loc.tr = plan[i - 1].type;
+    } else if (i < list.length - 1 && local > it.len - (h = halfAt(list, plan, i))) {
+      loc.b = { seg: list[i + 1], local: local - it.len, alpha: ease((local - it.len + h) / (2 * h)) }; loc.tr = plan[i].type;
     }
     return loc;
   }
@@ -140,9 +188,10 @@
   /* A shot as the style shows it: graded, pushed in, pulsing on the beat, with
      the style's overlays. No logo (that is a layer of its own). */
   function mediaLayer(g, w, h, it, local, t) {
-    var st = recipe(), gr = GRADES[st.grade] || {}, p = Math.max(0, Math.min(1, (local + xf() / 2) / (it.len + xf())));
+    var st = recipe(), gr = GRADES[st.grade] || {}, p = Math.max(0, Math.min(1, (local + 0.25) / (it.len + 0.5)));
     var zoom = 1 + st.push * p + (st.punch ? st.punch * beatPulse(t) : 0) + (st.wiggle ? 0.03 : 0);
-    g.save(); if (gr.filter) g.filter = gr.filter;
+    var f = [gr.filter, S.fx].filter(Boolean).join(" ");
+    g.save(); if (f) g.filter = f;
     drawMedia(g, w, h, it, zoom, st.wiggle ? 0.6 * Math.sin(t * 2.2) : 0);
     g.restore();
     if (it.tint) { g.fillStyle = TINT; g.fillRect(0, 0, w, h); }
@@ -179,6 +228,10 @@
   /* Draw a segment moved or scaled as one frame-sized picture. Footage is drawn
      larger than the frame (cover), so each is clipped to its own frame first. */
   function scaled(g, w, h, k, fn) { g.save(); g.translate(w / 2, h / 2); g.scale(k, k); g.translate(-w / 2, -h / 2); g.beginPath(); g.rect(0, 0, w, h); g.clip(); fn(); g.restore(); }
+  function blurred(g, px, fn) {   // a canvas blur over a whole segment, kept when the grade sets its own filter
+    var was = S.fx; S.fx = px > 0.3 ? "blur(" + px.toFixed(1) + "px)" : "";
+    g.save(); if (S.fx) g.filter = S.fx; fn(); g.restore(); S.fx = was;
+  }
   function shifted(g, w, h, dx, fn) { g.save(); g.translate(dx, 0); g.beginPath(); g.rect(0, 0, w, h); g.clip(); fn(); g.restore(); }
   /* Each project's logo in two colourings — one for footage and the navy end
      card, one for the light text cards — and its accent, which stands in for red
@@ -262,28 +315,58 @@
   /* One frame. The media elements must already show the right moments.
      Segment a is going out and b coming in, b.alpha of the way through. */
   function frame(g, w, h, loc) {
-    var st = recipe(), b = loc.b, t = loc.t || 0;
+    var st = recipe(), b = loc.b, t = loc.t || 0, tr = loc.tr, k = w / W;
     var A = function () { drawSeg(g, w, h, loc.a.seg, loc.a.local, t); }, B = function () { drawSeg(g, w, h, b.seg, b.local, t); };
     g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
     if (!b) A();
     else {
       var m = b.alpha;
-      if (st.trans === "flash" || st.trans === "black" || st.trans === "leak") {   // dip through a colour, switching at the peak
+      var pk = 1 - Math.abs(2 * m - 1);   // 0 at both ends of the transition, 1 in its middle
+      if (tr === "flash" || tr === "black" || tr === "leak" || tr === "burn") {   // dip through light or dark, switching at the peak
         (m < 0.5 ? A : B)();
-        var k = 1 - Math.abs(2 * m - 1);
-        g.save(); g.globalAlpha = st.trans === "leak" ? 0.85 * k : k;
-        if (st.trans === "leak") {
-          var lg = g.createRadialGradient(w * 0.15, h * 0.2, 0, w * 0.15, h * 0.2, h * 0.9);
-          lg.addColorStop(0, "rgba(255,236,200,1)"); lg.addColorStop(0.5, "rgba(255,170,90,0.75)"); lg.addColorStop(1, "rgba(255,120,60,0.1)");
+        g.save();
+        if (tr === "leak" || tr === "burn") {
+          var lx = tr === "burn" ? w * 0.95 : w * 0.15, ly = tr === "burn" ? h * 0.75 : h * 0.2;
+          var lg = g.createRadialGradient(lx, ly, 0, lx, ly, h * (tr === "burn" ? 0.75 : 0.9));
+          if (tr === "burn") { lg.addColorStop(0, "rgba(255,250,235,1)"); lg.addColorStop(0.35, "rgba(255,140,40,0.95)"); lg.addColorStop(0.7, "rgba(200,40,10,0.5)"); lg.addColorStop(1, "rgba(120,0,0,0)"); }
+          else { lg.addColorStop(0, "rgba(255,236,200,1)"); lg.addColorStop(0.5, "rgba(255,170,90,0.75)"); lg.addColorStop(1, "rgba(255,120,60,0.1)"); }
+          g.globalAlpha = (tr === "burn" ? 1 : 0.85) * pk; if (tr === "burn") g.globalCompositeOperation = "screen";
           g.fillStyle = lg;
-        } else g.fillStyle = st.trans === "flash" ? "#fff" : "#000";
+        } else { g.globalAlpha = pk; g.fillStyle = tr === "flash" ? "#fff" : "#000"; }
         g.fillRect(0, 0, w, h); g.restore();
-      } else if (st.trans === "zoom") {   // the old shot rushes in, the new one lands from slightly large
+      } else if (tr === "zoom") {   // the old shot rushes in, the new one lands from slightly large
         scaled(g, w, h, 1 + 0.15 * m, A);
         g.save(); g.globalAlpha = m; scaled(g, w, h, 1.15 - 0.15 * m, B); g.restore();
-      } else if (st.trans === "slide") {   // push: the new shot comes from the left (reading runs right to left)
-        shifted(g, w, h, m * w, A); shifted(g, w, h, -(1 - m) * w, B);
-      } else if (st.trans === "pop") {
+      } else if (tr === "zoomout") {   // the old shot pulls away and fades off the new one
+        scaled(g, w, h, 1.1 - 0.1 * m, B);
+        g.save(); g.globalAlpha = 1 - m; scaled(g, w, h, 1 - 0.18 * m, A); g.restore();
+      } else if (tr === "slide" || tr === "whip") {   // push from the left (reading runs right to left); whip is faster and blurred
+        var bl = tr === "whip" ? 46 * k * pk : 0;
+        blurred(g, bl, function () { shifted(g, w, h, m * w, A); shifted(g, w, h, -(1 - m) * w, B); });
+      } else if (tr === "wipe") {   // the new shot is uncovered from the left, behind a soft white edge
+        A(); var ex = m * w;
+        g.save(); g.beginPath(); g.rect(0, 0, ex, h); g.clip(); B(); g.restore();
+        g.save(); var eg = g.createLinearGradient(ex - 24 * k, 0, ex + 6 * k, 0);
+        eg.addColorStop(0, "rgba(255,255,255,0)"); eg.addColorStop(1, "rgba(255,255,255," + (0.7 * pk) + ")");
+        g.fillStyle = eg; g.fillRect(ex - 24 * k, 0, 30 * k, h); g.restore();
+      } else if (tr === "iris") {   // a growing circle uncovers the new shot from the middle
+        A(); g.save(); g.beginPath(); g.arc(w / 2, h / 2, Math.hypot(w, h) / 2 * m, 0, Math.PI * 2); g.clip(); B(); g.restore();
+      } else if (tr === "glitch") {   // a quick digital jolt: shifted slices and a colour fringe, switching at the peak
+        (m < 0.5 ? A : B)();
+        var cvs = g.canvas, seed = Math.floor(m * 12);
+        g.save();
+        for (var sl = 0; sl < 7; sl++) {
+          var r1 = seeded(seed * 7 + sl, 3), r2 = seeded(seed * 7 + sl, 4), y = r1 * h, bh2 = (0.02 + 0.08 * r2) * h;
+          g.drawImage(cvs, 0, y, w, bh2, (r2 - 0.5) * 120 * k * pk, y, w, bh2);
+        }
+        g.globalCompositeOperation = "screen"; g.globalAlpha = 0.2 * pk;
+        g.fillStyle = "rgba(255,0,80,1)"; g.fillRect(-8 * k * pk, 0, w, h);
+        g.fillStyle = "rgba(0,220,255,1)"; g.fillRect(8 * k * pk, 0, w, h);
+        g.restore();
+      } else if (tr === "blur") {   // dissolve through a soft focus
+        var bp = 28 * k * pk;
+        blurred(g, bp, A); g.save(); g.globalAlpha = m; blurred(g, bp, B); g.restore();
+      } else if (tr === "pop") {
         A(); g.save(); g.globalAlpha = Math.min(1, m * 2.2); scaled(g, w, h, 0.82 + 0.18 * backOut(m), B); g.restore();
       } else { A(); g.save(); g.globalAlpha = m; B(); g.restore(); }   // dissolve
     }
@@ -579,9 +662,9 @@
   function b64Blob(b64, type) { var s = atob(b64), a = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return new Blob([a], { type: type }); }
   /* Where each segment sits on the timeline, with the half-dissolves on either side. */
   function positions() {
-    var list = segs(), acc = 0;
+    var list = segs(), plan = cutPlan(list), acc = 0;
     return list.map(function (s, i) {
-      var p = { seg: s, t0: acc, h0: i ? half(list[i - 1], s) : 0, h1: i < list.length - 1 ? half(s, list[i + 1]) : 0 };
+      var p = { seg: s, t0: acc, h0: i ? halfAt(list, plan, i - 1) : 0, h1: i < list.length - 1 ? halfAt(list, plan, i) : 0 };
       acc += s.len; return p;
     });
   }
