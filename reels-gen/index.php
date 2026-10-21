@@ -4,7 +4,8 @@
  * reel of one long video), edited and
  * encoded entirely in the browser (WebCodecs + mp4-muxer). Media is never
  * uploaded: only the script text, the voiceover lines and the music request go
- * to the auth Worker (the Gemini and ElevenLabs keys stay there).
+ * to the auth Worker (the Gemini and ElevenLabs keys stay there) — and, for a
+ * summary made of speech, the long video's soundtrack, for Gemini to hear.
  * Strict CSP applies (no inline script); access is checked by app.js against the
  * user's projects ("reels-gen"), like Thumbnail Gen.
  */
@@ -178,6 +179,11 @@
               <div class="h" id="rgLongInfo">MP4 · MOV · WEBM — المعالجة على جهازك، لا شيء يُرفع</div>
               <input type="file" id="rgLongFile" accept="video/*">
             </label>
+            <select id="rgSumKind" style="margin-top:8px">
+              <option value="shots">لقطات على الإيقاع — فعاليات وحركة</option>
+              <option value="talk">كلام وأفكار كاملة — مقابلات وكلمات</option>
+            </select>
+            <div class="hint" id="rgSumKindHint" style="margin-top:4px"></div>
             <div class="row" style="margin-top:8px">
               <select id="rgSumLen">
                 <option value="30">ريل 30 ثانية</option>

@@ -30,6 +30,10 @@ const VOICE_MAX_CHARS  = 1200; // نص التعليق كاملاً (ريل 45 ث
 const VOICE_NAME       = "mazen";            // يُبحث عنه في أصوات الحساب ثم في مكتبة ElevenLabs
 const VOICE_NAME_FULL  = "mazen lawand";
 const VOICE_MODEL      = "eleven_multilingual_v2";
+// Reels Gen — تلخيص الكلام: Gemini يسمع صوت الفيديو ويختار أفكاراً كاملة
+const MOMENTS_DAILY_MAX = 30;                 // تحليلات لكل مستخدم خلال 24 ساعة
+const MOMENTS_MAX_BYTES = 40 * 1048576;       // صوت Opus ≈ 11 MB للساعة
+const MOMENTS_MAX_SEGS  = 3000;
 var voiceIdCache = null;       // يبقى طوال عمر نسخة الـWorker
 
 function cors() {
@@ -195,7 +199,7 @@ function canAssign(actorRole, targetRole) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors() });
     var url = new URL(request.url);
     var path = url.pathname.replace(/\/+$/, "");
@@ -559,6 +563,95 @@ export default {
         });
         await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'voice', datetime('now'))").bind(vcUser.email).run();
         return json({ ok: true, audio: vcD.audio_base64, lines: vcTimes, duration: ce.length ? ce[ce.length - 1] : 0 });
+      }
+
+      /* ---- 7b5) Reels Gen: تلخيص فيديو بالكلام — اختيار أفكار كاملة (Gemini) ----
+         الجسم: [4 بايت طول JSON][JSON {seconds, segments:[[start,end]]}][صوت Ogg Opus].
+         المقاطع حدودها سكتات اكتشفها المتصفح؛ Gemini يسمع الصوت ويختار سلاسل متتالية منها
+         (from..to) تشكّل كل منها فكرة كاملة، مرتّبة للريل. يُرفع الصوت عبر Files API ثم
+         يُحذف فوراً. يعيد {moments:[{from,to,text,why}], topic}. */
+      if (request.method === "POST" && path === "/reels/moments") {
+        var moUser = await getSessionUser(env, request);
+        if (!moUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, moUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
+        if (!env.GEMINI_API_KEY) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        if (Number(request.headers.get("Content-Length") || 0) > MOMENTS_MAX_BYTES) return json({ error: "صوت الفيديو أكبر من المسموح" }, 413);
+        if ((await usedToday(env, moUser.email, "moments")) >= MOMENTS_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتحليل الكلام. جرّب بكرا." }, 429);
+        var moBuf = await request.arrayBuffer();
+        if (moBuf.byteLength < 8 || moBuf.byteLength > MOMENTS_MAX_BYTES) return json({ error: "طلب غير صالح" }, 400);
+        var moLen = new DataView(moBuf).getUint32(0), moMeta;
+        try { moMeta = JSON.parse(new TextDecoder().decode(new Uint8Array(moBuf, 4, moLen))); } catch (e) { return json({ error: "طلب غير صالح" }, 400); }
+        var moAudio = moBuf.slice(4 + moLen);
+        var moSegs = (Array.isArray(moMeta.segments) ? moMeta.segments : []).slice(0, MOMENTS_MAX_SEGS)
+          .map(function (s) { return [Number(s[0]) || 0, Number(s[1]) || 0]; });
+        var moRoom = Math.max(8, Math.min(90, Number(moMeta.seconds) || 40));
+        if (!moSegs.length || moAudio.byteLength < 100) return json({ error: "ما في كلام بالفيديو" }, 400);
+        var gk = "?key=" + env.GEMINI_API_KEY, gBase = "https://generativelanguage.googleapis.com";
+        var moStart = await fetch(gBase + "/upload/v1beta/files" + gk, { method: "POST",
+          headers: { "X-Goog-Upload-Protocol": "resumable", "X-Goog-Upload-Command": "start", "X-Goog-Upload-Header-Content-Length": String(moAudio.byteLength),
+                     "X-Goog-Upload-Header-Content-Type": "audio/ogg", "Content-Type": "application/json" },
+          body: JSON.stringify({ file: { display_name: "reels-gen-moments" } }) });
+        var moUpUrl = moStart.ok && moStart.headers.get("x-goog-upload-url");
+        if (!moUpUrl) return json({ error: "تعذّر رفع الصوت لـ Gemini" }, 502);
+        var moFr = await fetch(moUpUrl, { method: "POST", headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" }, body: moAudio });
+        var moFile = moFr.ok ? ((await moFr.json()).file || null) : null;
+        if (!moFile || !moFile.name) return json({ error: "تعذّر رفع الصوت لـ Gemini" }, 502);
+        try {
+          for (var mw = 0; mw < 40 && moFile.state === "PROCESSING"; mw++) {   // audio is usually ready at once
+            await new Promise(function (r) { setTimeout(r, 1500); });
+            moFile = await (await fetch(gBase + "/v1beta/" + moFile.name + gk)).json();
+          }
+          if (moFile.state !== "ACTIVE") return json({ error: "Gemini ما قدر يقرأ الصوت" }, 502);
+          var moSys =
+"You are a video editor making a short vertical summary reel from a long video about an NGO's education and community projects in Syria.\n" +
+"You get the video's soundtrack and a numbered list of the speech segments found in it, each with its start and end in seconds from the start of the audio. Segments are separated by pauses.\n" +
+"Choose what the reel will play, in the speakers' own voices, so that someone who sees only the reel understands the video's main idea.\n" +
+"RULES:\n" +
+"- Pick RUNS of consecutive segments (from..to). Each run is a COMPLETE thought: it never starts in the middle of a sentence and never stops before the sentence ends. Its first segment is where the thought starts; its last is where it ends.\n" +
+"- A run lasts 3 to 20 seconds (from the start of 'from' to the end of 'to').\n" +
+"- All runs together last between " + Math.max(5, moRoom - 6) + " and " + moRoom + " seconds. Never more than " + moRoom + ".\n" +
+"- Order the runs for the reel (it may differ from the video's order): open with a strong self-contained statement that makes people keep watching, then the key points, and end with a closing line (a conclusion, a result or a call to action) when there is one.\n" +
+"- Prefer clear, meaningful speech. Skip greetings, thanks, self-introductions (unless they are the point), filler, repeated ideas, false starts, laughter, applause, music and unclear audio.\n" +
+"- Never change anyone's words. 'text' is the verbatim transcript of the run as spoken. 'why' is 2 to 6 Arabic words on the run's role in the reel (like «افتتاحية قوية» or «النتيجة»).\n" +
+"- 'topic' is one short Arabic sentence: the video's main idea.\n" +
+"- Use only numbers from the list. The list marks where there is SOUND, not where there are words: tones, music, noise or crowd sound are not speech.\n" +
+"- NEVER invent words. Write in 'text' only words you actually hear. If you cannot make out real spoken words in the audio, return {\"moments\": [], \"topic\": \"\"} — an empty answer is correct and expected then.\n" +
+"Return ONLY JSON.";
+          var moList = moSegs.map(function (s, i) { return (i + 1) + ": " + s[0].toFixed(1) + "-" + s[1].toFixed(1); }).join("\n");
+          var moBody = JSON.stringify({
+            system_instruction: { parts: [{ text: moSys }] },
+            contents: [{ role: "user", parts: [{ file_data: { mime_type: "audio/ogg", file_uri: moFile.uri } }, { text: "Speech segments (number: start-end seconds):\n" + moList }] }],
+            generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: {
+              type: "OBJECT", required: ["moments"], properties: {
+                topic: { type: "STRING" },
+                moments: { type: "ARRAY", items: { type: "OBJECT", required: ["from", "to", "text"],
+                  properties: { from: { type: "INTEGER" }, to: { type: "INTEGER" }, text: { type: "STRING" }, why: { type: "STRING" } } } } } } }
+          });
+          // as for /reels/script: retry when Gemini is busy, then fall back to the lighter model
+          var moTries = ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest"], moR = null, moD = null;
+          for (var mi = 0; mi < moTries.length; mi++) {
+            if (mi) await new Promise(function (r) { setTimeout(r, 1500 * mi); });
+            try {
+              moR = await fetch(gBase + "/v1beta/models/" + moTries[mi] + ":generateContent" + gk, { method: "POST", headers: { "Content-Type": "application/json" }, body: moBody });
+              moD = await moR.json();
+            } catch (e) { moR = null; moD = null; continue; }
+            if (moR.ok || (moR.status !== 503 && moR.status !== 429 && moR.status !== 500)) break;
+          }
+          if (!moR) return json({ error: "تعذّر الاتصال بـ Gemini" }, 502);
+          if (!moR.ok) {
+            var moBusy = moR.status === 503 || moR.status === 429;
+            return json({ error: moBusy ? "Gemini مضغوط حالياً — جرّب بعد دقيقة" : ((moD && moD.error && moD.error.message) || "فشل تحليل الكلام") }, 502);
+          }
+          var moOut = ""; try { moOut = moD.candidates[0].content.parts[0].text || ""; } catch (e) {}
+          var moParsed; try { moParsed = JSON.parse(moOut); } catch (e) { return json({ error: "ردّ Gemini غير صالح" }, 502); }
+          var moMoments = (Array.isArray(moParsed && moParsed.moments) ? moParsed.moments : []).map(function (m) {
+            return { from: Math.round(Number(m && m.from)), to: Math.round(Number(m && m.to)), text: String(m && m.text || "").trim().slice(0, 600), why: String(m && m.why || "").trim().slice(0, 60) };
+          }).filter(function (m) { return m.from >= 1 && m.to >= m.from && m.to <= moSegs.length; }).slice(0, 20);
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'moments', datetime('now'))").bind(moUser.email).run();
+          return json({ ok: true, moments: moMoments, topic: String(moParsed.topic || "").trim().slice(0, 200) });
+        } finally {
+          ctx.waitUntil(fetch(gBase + "/v1beta/" + moFile.name + gk, { method: "DELETE" }).catch(function () {}));   // the audio does not stay with Google
+        }
       }
 
       /* ---- 7c) تدقيق إملائي/نحوي عبر Gemini (يعيد نصًّا مصحَّحًا لكل حقل) ---- */

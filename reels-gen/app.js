@@ -12,7 +12,8 @@
    summary reel: its strongest moments, cropped to follow the action, under
    music or, without it, with the video's own sound.
    Media never leaves the device; only text and the music request go to the
-   auth Worker. */
+   auth Worker — and, for a summary told by its speech, the long video's
+   soundtrack, which Gemini hears to choose whole thoughts (/reels/moments). */
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
@@ -404,7 +405,7 @@
     var mode = recipe().speed, vi = 0;
     shots.forEach(function (it) {
       it.speed = 1; it.ramp = false;
-      if (it.kind !== "video" || (it.sum && !S.musicBlob)) return;   // a summary without music is heard, so it runs at its own speed
+      if (it.kind !== "video" || it.talk || (it.sum && !S.musicBlob)) return;   // a summary without music is heard, so it runs at its own speed
       var hi = (it.fps || 30) >= 48;   // 50/60 fps footage slows down cleanly at our 25 fps
       if (mode === "fast") it.speed = vi % 2 ? 1.6 : 1;
       else if (mode === "light") it.speed = 1.25;
@@ -415,8 +416,10 @@
     });
   }
   function vTime(it, local) { return Math.max(0, Math.min(it.srcDur - 0.04, it.start + span(it, local))); }
-  /* A clip is heard when the user keeps its sound, and every moment of a summary that has no music. */
-  function hears(it) { return it.kind === "video" && (it.sound || (it.sum && !S.musicBlob)); }
+  /* A clip is heard when the user keeps its sound, every moment of a summary
+     that has no music, and every spoken thought (music steps back under it). */
+  function hears(it) { return it.kind === "video" && (it.sound || it.talk || (it.sum && !S.musicBlob)); }
+  function talkReel() { return S.items.some(function (it) { return it.talk; }); }
   function seekEl(it, local) {   // resolves once a video shows start+local (images and cards: at once)
     if (it.kind !== "video") return Promise.resolve();
     var target = vTime(it, local);
@@ -508,7 +511,7 @@
   }
   function newCard(text) { return { id: nextId++, kind: "card", text: text || "", len: CARD_LEN, missing: false }; }
   function clampItem(it) {
-    it.len = Math.max(1, Math.min(15, +it.len || (it.kind === "card" ? CARD_LEN : recipe().len)));
+    it.len = Math.max(1, Math.min(it.talk ? 30 : 15, +it.len || (it.kind === "card" ? CARD_LEN : recipe().len)));   // a spoken thought may run longer than a shot
     if (it.kind === "video") {
       it.len = Math.min(it.len, Math.max(1, Math.floor((srcRoom(it) - 0.1) / rateOf(it) * 10) / 10));
       if (it.center != null) it.start = it.center - span(it, it.len) / 2;   // a summary moment stays centred on its best second
@@ -548,6 +551,8 @@
           (it.kind === "video" ? '<div style="flex:1"><label class="l">البداية (ث)</label><input type="number" data-f="start" min="0" step="0.5" value="' + it.start.toFixed(1) + '"></div>' : "") + '</div>' +
           '<div class="row"><label class="chk"><input type="checkbox" data-f="tint"' + (it.tint ? " checked" : "") + '> طبقة كحلية</label>' +
           (it.kind === "video" && !it.sum ? '<label class="chk"><input type="checkbox" data-f="sound"' + (it.sound ? " checked" : "") + '> الصوت الأصلي</label>' : "") + '</div>' +
+          (it.talk && (it.say || it.role) ? '<div class="hint" title="' + esc(it.say) + '">' + (it.role ? '<b>' + esc(it.role) + '</b>' + (it.say ? " · " : "") : "") +
+                                              esc(it.say.length > 110 ? it.say.slice(0, 110) + "…" : it.say) + '</div>' : "") +
           (it.skip ? '<div class="hint" style="color:var(--accent)">مستبعدة' + (it.why ? " — " + esc(it.why) : "") + '</div>'
                    : it.off ? '<div class="hint" style="color:var(--accent)">خارج الريل — الوقت ما بيكفي</div>' : "") +
           '<div class="tools"><button type="button" data-a="card" title="كرت نص قبل هذه اللقطة">+ نص</button><button type="button" data-a="rot" title="تدوير 90°">↻</button>' +
@@ -782,7 +787,7 @@
     if (!S.music) return;
     var short = S.music.duration + 0.3 < total();
     $("rgMusicSt").textContent = "✓ " + S.musicLabel + " · " + S.music.duration.toFixed(1) + " ث · " + Math.round(S.bpm) + " BPM" +
-      (short ? " — أقصر من الريل (" + total().toFixed(1) + " ث)، أعد التوليد" : $("rgBeatSync").checked ? " · القطع على الإيقاع" : "");
+      (short ? " — أقصر من الريل (" + total().toFixed(1) + " ث)، أعد التوليد" : talkReel() ? " · بتنخفض تحت الكلام" : $("rgBeatSync").checked ? " · القطع على الإيقاع" : "");
     $("rgMusicSt").style.color = short ? "var(--accent)" : "";
   }
   /* ---------- bundled music ----------
@@ -883,7 +888,7 @@
      than 1 s or ask a clip for more footage than it has. With a voiceover the
      end card takes up the difference so the reel keeps its length. */
   function snapToBeats() {
-    var list = ready(); if (!S.beats || !S.beats.length || list.length < 2) return false;
+    var list = ready(); if (!S.beats || !S.beats.length || list.length < 2 || talkReel()) return false;   // speech is cut at its pauses, not on the beat
     var lens = list.map(function (it) { return it.len; }), endLen = S.endLen;
     snapCuts(list, 0.3);
     if (voiceReady() && !voiceFits()) {   // a card moved onto the voice: put it back and snap only the shot-to-shot cuts
@@ -1089,6 +1094,12 @@
     var cards = S.items.filter(function (it) { return !it.missing && it.kind === "card"; });
     var skipped = S.items.filter(function (it) { return it.skip; });
     if (!shots.length) { S.endLen = null; return 0; }
+    if (talkReel()) {   // spoken thoughts keep their own length: the reel is as long as they are
+      assignSpeeds(shots);
+      shots.forEach(function (it) { it.off = false; if (it.talk && it.hi != null) it.len = it.hi - it.lo; clampItem(it); });
+      S.items = S.items.filter(function (it) { return !it.skip; }).concat(skipped); S.endLen = null;
+      return 0;
+    }
     var room = Math.max(1.5, reelLen() - recipe().end - cards.reduce(function (s, c) { return s + c.len; }, 0));
     assignSpeeds(shots);
     var n = S.mode === "sum" ? shots.length : Math.max(1, Math.min(shots.length, Math.round(room / recipe().len))), use = shots.slice(0, n), pool = shots.slice(n);   // a summary already chose its count
@@ -1255,7 +1266,14 @@
       return sampleAudio(D).then(function () { return sampleFrames(D); });
     });
     thumbQueue = job.catch(function () {});
-    job.then(function () { sumBar(null); return buildSummary(); })
+    job.then(function () {
+      sumBar(null);
+      if (!D.speech && D.pcm) D.speech = speechSegs(D.pcm);
+      if ($("rgSumKind").value === "talk") return buildTalk();
+      return buildSummary().then(function () {   // footage full of speech is better told by its words
+        if (D.speech && D.speech.ratio > 0.4 && !S.musicBlob) sumSt($("rgSumSt").textContent + " · الفيديو فيه كلام كتير — جرّب «كلام وأفكار كاملة»");
+      });
+    })
       .catch(function (e) { sumBar(null); sumSt("تعذّر تحليل الفيديو: " + (e && e.message || e), true); })
       .then(function () { btn.disabled = false; });
   }
@@ -1414,10 +1432,169 @@
             (T < reelLen() - 0.5 ? " · اللحظات الواضحة بتكفي لريل " + Math.round(T) + " ث بس — جرّب طول أقصر" : ""), T < reelLen() - 0.5);
     });
   }
+  /* ---------- summary from speech ----------
+     For interviews and talks the reel is made of whole spoken thoughts. The
+     soundtrack is split at its pauses (speechSegs); Gemini hears it with that
+     list and returns runs of consecutive segments that each make a complete
+     thought, in the order the reel should play them (/reels/moments). Every
+     moment starts and ends on a pause, so no word is cut. Without Gemini (no
+     access, busy, over the daily cap) the runs are picked on the device:
+     whole sentences between longer pauses, where the speech is steady and the
+     picture good — clean cuts, but no understanding of what is said. */
+  var TALK_FRAME = 0.02, TALK_GAP = 0.4, TALK_SEG_MAX = 12;
+  function speechSegs(buf) {
+    var x = buf.getChannelData(0), sr = buf.sampleRate, hop = Math.round(TALK_FRAME * sr), n = Math.floor(x.length / hop), db = new Float32Array(n), i, k;
+    for (i = 0; i < n; i++) { var e = 0; for (k = i * hop; k < (i + 1) * hop; k++) e += x[k] * x[k]; db[i] = 10 * Math.log10(e / hop + 1e-10); }
+    var sorted = Array.from(db).sort(function (a, b) { return a - b; }), floor = sorted[Math.floor(n * 0.1)] || -100, loud = sorted[Math.floor(n * 0.95)] || 0;
+    var thr = Math.max(floor + 10, loud - 30, -55);   // above the room's noise, within 30 dB of the loud parts
+    var runs = [], a = -1;
+    for (i = 0; i <= n; i++) { var on = i < n && db[i] > thr; if (on && a < 0) a = i; else if (!on && a >= 0) { runs.push([a, i]); a = -1; } }
+    var gap = Math.round(TALK_GAP / TALK_FRAME), merged = [];
+    runs.forEach(function (r) { var last = merged[merged.length - 1]; if (last && r[0] - last[1] < gap) last[1] = r[1]; else merged.push(r.slice()); });
+    merged = merged.filter(function (r) { return (r[1] - r[0]) * TALK_FRAME >= 0.25; });
+    var segs = [], edge = Math.round(3 / TALK_FRAME);
+    (function split(list) {   // a long stretch without a pause is split at its quietest moment
+      list.forEach(function (r) {
+        if ((r[1] - r[0]) * TALK_FRAME <= TALK_SEG_MAX) { segs.push(r); return; }
+        var m = r[0] + edge; for (var f = r[0] + edge; f < r[1] - edge; f++) if (db[f] < db[m]) m = f;
+        split([[r[0], m], [m + 1, r[1]]]);
+      });
+    })(merged);
+    var spoken = 0;
+    segs = segs.map(function (r) { spoken += r[1] - r[0]; return [r[0] * TALK_FRAME, r[1] * TALK_FRAME]; });
+    return { segs: segs, ratio: n ? spoken / n : 0 };
+  }
+  /* The soundtrack as Ogg Opus (24 kb/s mono: about 11 MB an hour), to send to Gemini. */
+  var OGG_CRC = (function () {
+    var t = new Uint32Array(256);
+    for (var i = 0; i < 256; i++) { var r = i << 24; for (var j = 0; j < 8; j++) r = r & 0x80000000 ? (r << 1) ^ 0x04c11db7 : r << 1; t[i] = r >>> 0; }
+    return t;
+  })();
+  function oggPage(packets, granule, seq, flags) {
+    var lace = [], size = 0;
+    packets.forEach(function (p) { var n = p.length; while (n >= 255) { lace.push(255); n -= 255; } lace.push(n); size += p.length; });
+    var page = new Uint8Array(27 + lace.length + size), dv = new DataView(page.buffer), o = 27 + lace.length, c = 0, i;
+    page.set([79, 103, 103, 83]); page[5] = flags;   // "OggS"
+    dv.setUint32(6, granule % 4294967296, true); dv.setUint32(10, Math.floor(granule / 4294967296), true);
+    dv.setUint32(14, 0x52474e31, true); dv.setUint32(18, seq, true); page[26] = lace.length; page.set(lace, 27);
+    packets.forEach(function (p) { page.set(p, o); o += p.length; });
+    for (i = 0; i < page.length; i++) c = ((c << 8) ^ OGG_CRC[((c >>> 24) ^ page[i]) & 255]) >>> 0;
+    dv.setUint32(22, c, true);
+    return page;
+  }
+  function speechOgg(buf) {
+    var sr = buf.sampleRate, x = buf.getChannelData(0), packets = [], failed = null, PRE = 312;
+    var enc = new AudioEncoder({ output: function (c) { var d = new Uint8Array(c.byteLength); c.copyTo(d); packets.push({ d: d, n: c.duration ? Math.round(c.duration * 0.048) : 960 }); },
+                                 error: function (e) { failed = e; } });
+    enc.configure({ codec: "opus", sampleRate: sr, numberOfChannels: 1, bitrate: 24000 });
+    function feed(o) {
+      if (failed) return Promise.reject(failed);
+      if (o >= x.length) return enc.flush();
+      var n = Math.min(sr, x.length - o);
+      var ad = new AudioData({ format: "f32-planar", sampleRate: sr, numberOfFrames: n, numberOfChannels: 1, timestamp: Math.round(o / sr * 1e6), data: x.slice(o, o + n) });
+      enc.encode(ad); ad.close();
+      if (o % (sr * 60) === 0) sumSt("…جارٍ تجهيز الصوت " + Math.round(o / x.length * 100) + "%");
+      return (enc.encodeQueueSize > 20 ? yieldTask() : Promise.resolve()).then(function () { return feed(o + n); });
+    }
+    return feed(0).then(function () {
+      enc.close();
+      var head = new Uint8Array(19), hv = new DataView(head.buffer), te = new TextEncoder(), vendor = te.encode("reels-gen");
+      head.set(te.encode("OpusHead")); head[8] = 1; head[9] = 1; hv.setUint16(10, PRE, true); hv.setUint32(12, sr, true);
+      var tags = new Uint8Array(16 + vendor.length), tv = new DataView(tags.buffer);
+      tags.set(te.encode("OpusTags")); tv.setUint32(8, vendor.length, true); tags.set(vendor, 12);
+      var pages = [oggPage([head], 0, 0, 2), oggPage([tags], 0, 1, 0)], seq = 2, gran = PRE, group = [], laces = 0;
+      packets.forEach(function (p, i) {
+        var l = Math.floor(p.d.length / 255) + 1;
+        if (laces + l > 255) { pages.push(oggPage(group, gran, seq++, 0)); group = []; laces = 0; }
+        group.push(p.d); laces += l; gran += p.n;
+        if (i === packets.length - 1) pages.push(oggPage(group, gran, seq++, 4));
+      });
+      return new Blob(pages, { type: "audio/ogg" });
+    });
+  }
+  function askMoments(D, room) {
+    var meta = new TextEncoder().encode(JSON.stringify({ seconds: Math.round(room), segments: D.speech.segs.map(function (s) { return [+s[0].toFixed(2), +s[1].toFixed(2)]; }) }));
+    var hdr = new Uint8Array(4); new DataView(hdr.buffer).setUint32(0, meta.length);
+    return fetch(WORKER + "/reels/moments", { method: "POST", headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/octet-stream" }, body: new Blob([hdr, meta, D.ogg]) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || "HTTP " + r.status); return d; }); });
+  }
+  /* Whole sentences on the device: runs that start and end on a real pause,
+     4–15 s, with no long silence inside; scored on how full of speech they
+     are, how good the picture is, and how clearly they end. */
+  function localThoughts(D, room) {
+    var segs = D.speech.segs, sm = D.samples, cands = [];
+    function vis(a, b) { var s = 0, n = 0; for (var i = Math.floor(a / D.dt); i <= Math.min(sm.length - 1, Math.floor(b / D.dt)); i++) { s += Math.max(-0.5, sm[i].score); n++; } return n ? s / n : 0; }
+    for (var i = 0; i < segs.length; i++) {
+      if (i && segs[i][0] - segs[i - 1][1] < 0.7) continue;
+      var said = 0;
+      for (var j = i; j < segs.length; j++) {
+        if (j > i && segs[j][0] - segs[j - 1][1] > 1.2) break;
+        said += segs[j][1] - segs[j][0];
+        var len = segs[j][1] - segs[i][0]; if (len > 15) break;
+        var after = j + 1 < segs.length ? segs[j + 1][0] - segs[j][1] : 3;
+        if (len >= 4 && after >= 0.7) cands.push({ from: i + 1, to: j + 1, a: segs[i][0], b: segs[j][1], score: said / len + 0.5 * vis(segs[i][0], segs[j][1]) + 0.15 * Math.min(after, 2) });
+      }
+    }
+    cands.sort(function (x, y) { return y.score - x.score; });
+    var picked = [], total = 0;
+    cands.forEach(function (c) {
+      if (total >= room - 3 || total + (c.b - c.a) > room) return;
+      if (picked.some(function (p) { return c.a < p.b + 2 && c.b > p.a - 2; })) return;
+      picked.push(c); total += c.b - c.a;
+    });
+    return picked.sort(function (x, y) { return x.a - y.a; }).map(function (c) { return { from: c.from, to: c.to, text: "", why: "" }; });
+  }
+  function buildTalk() {
+    var D = S.sumData, st = recipe();
+    if (!D.speech || !D.speech.segs.length) { sumSt(D.pcm ? "ما لقيت كلام بالفيديو — جرّب «لقطات على الإيقاع»" : "تعذّر قراءة صوت الفيديو (الملف أكبر من " + Math.round(SUM_AUDIO_MAX / 1048576) + " MB أو صيغة الصوت غير مدعومة)", true); return Promise.resolve(); }
+    var cards = S.items.map(function (it, i) { return { it: it, i: i }; }).filter(function (x) { return x.it.kind === "card"; });
+    var room = reelLen() - st.end - cards.reduce(function (s, x) { return s + x.it.len; }, 0);
+    sumSt("…جارٍ تجهيز الصوت");
+    return (D.ogg ? Promise.resolve() : speechOgg(D.pcm).then(function (o) { D.ogg = o; }))
+      .then(function () { sumSt("…Gemini عم يسمع الفيديو ويختار أفكار كاملة"); return askMoments(D, room); })
+      .then(function (d) { return { list: d.moments || [], topic: d.topic || "", ai: true }; },
+            function (e) { return { list: localThoughts(D, room), ai: false, err: e && e.message || String(e) }; })
+      .then(function (res) {
+        var segs = D.speech.segs, used = {}, list = [], said = 0;
+        res.list.forEach(function (x) {   // whole runs only, never the same words twice
+          if (!(x.from >= 1 && x.to >= x.from && x.to <= segs.length)) return;
+          for (var k = x.from; k <= x.to; k++) if (used[k]) return;
+          for (k = x.from; k <= x.to; k++) used[k] = true;
+          list.push(x); said += segs[x.to - 1][1] - segs[x.from - 1][0];
+        });
+        while (said > room + 2 && list.length > 2) {   // too long: drop from the middle, keep the opening and the close
+          var cut = list.splice(list.length - 2, 1)[0]; said -= segs[cut.to - 1][1] - segs[cut.from - 1][0];
+        }
+        if (!list.length) { sumSt(res.ai ? "Gemini ما لقى كلام واضح بالفيديو — جرّب «لقطات على الإيقاع»" : "ما لقيت جمل واضحة بالفيديو", true); return; }
+        sumSt("…جارٍ تجهيز اللحظات");
+        return Promise.all(list.map(function (x, i) { return sumEl(i); })).then(function (els) {
+          var m = D.m;
+          var shots = list.map(function (x, i) {
+            var f = x.from - 1, t = x.to - 1;   // a breath before the first word and after the last, short of the next voice
+            var lo = Math.max(f ? segs[f - 1][1] + 0.05 : 0, segs[f][0] - 0.15), hi = Math.min(t + 1 < segs.length ? segs[t + 1][0] - 0.05 : m.srcDur - 0.05, segs[t][1] + 0.25);
+            return { id: nextId++, name: m.file.name, kind: "video", el: els[i], url: m.url, file: m.file, w: m.w, h: m.h, srcDur: m.srcDur, fps: m.fps,
+                     rot: 0, tint: false, sound: false, missing: false, sum: true, talk: true, say: x.text || "", role: x.why || "",
+                     lo: lo, hi: hi, center: (lo + hi) / 2, start: lo, len: hi - lo };
+          });
+          cards.forEach(function (x) { shots.splice(Math.min(x.i, shots.length), 0, x.it); });
+          S.items = shots; S.t = 0;
+          relayout();
+          sumSt((res.ai ? "✓ اختار Gemini " + list.length + " أفكار كاملة" + (res.topic ? " — " + res.topic : "")
+                        : "Gemini ما اشتغل (" + res.err + ") — اخترت " + list.length + " جمل كاملة على السكتات، بس بدون فهم للمحتوى") +
+                " · " + fmt(total()), !res.ai);
+        });
+      });
+  }
+  function kindHint() {
+    $("rgSumKindHint").textContent = $("rgSumKind").value === "talk"
+      ? "Gemini بيسمع الكلام وبيختار أفكار كاملة بدون ما يقطع جملة — صوت الفيديو بيترفع لـ Google لهالغرض وبينحذف بعدها؛ والموسيقى، إذا اخترتها، بتنخفض تحت الكلام"
+      : "لقطات قصيرة على إيقاع الموسيقى؛ بدون موسيقى بيضل صوت الفيديو الأصلي";
+  }
   /* "Make a reel" and "summarise a video" share the timeline; switching clears it. */
   function setMode(mode) {
     S.mode = mode === "sum" ? "sum" : "create"; $("rgMode").value = S.mode;
     var sum = S.mode === "sum";
+    kindHint();
     $("rgSumField").hidden = !sum; $("rgFilesField").hidden = sum; $("rgPick").hidden = sum;
     if (!S.musicBlob) $("rgMusicSt").textContent = sum ? "لا موسيقى بعد — بدونها الريل بصوت الفيديو الأصلي" : "لا موسيقى بعد";
     $("rgEmpty").innerHTML = sum ? "ارفع فيديو طويل واضغط<br>«تحليل وتلخيص»" : "أضف صوراً أو مقاطع فيديو<br>لتظهر المعاينة هنا";
@@ -1469,7 +1646,7 @@
     if (S.lines.length && !voiceReady() &&
         !confirm(S.voice ? "نص التعليق تغيّر بعد توليد الصوت، فالصوت والكروت ما بيطابقوا النص. تصدير على كل حال؟"
                          : "التعليق الصوتي لسا ما تولّد، فالريل رح يطلع بلا صوت مازن وبلا كروت السكريبت. تصدير على كل حال؟")) return;
-    if (Math.abs(T - reelLen()) > 0.1 && confirm("طول الريل " + T.toFixed(1) + " ث مش " + reelLen() + ". ضبطه على " + reelLen() + " ث قبل التصدير؟")) relayout();
+    if (!talkReel() && Math.abs(T - reelLen()) > 0.1 && confirm("طول الريل " + T.toFixed(1) + " ث مش " + reelLen() + ". ضبطه على " + reelLen() + " ث قبل التصدير؟")) relayout();
     stop(); status("…تحضير الصوت");
     Promise.all(ready().filter(hears).map(ensureAudio))
       .then(runExport, function () {
@@ -1559,14 +1736,15 @@
 
   /* ---------- projects (settings only; media is re-linked by file name) ---------- */
   function saveProject() {
-    var d = { app: "reels-gen", v: 3, recipe: S.recipe, project: S.project, mode: S.mode, sumLen: +$("rgSumLen").value,
+    var d = { app: "reels-gen", v: 3, recipe: S.recipe, project: S.project, mode: S.mode, sumLen: +$("rgSumLen").value, sumKind: $("rgSumKind").value,
               sum: S.sum ? { name: S.sum.name, dt: S.sum.dt, fx: Array.from(S.sum.fx, function (x) { return Math.round(x * 1000) / 1000; }) } : null,   // the crop follows this track once the video is back
               beatSync: $("rgBeatSync").checked, endLen: S.endLen, musicTrack: S.musicTrack, script: $("rgScript").value, lines: S.lines,
               voice: S.voice ? { data: S.voice.data, times: S.voice.times, dur: S.voice.dur } : null,   // the paid-for voiceover travels with the project
               items: S.items.map(function (it) {
                 return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
                                           : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, off: !!it.off, skip: !!it.skip, why: it.why || "",
-                                              sum: !!it.sum, center: it.center != null ? it.center : null, lo: it.hi != null ? it.lo : null, hi: it.hi != null ? it.hi : null };
+                                              sum: !!it.sum, center: it.center != null ? it.center : null, lo: it.hi != null ? it.lo : null, hi: it.hi != null ? it.hi : null,
+                                              talk: !!it.talk, say: it.say || "", role: it.role || "" };
               }) };
     var a = document.createElement("a"); a.download = "Reel_project_" + project().name + ".json";
     a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: "application/json" })); a.click();
@@ -1575,6 +1753,7 @@
   function openProject(d) {
     if (!d || d.app !== "reels-gen" || !Array.isArray(d.items)) { status("الملف ليس مشروع Reels Gen", true); return; }
     stop(); setProject(PROJECTS[d.project] ? d.project : "disc");   // projects saved before the picker were DISC reels
+    if (d.sumKind) $("rgSumKind").value = d.sumKind === "talk" ? "talk" : "shots";
     setMode(d.mode); if (d.sumLen) $("rgSumLen").value = String(d.sumLen);
     S.sumData = null; $("rgAnalyse").disabled = true; sumSt(""); $("rgLongName").textContent = "اسحب الفيديو هنا أو اضغط للاختيار";
     S.sum = d.sum && Array.isArray(d.sum.fx) ? { name: String(d.sum.name || ""), dt: +d.sum.dt || 1, fx: Float32Array.from(d.sum.fx) } : null;
@@ -1584,7 +1763,8 @@
       if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; S.items.push(c); return; }
       if (d.v === 1 && x.text && String(x.text).trim()) S.items.push(newCard(String(x.text)));   // v1 captions sat on the shot; they become a card before it
       S.items.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true,
-                     sum: !!x.sum, center: x.center != null ? +x.center : undefined, lo: x.hi != null ? +x.lo : undefined, hi: x.hi != null ? +x.hi : undefined });
+                     sum: !!x.sum, center: x.center != null ? +x.center : undefined, lo: x.hi != null ? +x.lo : undefined, hi: x.hi != null ? +x.hi : undefined,
+                     talk: !!x.talk, say: String(x.say || ""), role: String(x.role || "") });
     });
     $("rgBeatSync").checked = d.beatSync !== false; S.endLen = +d.endLen || null;
     $("rgScript").value = d.script || ""; S.lines = Array.isArray(d.lines) ? d.lines.map(function (l) { return { voice: String(l.voice || ""), card: String(l.card || "") }; }) : [];
@@ -1627,8 +1807,8 @@
     function applyStyle(key) {   // re-lay the reel for the style's pace and speeds (text cards keep their length)
       var bundled = !!S.musicTrack;
       setStyle(key); S.endLen = null;
-      if (S.mode === "sum" && S.sumData && S.sumData.samples) buildSummary();   // a new pace needs a new count of moments
-      else { S.items.forEach(function (it) { if (it.kind !== "card") { it.len = recipe().len; clampItem(it); } }); relayout(); }
+      if (S.mode === "sum" && S.sumData && S.sumData.samples && !talkReel()) buildSummary();   // a new pace needs a new count of moments
+      else { S.items.forEach(function (it) { if (it.kind !== "card" && !it.talk) { it.len = recipe().len; clampItem(it); } }); relayout(); }
       if (bundled && TRACKS && TRACKS[S.recipe]) useTrack(S.recipe, TRACKS[S.recipe][0]);   // keep the music in step with the style
     }
     $("rgRecipe").addEventListener("change", function () { applyStyle(this.value); });
@@ -1662,8 +1842,10 @@
     ["dragleave", "drop"].forEach(function (ev) { longDrop.addEventListener(ev, function (e) { e.preventDefault(); longDrop.classList.remove("over"); }); });
     longDrop.addEventListener("drop", function (e) { setLong(e.dataTransfer.files[0]); });
     $("rgAnalyse").onclick = analyseLong;
+    $("rgSumKind").addEventListener("change", function () { kindHint(); if (S.sumData) sumSt("اضغط «تحليل وتلخيص» للتلخيص بهالطريقة"); });
     $("rgSumLen").addEventListener("change", function () {
-      if (S.sumData && S.sumData.samples) buildSummary(); else { S.endLen = null; relayout(); }
+      if (talkReel()) sumSt("اضغط «تحليل وتلخيص» لتختار الأفكار على الطول الجديد");   // a new length needs a new choice of thoughts
+      else if (S.sumData && S.sumData.samples) buildSummary(); else { S.endLen = null; relayout(); }
     });
     $("rgExport").onclick = exportMp4;
     $("rgCover").onclick = exportCover;

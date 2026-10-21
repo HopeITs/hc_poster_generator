@@ -62,13 +62,18 @@ wrangler d1 export studyzone-db --remote --output backup.sql
 | POST | `/reels/music` | owner / comms |
 | POST | `/reels/script` | `reels-gen` access |
 | POST | `/reels/voice` | `reels-gen` access |
+| POST | `/reels/moments` | `reels-gen` access |
 
 The Reels Gen routes log each call in `ai_usage` and cap it per user per 24 h.
-`/reels/script` uses `GEMINI_API_KEY`; `/reels/music` and `/reels/voice` use
+`/reels/script` and `/reels/moments` use `GEMINI_API_KEY`; `/reels/music` and `/reels/voice` use
 `ELEVENLABS_API_KEY`. `/reels/voice` reads with the Mazen Lawand voice: set
 `ELEVENLABS_VOICE_ID` to pin it, otherwise it is looked up by name in the
 account's voices, then in the shared library (and added to the account once,
 which ElevenLabs requires before the API can use a library voice).
+`/reels/moments` takes a long video's speech as Ogg Opus with the pause-bounded
+segments the browser found, uploads the audio to Gemini's Files API, asks which
+runs of segments make complete thoughts for a summary reel, and deletes the
+file again.
 
 Photo endpoints take the email from the session, never from the request body,
 so a user cannot modify anyone else's photo. Deletion is a `POST` because
