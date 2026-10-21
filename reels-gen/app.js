@@ -34,8 +34,7 @@
        speed  automatic clip speed: none | fast (every other clip ×1.6) | light (×1.25)
               | gentle (slight slow-motion) | slow (½ speed on 50/60 fps footage) | ramp (2× then 1×)
        grade  colour look (GRADES), push slow push-in, punch zoom pulse on beats, wiggle tiny sway
-       card   how text cards come in, mood the default music
-       bars   cinema bars top and bottom */
+       card   how text cards come in, mood the default music */
   var RECIPES = {
     youth:    { name: "شبابي حيوي",      hint: "رتم سريع على الإيقاع، تكبير قافز على الضربات، وتسريع لبعض المقاطع",
                 len: 1.4, every: 2, end: 2.5, speed: "fast",   grade: "vivid",   push: 0.04, punch: 0.05, card: "pop",      mood: "energetic",
@@ -49,8 +48,8 @@
     promo:    { name: "إعلان تسجيل",     hint: "وميض أبيض على الضربات، خط عريض، وكرت نهاية أطول",
                 len: 2.2, every: 2, end: 4, speed: "light",  grade: "punchy",  push: 0.05,              card: "big",      mood: "upbeat",
                 strong: [["flash", 0.3], ["zoom", 0.25]],     light: [["cut", 0], ["wipe", 0.35]],       cardTr: ["flash", 0.3] },
-    cine:     { name: "سينمائي",         hint: "تبطيء، تعتيم للأسود، حبيبات وأشرطة سينمائية",
-                len: 4.5, every: 4, end: 3.5, speed: "slow",   grade: "cine",    push: 0.1,               card: "type",     mood: "cinematic", bars: true,
+    cine:     { name: "سينمائي",         hint: "تبطيء، تعتيم للأسود، وحبيبات سينمائية",
+                len: 4.5, every: 4, end: 3.5, speed: "slow",   grade: "cine",    push: 0.1,               card: "type",     mood: "cinematic",
                 strong: [["black", 0.8]],                     light: [["dissolve", 0.9], ["blur", 0.7]], cardTr: ["black", 0.8] },
     memory:   { name: "ذكريات وحنين",    hint: "ألوان باهتة دافية، وميض ضوئي وحركة بطيئة",
                 len: 3.5, every: 4, end: 3.5, speed: "gentle", grade: "faded",   push: 0.07,              card: "fade",     mood: "nostalgic",
@@ -370,7 +369,6 @@
         A(); g.save(); g.globalAlpha = Math.min(1, m * 2.2); scaled(g, w, h, 0.82 + 0.18 * backOut(m), B); g.restore();
       } else { A(); g.save(); g.globalAlpha = m; B(); g.restore(); }   // dissolve
     }
-    if (st.bars) { var bh = h * 0.07; g.fillStyle = "#000"; g.fillRect(0, 0, w, bh); g.fillRect(0, h - bh, w, bh); }
     logoLayer(g, w, h, loc);
   }
   /* The logo sits above every transition, so it never zooms or slides; between
