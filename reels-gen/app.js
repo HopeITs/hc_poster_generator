@@ -1253,7 +1253,7 @@
       if (miss.length) {   // re-link a reopened project: every moment gets its own element on the file
         return Promise.all(miss.map(function (it, i) {
           return sumEl(i).then(function (el) { Object.assign(it, { el: el, url: m.url, file: file, w: m.w, h: m.h, srcDur: m.srcDur, fps: m.fps, missing: false }); clampItem(it); });
-        })).then(function () { sumSt("✓ رجعت " + miss.length + " لحظة من الفيديو — «تحليل وتلخيص» بيعيد الاختيار"); relayout(); });
+        })).then(function () { sumSt("✓ رجعت " + miss.length + " لحظة من الفيديو" + (S.talkGoal ? " · هدف الريل: " + S.talkGoal : "") + " — «تحليل وتلخيص» بيعيد الاختيار"); relayout(); });
       }
       S.items = S.items.filter(function (it) { return it.kind === "card"; }); S.sum = null; relayout();
       sumSt(m.srcDur < reelLen() * 1.5 ? "الفيديو قصير على التلخيص — الأفضل «إنشاء ريل»، أو اضغط «تحليل وتلخيص» على كل حال" : "اختار الطول والأسلوب واضغط «تحليل وتلخيص»", m.srcDur < reelLen() * 1.5);
@@ -1434,9 +1434,11 @@
   }
   /* ---------- summary from speech ----------
      For interviews and talks the reel is made of whole spoken thoughts. The
-     soundtrack is split at its pauses (speechSegs); Gemini hears it with that
-     list and returns runs of consecutive segments that each make a complete
-     thought, in the order the reel should play them (/reels/moments). Every
+     soundtrack is split at its pauses (speechSegs); Gemini transcribes each
+     segment, then from that text names the reel's goal and returns runs of
+     consecutive segments that each make a complete thought, in the order of
+     the goal's structure (/reels/moments). A moment's text is the transcript
+     of its segments. Every
      moment starts and ends on a pause, so no word is cut. Without Gemini (no
      access, busy, over the daily cap) the runs are picked on the device:
      whole sentences between longer pauses, where the speech is steady and the
@@ -1551,8 +1553,13 @@
     var room = reelLen() - st.end - cards.reduce(function (s, x) { return s + x.it.len; }, 0);
     sumSt("…جارٍ تجهيز الصوت");
     return (D.ogg ? Promise.resolve() : speechOgg(D.pcm).then(function (o) { D.ogg = o; }))
-      .then(function () { sumSt("…Gemini عم يسمع الفيديو ويختار أفكار كاملة"); return askMoments(D, room); })
-      .then(function (d) { return { list: d.moments || [], topic: d.topic || "", ai: true }; },
+      .then(function () { sumSt("…Gemini عم يفرّغ الكلام، وبعدين بيختار أفكار كاملة (فيديو ساعة ممكن ياخد دقيقتين)"); return askMoments(D, room); })
+      .then(function (d) {
+        var tr = Array.isArray(d.transcript) ? d.transcript : [];
+        D.transcript = tr; D.goal = d.goal || ""; D.topic = d.topic || "";
+        (d.moments || []).forEach(function (x) { x.text = tr.slice(x.from - 1, x.to).filter(Boolean).join(" "); });   // the words as transcribed, segment by segment
+        return { list: d.moments || [], topic: d.topic || "", goal: d.goal || "", ai: true };
+      },
             function (e) { return { list: localThoughts(D, room), ai: false, err: e && e.message || String(e) }; })
       .then(function (res) {
         var segs = D.speech.segs, used = {}, list = [], said = 0;
@@ -1579,7 +1586,7 @@
           cards.forEach(function (x) { shots.splice(Math.min(x.i, shots.length), 0, x.it); });
           S.items = shots; S.t = 0;
           relayout();
-          sumSt((res.ai ? "✓ اختار Gemini " + list.length + " أفكار كاملة" + (res.topic ? " — " + res.topic : "")
+          sumSt((res.ai ? "✓ " + (res.goal ? "هدف الريل: " + res.goal + " · " : "") + "اختار Gemini " + list.length + " أفكار كاملة" + (res.topic ? " — " + res.topic : "")
                         : "Gemini ما اشتغل (" + res.err + ") — اخترت " + list.length + " جمل كاملة على السكتات، بس بدون فهم للمحتوى") +
                 " · " + fmt(total()), !res.ai);
         });
@@ -1737,6 +1744,7 @@
   /* ---------- projects (settings only; media is re-linked by file name) ---------- */
   function saveProject() {
     var d = { app: "reels-gen", v: 3, recipe: S.recipe, project: S.project, mode: S.mode, sumLen: +$("rgSumLen").value, sumKind: $("rgSumKind").value,
+              talkGoal: S.sumData && S.sumData.goal || S.talkGoal || "", talkTopic: S.sumData && S.sumData.topic || S.talkTopic || "",
               sum: S.sum ? { name: S.sum.name, dt: S.sum.dt, fx: Array.from(S.sum.fx, function (x) { return Math.round(x * 1000) / 1000; }) } : null,   // the crop follows this track once the video is back
               beatSync: $("rgBeatSync").checked, endLen: S.endLen, musicTrack: S.musicTrack, script: $("rgScript").value, lines: S.lines,
               voice: S.voice ? { data: S.voice.data, times: S.voice.times, dur: S.voice.dur } : null,   // the paid-for voiceover travels with the project
@@ -1754,6 +1762,7 @@
     if (!d || d.app !== "reels-gen" || !Array.isArray(d.items)) { status("الملف ليس مشروع Reels Gen", true); return; }
     stop(); setProject(PROJECTS[d.project] ? d.project : "disc");   // projects saved before the picker were DISC reels
     if (d.sumKind) $("rgSumKind").value = d.sumKind === "talk" ? "talk" : "shots";
+    S.talkGoal = String(d.talkGoal || ""); S.talkTopic = String(d.talkTopic || "");
     setMode(d.mode); if (d.sumLen) $("rgSumLen").value = String(d.sumLen);
     S.sumData = null; $("rgAnalyse").disabled = true; sumSt(""); $("rgLongName").textContent = "اسحب الفيديو هنا أو اضغط للاختيار";
     S.sum = d.sum && Array.isArray(d.sum.fx) ? { name: String(d.sum.name || ""), dt: +d.sum.dt || 1, fx: Float32Array.from(d.sum.fx) } : null;

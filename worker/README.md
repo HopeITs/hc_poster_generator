@@ -71,9 +71,10 @@ The Reels Gen routes log each call in `ai_usage` and cap it per user per 24 h.
 account's voices, then in the shared library (and added to the account once,
 which ElevenLabs requires before the API can use a library voice).
 `/reels/moments` takes a long video's speech as Ogg Opus with the pause-bounded
-segments the browser found, uploads the audio to Gemini's Files API, asks which
-runs of segments make complete thoughts for a summary reel, and deletes the
-file again.
+segments the browser found, and works in two steps: Gemini transcribes each
+segment from the audio (uploaded through the Files API and deleted right
+after), then, from the text alone, picks the reel's goal from a fixed list and
+the runs of segments that make whole thoughts in that goal's structure.
 
 Photo endpoints take the email from the session, never from the request body,
 so a user cannot modify anyone else's photo. Deletion is a `POST` because
