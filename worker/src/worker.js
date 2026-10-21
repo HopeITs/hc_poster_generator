@@ -34,6 +34,7 @@ const VOICE_MODEL      = "eleven_multilingual_v2";
 const MOMENTS_DAILY_MAX = 30;                 // تحليلات لكل مستخدم خلال 24 ساعة
 const MOMENTS_MAX_BYTES = 40 * 1048576;       // صوت Opus ≈ 11 MB للساعة
 const MOMENTS_MAX_SEGS  = 3000;
+const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مستخدم خلال 24 ساعة (حتى 3 لكل ريل)
 // أهداف الريل وبنية كل هدف — Gemini يختار واحداً من المحتوى ويرتّب الأفكار حسبه
 const MOMENTS_GOALS = {
   "تعريف بمشروع":  "what the project is, then who it serves, then what they do there, then how to join or learn more",
@@ -185,26 +186,125 @@ async function findVoiceId(env) {
 
 /* ---------- قواعد الصلاحيات ---------- */
 /* ---------- Gemini: one JSON answer ----------
-   Retries when Gemini is busy (503/429/500) and falls back along the given
-   models. Returns {data} (the parsed JSON) or {error} (a message for the user). */
-async function geminiJSON(env, models, body, label) {
-  var r = null, d = null, payload = JSON.stringify(body);
+   Reels Gen calls Gemini on a key of its own (REELS_GEMINI_KEY, a separate
+   free Google project, so its daily quota is not shared with the other tools),
+   and on GEMINI_API_KEY until that secret is set. */
+function reelsKey(env) { return env.REELS_GEMINI_KEY || env.GEMINI_API_KEY; }
+/* Retries when Gemini is busy and falls back along the given models. A model
+   that rejects the request outright (400) is asked again with less: first
+   without the thinking and output-length settings, then without the strict
+   schema (written into the instructions instead) — the lighter models refuse
+   some of these. What a model needed is remembered for the Worker's lifetime,
+   so later calls do not spend a request finding out again. Returns {data}
+   (the parsed JSON) or {error} (a message for the user). */
+var geminiLenient = {};   // model → 1 (no thinking / output settings) or 2 (no schema either)
+function geminiSoften(body, level) {
+  if (!level || !body.generationConfig) return body;
+  var gc = Object.assign({}, body.generationConfig), sys = body.system_instruction;
+  delete gc.thinkingConfig; delete gc.maxOutputTokens;
+  if (level >= 2 && gc.responseSchema) {
+    var schema = gc.responseSchema; delete gc.responseSchema;
+    sys = { parts: [{ text: (sys ? sys.parts[0].text : "") + "\nThe JSON must follow this schema exactly: " + JSON.stringify(schema) }] };
+  }
+  return Object.assign({}, body, { generationConfig: gc, system_instruction: sys });
+}
+async function geminiJSON(key, models, body, label) {
+  var r = null, d = null, overQuota = false;
+  async function call(model) {
+    var level = geminiLenient[model] || 0, t0 = Date.now();
+    r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + key,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geminiSoften(body, level)) });
+    d = await r.json();
+    console.log("gemini " + (label || "") + " " + model + (level ? " (lenient " + level + ")" : "") + " " + r.status + " " + (Date.now() - t0) + "ms" + (r.ok ? "" : ": " + JSON.stringify(d && d.error || d).slice(0, 300)));
+    if (r.status === 429) overQuota = true;
+    if (r.status === 400 && level < 2 && body.generationConfig) { geminiLenient[model] = level + 1; return call(model); }
+  }
   for (var i = 0; i < models.length; i++) {
     if (i) await new Promise(function (res) { setTimeout(res, 1500 * i); });
-    var t0 = Date.now();
-    try {
-      r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + models[i] + ":generateContent?key=" + env.GEMINI_API_KEY,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
-      d = await r.json();
-    } catch (e) { r = null; d = null; continue; }
-    console.log("gemini " + (label || "") + " " + models[i] + " " + r.status + " " + (Date.now() - t0) + "ms" + (r.ok ? "" : ": " + JSON.stringify(d && d.error || d).slice(0, 800)));
-    if (r.ok || r.status === 401 || r.status === 403 || r.status === 404) break;   // anything else (busy, or a 400 one model gives now and then) tries the next
+    try { await call(models[i]); } catch (e) { r = null; d = null; continue; }
+    if (r.ok || r.status === 401 || r.status === 403 || r.status === 404) break;   // anything else (busy, over quota, rejected) tries the next model
   }
   if (!r) return { error: "تعذّر الاتصال بـ Gemini" };
-  if (!r.ok) return { error: r.status === 503 || r.status === 429 ? "Gemini مضغوط حالياً — جرّب بعد دقيقة" : ((d && d.error && d.error.message) || "فشل طلب Gemini") };
+  if (!r.ok) return { error: overQuota && r.status !== 400 ? "خلص الحد اليومي المجاني لـ Gemini، والنموذج البديل مضغوط — جرّب بعد شوي أو بكرا"
+                           : r.status === 503 ? "Gemini مضغوط حالياً — جرّب بعد دقيقة"
+                           : ((d && d.error && d.error.message) || "فشل طلب Gemini") };
   var out = ""; try { out = d.candidates[0].content.parts[0].text || ""; } catch (e) {}
+  out = out.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");   // a lenient answer may come fenced
   try { return { data: JSON.parse(out) }; } catch (e) { return { error: "ردّ Gemini غير صالح" }; }
 }
+/* A long answer (a minute or two of Gemini) as a stream: the response starts
+   at once and a space goes out every few seconds until the JSON follows, so
+   nothing on the way gives up on the request and sends it again (which would
+   run it — and spend the quota — twice). Errors travel in the JSON, with 200. */
+function slowJSON(work) {
+  var ts = new TransformStream(), w = ts.writable.getWriter(), enc = new TextEncoder();
+  w.write(enc.encode(" ")).catch(function () {});
+  var tick = setInterval(function () { w.write(enc.encode(" ")).catch(function () {}); }, 4000);
+  (async function () {
+    var out; try { out = await work(); } catch (e) { out = { error: "خطأ بالخادم: " + (e && e.message || e) }; }
+    clearInterval(tick);
+    try { await w.write(enc.encode(JSON.stringify(out))); await w.close(); } catch (e) {}
+  })();
+  return new Response(ts.readable, { status: 200, headers: { ...cors(), "Content-Type": "application/json", "Cache-Control": "no-store" } });
+}
+
+/* ---------- Reels Gen: speech summaries (shared by /reels/moments and /reels/critique) ---------- */
+// Upload audio to Gemini's Files API and wait until it can be read. Returns {file} or {error};
+// the caller deletes the file (geminiDelete) as soon as it is done with it.
+async function geminiUpload(key, bytes, mime, name) {
+  var gk = "?key=" + key, gBase = "https://generativelanguage.googleapis.com";
+  var st = await fetch(gBase + "/upload/v1beta/files" + gk, { method: "POST",
+    headers: { "X-Goog-Upload-Protocol": "resumable", "X-Goog-Upload-Command": "start", "X-Goog-Upload-Header-Content-Length": String(bytes.byteLength),
+               "X-Goog-Upload-Header-Content-Type": mime, "Content-Type": "application/json" },
+    body: JSON.stringify({ file: { display_name: name } }) });
+  var url = st.ok && st.headers.get("x-goog-upload-url");
+  if (!url) return { error: "تعذّر رفع الصوت لـ Gemini" };
+  var fr = await fetch(url, { method: "POST", headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" }, body: bytes });
+  var file = fr.ok ? ((await fr.json()).file || null) : null;
+  if (!file || !file.name) return { error: "تعذّر رفع الصوت لـ Gemini" };
+  for (var i = 0; i < 40 && file.state === "PROCESSING"; i++) {   // audio is usually ready at once
+    await new Promise(function (r) { setTimeout(r, 1500); });
+    file = await (await fetch(gBase + "/v1beta/" + file.name + gk)).json();
+  }
+  if (file.state !== "ACTIVE") return { error: "Gemini ما قدر يقرأ الصوت", file: file };
+  return { file: file };
+}
+function geminiDelete(key, ctx, file) {   // the audio does not stay with Google
+  if (file && file.name) ctx.waitUntil(fetch("https://generativelanguage.googleapis.com/v1beta/" + file.name + "?key=" + key, { method: "DELETE" }).catch(function () {}));
+}
+// Body: [4-byte JSON length][JSON][Ogg Opus audio]
+function splitAudioBody(buf) {
+  if (buf.byteLength < 8 || buf.byteLength > MOMENTS_MAX_BYTES) return null;
+  var len = new DataView(buf).getUint32(0), meta;
+  try { meta = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, len))); } catch (e) { return null; }
+  return { meta: meta, audio: buf.slice(4 + len) };
+}
+function momentsSegs(meta) {
+  return (Array.isArray(meta.segments) ? meta.segments : []).slice(0, MOMENTS_MAX_SEGS).map(function (s) { return [Number(s[0]) || 0, Number(s[1]) || 0]; });
+}
+// The transcript as the editor reads it: number [start-end, length] words
+function momentsLines(segs, text) {
+  return text.map(function (t, i) { return t ? (i + 1) + " [" + segs[i][0].toFixed(1) + "-" + segs[i][1].toFixed(1) + ", " + (segs[i][1] - segs[i][0]).toFixed(1) + "s] " + t : ""; }).filter(Boolean);
+}
+function momentsRuns(list, segs, text) {
+  return (list || []).map(function (m) {
+    return { from: Math.round(Number(m && m.from)), to: Math.round(Number(m && m.to)), why: String(m && m.why || "").trim().slice(0, 60) };
+  }).filter(function (m) { return m.from >= 1 && m.to >= m.from && m.to <= segs.length && text[m.from - 1] && text[m.to - 1]; }).slice(0, 20);
+}
+function momentsSecs(runs, segs) { return runs.reduce(function (s, m) { return s + segs[m.to - 1][1] - segs[m.from - 1][0]; }, 0); }
+function momentsRules(lo, room) {
+  return "RULES for moments:\n" +
+"- Each run is ONE COMPLETE, CLEAR THOUGHT that makes sense on its own. It starts where a sentence starts and ends where a sentence ends: never cut a sentence, never leave a thought unfinished. If a sentence spans several segments, include all of them.\n" +
+"- A run must not lean on words outside it: if it opens with a word that points back (them, this, that, so, and, also, هم، هاد، هيك، لأنو، و…), start the run earlier so the listener knows what it refers to — or choose another run.\n" +
+"- Usually 3 to 6 runs, each 3 to 20 seconds (start of 'from' to end of 'to'). Together they last between " + lo + " and " + room + " seconds: fill that time, never go over " + room + ".\n" +
+"- Follow the goal's structure; the order may differ from the video's. The first run is a strong, self-contained opening that makes people keep watching. If the video ends with a call to action (how to join or register), the reel ends with it.\n" +
+"- Leave out greetings, thanks, self-introductions (unless they are the point), filler (um, so, okay), checks of the microphone, repeated ideas and false starts — do not keep them inside a run either: end the run before them or start it after them.\n" +
+"- 'why' is 2 to 6 Arabic words on the run's role in the structure (like «افتتاحية قوية» or «النتيجة»).\n" +
+"- Use only numbers from the transcript, and choose from what is written there.\n";
+}
+var MOMENTS_RUNS_SCHEMA = { type: "ARRAY", items: { type: "OBJECT", required: ["from", "to", "why"], propertyOrdering: ["from", "to", "why"],
+  properties: { from: { type: "INTEGER" }, to: { type: "INTEGER" }, why: { type: "STRING" } } } };
+var CRITIC_KINDS = ["cut_start", "cut_end", "missing_context", "unclear", "weak", "filler", "order", "off_topic"];
 
 function canManage(role) { return role === "owner" || role === "admin" || role === "comms"; }
 function isGlobalRole(role) { return role === "owner" || role === "comms"; } // وصول شامل لكل المشاريع
@@ -506,7 +606,7 @@ export default {
         var scUser = await getSessionUser(env, request);
         if (!scUser) return json({ error: "غير مسجّل دخول" }, 401);
         if (!(await hasProjectSlug(env, scUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
-        if (!env.GEMINI_API_KEY) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        if (!reelsKey(env)) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
         var scb = await request.json();
         var scText = String(scb.script || "").trim().slice(0, SCRIPT_MAX_CHARS);
         var scSecs = Math.max(15, Math.min(80, Math.round(Number(scb.seconds) || 40)));
@@ -534,7 +634,7 @@ export default {
         for (var sci = 0; sci < scTries.length; sci++) {
           if (sci) await new Promise(function (r) { setTimeout(r, 800 * sci); });
           try {
-            scR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + scTries[sci] + ":generateContent?key=" + env.GEMINI_API_KEY,
+            scR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + scTries[sci] + ":generateContent?key=" + reelsKey(env),
               { method: "POST", headers: { "Content-Type": "application/json" }, body: scBody });
             scD = await scR.json();
           } catch (e) { scR = null; scD = null; continue; }
@@ -597,116 +697,172 @@ export default {
       }
 
       /* ---- 7b5) Reels Gen: تلخيص فيديو بالكلام — أفكار كاملة (Gemini، خطوتان) ----
-         الجسم: [4 بايت طول JSON][JSON {seconds, segments:[[start,end]]}][صوت Ogg Opus].
+         الجسم: [4 بايت طول JSON][JSON {seconds, segments:[[start,end]], transcript?}][صوت Ogg Opus].
          المقاطع حدودها سكتات اكتشفها المتصفح. الخطوة 1: Gemini يسمع الصوت ويفرّغ كل مقطع
-         برقمه فقط (يُرفع عبر Files API ويُحذف بعدها مباشرة). الخطوة 2: نص فقط — يقرأ
-         التفريغ، يحدّد هدف الريل من قائمة ثابتة، ويختار سلاسل متتالية (from..to) كل منها
-         فكرة كاملة تبدأ وتنتهي مع الجملة، مرتّبة حسب بنية ذلك الهدف.
-         يعيد {goal, topic, transcript:[نص كل مقطع], moments:[{from,to,why}]}. */
+         برقمه فقط (يُرفع عبر Files API ويُحذف بعدها مباشرة) — وتُتخطّى إن أرسل المتصفح
+         التفريغ من مرة سابقة (بلا صوت). الخطوة 2: نص فقط — يحدّد هدف الريل من قائمة ثابتة
+         ويختار سلاسل متتالية (from..to) كل منها فكرة كاملة، مرتّبة حسب بنية الهدف.
+         الرد يتدفّق (slowJSON): {goal, topic, transcript, moments:[{from,to,why}]} أو {error}. */
       if (request.method === "POST" && path === "/reels/moments") {
         var moUser = await getSessionUser(env, request);
         if (!moUser) return json({ error: "غير مسجّل دخول" }, 401);
         if (!(await hasProjectSlug(env, moUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
-        if (!env.GEMINI_API_KEY) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        var moKey = reelsKey(env);
+        if (!moKey) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
         if (Number(request.headers.get("Content-Length") || 0) > MOMENTS_MAX_BYTES) return json({ error: "صوت الفيديو أكبر من المسموح" }, 413);
         if ((await usedToday(env, moUser.email, "moments")) >= MOMENTS_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتحليل الكلام. جرّب بكرا." }, 429);
-        var moBuf = await request.arrayBuffer();
-        if (moBuf.byteLength < 8 || moBuf.byteLength > MOMENTS_MAX_BYTES) return json({ error: "طلب غير صالح" }, 400);
-        var moLen = new DataView(moBuf).getUint32(0), moMeta;
-        try { moMeta = JSON.parse(new TextDecoder().decode(new Uint8Array(moBuf, 4, moLen))); } catch (e) { return json({ error: "طلب غير صالح" }, 400); }
-        var moAudio = moBuf.slice(4 + moLen);
-        var moSegs = (Array.isArray(moMeta.segments) ? moMeta.segments : []).slice(0, MOMENTS_MAX_SEGS)
-          .map(function (s) { return [Number(s[0]) || 0, Number(s[1]) || 0]; });
-        var moRoom = Math.max(8, Math.min(90, Number(moMeta.seconds) || 40));
-        if (!moSegs.length || moAudio.byteLength < 100) return json({ error: "ما في كلام بالفيديو" }, 400);
-        var gk = "?key=" + env.GEMINI_API_KEY, gBase = "https://generativelanguage.googleapis.com";
-        var moModels = ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest"];
-
-        // 1) transcribe each numbered segment from the audio — nothing else
-        var moStart = await fetch(gBase + "/upload/v1beta/files" + gk, { method: "POST",
-          headers: { "X-Goog-Upload-Protocol": "resumable", "X-Goog-Upload-Command": "start", "X-Goog-Upload-Header-Content-Length": String(moAudio.byteLength),
-                     "X-Goog-Upload-Header-Content-Type": "audio/ogg", "Content-Type": "application/json" },
-          body: JSON.stringify({ file: { display_name: "reels-gen-moments" } }) });
-        var moUpUrl = moStart.ok && moStart.headers.get("x-goog-upload-url");
-        if (!moUpUrl) return json({ error: "تعذّر رفع الصوت لـ Gemini" }, 502);
-        var moFr = await fetch(moUpUrl, { method: "POST", headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" }, body: moAudio });
-        var moFile = moFr.ok ? ((await moFr.json()).file || null) : null;
-        if (!moFile || !moFile.name) return json({ error: "تعذّر رفع الصوت لـ Gemini" }, 502);
-        var moText = moSegs.map(function () { return ""; }), moT;
-        try {
-          for (var mw = 0; mw < 40 && moFile.state === "PROCESSING"; mw++) {   // audio is usually ready at once
-            await new Promise(function (r) { setTimeout(r, 1500); });
-            moFile = await (await fetch(gBase + "/v1beta/" + moFile.name + gk)).json();
-          }
-          if (moFile.state !== "ACTIVE") return json({ error: "Gemini ما قدر يقرأ الصوت" }, 502);
-          var moList = moSegs.map(function (s, i) { return (i + 1) + ": " + s[0].toFixed(1) + "-" + s[1].toFixed(1); }).join("\n");
-          moT = await geminiJSON(env, moModels, {
-            system_instruction: { parts: [{ text:
+        var moIn = splitAudioBody(await request.arrayBuffer());
+        if (!moIn) return json({ error: "طلب غير صالح" }, 400);
+        var moSegs = momentsSegs(moIn.meta), moRoom = Math.max(8, Math.min(90, Number(moIn.meta.seconds) || 40));
+        var moKnown = Array.isArray(moIn.meta.transcript) && moIn.meta.transcript.length === moSegs.length;
+        if (!moSegs.length || (!moKnown && moIn.audio.byteLength < 100)) return json({ error: "ما في كلام بالفيديو" }, 400);
+        var moModels = ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"];
+        return slowJSON(async function () {
+          var moText = moSegs.map(function (s, i) { return moKnown ? String(moIn.meta.transcript[i] || "").slice(0, 400) : ""; });
+          if (!moKnown) {
+            // 1) transcribe each numbered segment from the audio — nothing else
+            var moUp = await geminiUpload(moKey, moIn.audio, "audio/ogg", "reels-gen-moments");
+            if (moUp.error) { geminiDelete(moKey, ctx, moUp.file); return { error: moUp.error }; }
+            var moT;
+            try {
+              var moList = moSegs.map(function (s, i) { return (i + 1) + ": " + s[0].toFixed(1) + "-" + s[1].toFixed(1); }).join("\n");
+              moT = await geminiJSON(moKey, moModels, {
+                system_instruction: { parts: [{ text:
 "You transcribe speech. You get a soundtrack and a numbered list of segments, each with its start and end in seconds from the start of the audio.\n" +
 "For EVERY number in the list, in order, write exactly the words spoken inside that time span, as spoken: the speaker's own dialect (mostly Syrian Arabic, in Arabic script), and English or other words as they are said. No translation, no correction, no summary.\n" +
 "The list marks where there is SOUND, not where there are words. If a segment has no clear words (music, applause, laughter, noise, tones, unclear voices), its text is \"\".\n" +
 "NEVER invent or guess words. Write only what you actually hear.\n" +
-"Return ONLY JSON: one entry per number, covering all " + moSegs.length + " numbers." }] },
-            contents: [{ role: "user", parts: [{ file_data: { mime_type: "audio/ogg", file_uri: moFile.uri } }, { text: "Segments (number: start-end seconds):\n" + moList }] }],
-            generationConfig: { temperature: 0, maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: {
-              type: "OBJECT", required: ["segments"], properties: { segments: { type: "ARRAY", items: { type: "OBJECT", required: ["n", "text"],
-                properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } } } } } }
-          }, "transcribe");
-        } finally {
-          ctx.waitUntil(fetch(gBase + "/v1beta/" + moFile.name + gk, { method: "DELETE" }).catch(function () {}));   // the audio does not stay with Google
-        }
-        if (moT.error) return json({ error: moT.error }, 502);
-        ((moT.data && moT.data.segments) || []).forEach(function (x) {
-          var n = Math.round(Number(x && x.n)); if (n >= 1 && n <= moSegs.length) moText[n - 1] = String(x.text || "").replace(/\s+/g, " ").trim().slice(0, 400);
-        });
-        await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'moments', datetime('now'))").bind(moUser.email).run();
-        var moSaid = moText.map(function (t, i) { return t ? (i + 1) + " [" + moSegs[i][0].toFixed(1) + "-" + moSegs[i][1].toFixed(1) + ", " + (moSegs[i][1] - moSegs[i][0]).toFixed(1) + "s] " + t : ""; }).filter(Boolean);
-        if (!moSaid.length) return json({ ok: true, goal: "", topic: "", transcript: moText, moments: [] });
+"Return ONLY JSON: {\"segments\":[{\"n\":1,\"text\":\"...\"}, ...]}, one entry per number, covering all " + moSegs.length + " numbers." }] },
+                contents: [{ role: "user", parts: [{ file_data: { mime_type: "audio/ogg", file_uri: moUp.file.uri } }, { text: "Segments (number: start-end seconds):\n" + moList }] }],
+                generationConfig: { temperature: 0, maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: {
+                  type: "OBJECT", required: ["segments"], properties: { segments: { type: "ARRAY", items: { type: "OBJECT", required: ["n", "text"],
+                    properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } } } } } }
+              }, "transcribe");
+            } finally { geminiDelete(moKey, ctx, moUp.file); }
+            if (moT.error) return { error: moT.error };
+            ((moT.data && moT.data.segments) || []).forEach(function (x) {
+              var n = Math.round(Number(x && x.n)); if (n >= 1 && n <= moSegs.length) moText[n - 1] = String(x.text || "").replace(/\s+/g, " ").trim().slice(0, 400);
+            });
+          }
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'moments', datetime('now'))").bind(moUser.email).run();
+          var moSaid = momentsLines(moSegs, moText);
+          if (!moSaid.length) return { ok: true, goal: "", topic: "", transcript: moText, moments: [] };
 
-        // 2) from the text alone: the reel's goal, a plan, then whole thoughts in that goal's shape
-        var moGoals = Object.keys(MOMENTS_GOALS), moLo = Math.max(5, moRoom - 6);
-        var moAsk = [{ role: "user", parts: [{ text: "Transcript:\n" + moSaid.join("\n") }] }];
-        function moRuns(data) {
-          return ((data && data.moments) || []).map(function (m) {
-            return { from: Math.round(Number(m && m.from)), to: Math.round(Number(m && m.to)), why: String(m && m.why || "").trim().slice(0, 60) };
-          }).filter(function (m) { return m.from >= 1 && m.to >= m.from && m.to <= moSegs.length && moText[m.from - 1] && moText[m.to - 1]; }).slice(0, 20);
-        }
-        function moSecs(runs) { return runs.reduce(function (s, m) { return s + moSegs[m.to - 1][1] - moSegs[m.from - 1][0]; }, 0); }
-        var moSel = {
-          system_instruction: { parts: [{ text:
+          // 2) from the text alone: the reel's goal, a plan, then whole thoughts in that goal's shape
+          var moGoals = Object.keys(MOMENTS_GOALS), moLo = Math.max(5, moRoom - 6);
+          var moAsk = [{ role: "user", parts: [{ text: "Transcript:\n" + moSaid.join("\n") }] }];
+          var moSel = {
+            system_instruction: { parts: [{ text:
 "You are a video editor making a short vertical summary reel from a long video about an NGO's education and community projects in Syria.\n" +
 "You get the video's transcript as numbered segments: number [start-end seconds, length] words. Segments are split at pauses, so one sentence often runs over several segments. Missing numbers had no words.\n" +
 "1) 'goal': decide from the content what this reel is for, exactly one of: " + moGoals.map(function (g) { return "«" + g + "» (" + MOMENTS_GOALS[g] + ")"; }).join("; ") + ".\n" +
 "2) 'topic': one short Arabic sentence, the video's main idea.\n" +
 "3) 'plan': a few short lines. Walk through the goal's structure step by step and, for each step, name the segment numbers that say it best, with their seconds. Add up the seconds.\n" +
 "4) 'moments': the RUNS of consecutive segments (from..to) from your plan, in the order the reel plays them, so that someone who sees only the reel understands the idea clearly, in the speakers' own voices.\n" +
-"RULES for moments:\n" +
-"- Each run is ONE COMPLETE, CLEAR THOUGHT that makes sense on its own. It starts where a sentence starts and ends where a sentence ends: never cut a sentence, never leave a thought unfinished. If a sentence spans several segments, include all of them.\n" +
-"- A run must not lean on words outside it: if it opens with a word that points back (them, this, that, so, and, also, هم، هاد، هيك، لأنو، و…), start the run earlier so the listener knows what it refers to — or choose another run.\n" +
-"- Usually 3 to 6 runs, each 3 to 20 seconds (start of 'from' to end of 'to'). Together they last between " + moLo + " and " + moRoom + " seconds: fill that time, never go over " + moRoom + ".\n" +
-"- Follow the goal's structure; the order may differ from the video's. The first run is a strong, self-contained opening that makes people keep watching. If the video ends with a call to action (how to join or register), the reel ends with it.\n" +
-"- Leave out greetings, thanks, self-introductions (unless they are the point), filler (um, so, okay), checks of the microphone, repeated ideas and false starts — do not keep them inside a run either: end the run before them or start it after them.\n" +
-"- 'why' is 2 to 6 Arabic words on the run's role in the structure (like «افتتاحية قوية» or «النتيجة»).\n" +
-"- Use only numbers from the transcript, and choose from what is written there.\n" +
+momentsRules(moLo, moRoom) + "Return ONLY JSON." }] },
+            contents: moAsk,
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: {
+              type: "OBJECT", required: ["goal", "topic", "plan", "moments"], propertyOrdering: ["goal", "topic", "plan", "moments"], properties: {
+                goal: { type: "STRING", enum: moGoals }, topic: { type: "STRING" }, plan: { type: "STRING" }, moments: MOMENTS_RUNS_SCHEMA } } }
+          };
+          var moS = await geminiJSON(moKey, moModels, moSel, "select");
+          if (moS.error) return { error: moS.error, transcript: moText };
+          var moMoments = momentsRuns(moS.data.moments, moSegs, moText), moSpoken = moText.reduce(function (s, t, i) { return s + (t ? moSegs[i][1] - moSegs[i][0] : 0); }, 0);
+          if (momentsSecs(moMoments, moSegs) < moLo - 4 && moSpoken > moRoom * 1.3) {   // far too short while there is enough to say: ask once more
+            moAsk.push({ role: "model", parts: [{ text: JSON.stringify(moS.data) }] },
+                       { role: "user", parts: [{ text: "Your runs last " + Math.round(momentsSecs(moMoments, moSegs)) + " seconds; the reel needs " + moLo + " to " + moRoom + ". Keep what works and add more complete, self-contained thoughts that fit the goal's structure." }] });
+            var moS2 = await geminiJSON(moKey, moModels, moSel, "select-again");
+            var moM2 = moS2.error ? [] : momentsRuns(moS2.data.moments, moSegs, moText);
+            if (momentsSecs(moM2, moSegs) > momentsSecs(moMoments, moSegs)) { moS = moS2; moMoments = moM2; }
+          }
+          var moGoal = String(moS.data.goal || ""); if (!MOMENTS_GOALS[moGoal]) moGoal = "";
+          return { ok: true, goal: moGoal, topic: String(moS.data.topic || "").trim().slice(0, 200), transcript: moText, moments: moMoments };
+        });
+      }
+
+      /* ---- 7b6) Reels Gen: ناقد يسمع الريل كمشاهد عادي، ومحرّر يعدّل حسب نقده ----
+         الجسم كـ /reels/moments، والصوت هنا صوت الريل نفسه (اللحظات المختارة بالتتابع).
+         JSON: {seconds, goal, topic, segments, transcript, moments:[{from,to,why}], starts:[ث],
+         revise}. الناقد «أعمى»: يسمع الصوت فقط ويعرف أين يبدأ كل مقطع، لا أكثر — لا
+         التفريغ ولا الهدف. يقول ما فهمه، ويقيّم ويحدّد المشاكل بأرقام اللحظات. إن كانت
+         العلامة دون 8 وطُلب التعديل، يعدّل المحرّر (نص فقط) الاختيار على ضوء النقد.
+         الرد يتدفّق: {critique:{understood, scores, issues, overall}, moments|null, plan} أو {error}. */
+      if (request.method === "POST" && path === "/reels/critique") {
+        var crUser = await getSessionUser(env, request);
+        if (!crUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, crUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
+        var crKey = reelsKey(env);
+        if (!crKey) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        if ((await usedToday(env, crUser.email, "critique")) >= CRITIQUE_DAILY_MAX) return json({ error: "وصلت للحد اليومي للنقد. جرّب بكرا." }, 429);
+        var crIn = splitAudioBody(await request.arrayBuffer());
+        if (!crIn) return json({ error: "طلب غير صالح" }, 400);
+        var crM = crIn.meta, crSegs = momentsSegs(crM), crRoom = Math.max(8, Math.min(90, Number(crM.seconds) || 40)), crLo = Math.max(5, crRoom - 6);
+        var crText = crSegs.map(function (s, i) { return String((crM.transcript || [])[i] || "").slice(0, 400); });
+        var crRuns = momentsRuns(crM.moments, crSegs, crText), crStarts = (Array.isArray(crM.starts) ? crM.starts : []).map(Number);
+        if (!crRuns.length || crStarts.length !== crRuns.length || crIn.audio.byteLength < 100) return json({ error: "طلب غير صالح" }, 400);
+        var crModels = ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"];
+        return slowJSON(async function () {
+          // the critic: a viewer who only hears the reel
+          var crUp = await geminiUpload(crKey, crIn.audio, "audio/ogg", "reels-gen-critique");
+          if (crUp.error) { geminiDelete(crKey, ctx, crUp.file); return { error: crUp.error }; }
+          var crC;
+          try {
+            crC = await geminiJSON(crKey, crModels, {
+              system_instruction: { parts: [{ text:
+"You are an ordinary viewer in Syria scrolling Instagram and Facebook reels. You hear this short reel once, with no picture, and you know nothing about it beforehand.\n" +
+"The reel is made of separate moments cut from a longer video and played one after another. You are told only when each moment starts.\n" +
+"Listen as a real viewer would, and judge honestly whether the reel gets a clear idea across to you. Do not guess what the makers meant: judge only what you hear.\n" +
+"- 'understood': in Arabic, one or two sentences: what this reel told you. If you did not get a clear idea, say so.\n" +
+"- 'scores' from 1 to 10: clarity (one clear idea comes across), completeness (no word or sentence cut at the start or end of a moment, no thought left hanging), context (nothing refers to someone or something you never heard about), opening (the first seconds make you want to keep listening), ending (it ends on a complete closing note), flow (the moments connect naturally).\n" +
+"- 'issues': each concrete problem, with the moment's number, a kind (" + CRITIC_KINDS.join(", ") + ") and in Arabic what exactly is wrong — quote the words you heard where it helps.\n" +
+"- 'overall' from 1 to 10: would this reel get its idea across to people like you. 8 or more only when it truly works.\n" +
 "Return ONLY JSON." }] },
-          contents: moAsk,
-          generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: {
-            type: "OBJECT", required: ["goal", "topic", "plan", "moments"], propertyOrdering: ["goal", "topic", "plan", "moments"], properties: {
-              goal: { type: "STRING", enum: moGoals }, topic: { type: "STRING" }, plan: { type: "STRING" },
-              moments: { type: "ARRAY", items: { type: "OBJECT", required: ["from", "to", "why"], propertyOrdering: ["from", "to", "why"],
-                properties: { from: { type: "INTEGER" }, to: { type: "INTEGER" }, why: { type: "STRING" } } } } } } }
-        };
-        var moS = await geminiJSON(env, moModels, moSel, "select");
-        if (moS.error) return json({ error: moS.error }, 502);
-        var moMoments = moRuns(moS.data), moSpoken = moText.reduce(function (s, t, i) { return s + (t ? moSegs[i][1] - moSegs[i][0] : 0); }, 0);
-        if (moSecs(moMoments) < moLo - 4 && moSpoken > moRoom * 1.3) {   // far too short while there is enough to say: ask once more
-          moAsk.push({ role: "model", parts: [{ text: JSON.stringify(moS.data) }] },
-                     { role: "user", parts: [{ text: "Your runs last " + Math.round(moSecs(moMoments)) + " seconds; the reel needs " + moLo + " to " + moRoom + ". Keep what works and add more complete, self-contained thoughts that fit the goal's structure." }] });
-          var moS2 = await geminiJSON(env, moModels, moSel, "select-again");
-          if (!moS2.error && moSecs(moRuns(moS2.data)) > moSecs(moMoments)) { moS = moS2; moMoments = moRuns(moS2.data); }
-        }
-        var moGoal = String(moS.data.goal || ""); if (!MOMENTS_GOALS[moGoal]) moGoal = "";
-        return json({ ok: true, goal: moGoal, topic: String(moS.data.topic || "").trim().slice(0, 200), transcript: moText, moments: moMoments });
+              contents: [{ role: "user", parts: [{ file_data: { mime_type: "audio/ogg", file_uri: crUp.file.uri } },
+                { text: "Moments start at (seconds): " + crStarts.map(function (t, i) { return (i + 1) + ": " + t.toFixed(1); }).join(", ") }] }],
+              generationConfig: { temperature: 0.3, responseMimeType: "application/json", responseSchema: {
+                type: "OBJECT", required: ["understood", "scores", "issues", "overall"], propertyOrdering: ["understood", "scores", "issues", "overall"], properties: {
+                  understood: { type: "STRING" },
+                  scores: { type: "OBJECT", required: ["clarity", "completeness", "context", "opening", "ending", "flow"], properties: {
+                    clarity: { type: "INTEGER" }, completeness: { type: "INTEGER" }, context: { type: "INTEGER" }, opening: { type: "INTEGER" }, ending: { type: "INTEGER" }, flow: { type: "INTEGER" } } },
+                  issues: { type: "ARRAY", items: { type: "OBJECT", required: ["moment", "kind", "problem"], properties: {
+                    moment: { type: "INTEGER" }, kind: { type: "STRING", enum: CRITIC_KINDS }, problem: { type: "STRING" } } } },
+                  overall: { type: "INTEGER" } } } }
+            }, "critic");
+          } finally { geminiDelete(crKey, ctx, crUp.file); }
+          if (crC.error) return { error: crC.error };
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'critique', datetime('now'))").bind(crUser.email).run();
+          var crSc = crC.data.scores || {}, clamp10 = function (x) { return Math.max(1, Math.min(10, Math.round(Number(x) || 1))); };
+          var critique = {
+            understood: String(crC.data.understood || "").trim().slice(0, 400),
+            scores: { clarity: clamp10(crSc.clarity), completeness: clamp10(crSc.completeness), context: clamp10(crSc.context), opening: clamp10(crSc.opening), ending: clamp10(crSc.ending), flow: clamp10(crSc.flow) },
+            issues: (Array.isArray(crC.data.issues) ? crC.data.issues : []).slice(0, 12).map(function (x) {
+              return { moment: Math.round(Number(x && x.moment)) || 0, kind: CRITIC_KINDS.indexOf(x && x.kind) >= 0 ? x.kind : "unclear", problem: String(x && x.problem || "").trim().slice(0, 300) };
+            }),
+            overall: clamp10(crC.data.overall)
+          };
+          if (critique.overall >= 8 || !crM.revise) return { ok: true, critique: critique, moments: null };
+
+          // the editor revises from the text, with the critique in hand
+          var crNow = crRuns.map(function (m, i) {
+            return "moment " + (i + 1) + " = segments " + m.from + "-" + m.to + " (" + m.why + "): " + crText.slice(m.from - 1, m.to).filter(Boolean).join(" ");
+          }).join("\n");
+          var crE = await geminiJSON(crKey, crModels, {
+            system_instruction: { parts: [{ text:
+"You are the video editor of a short vertical summary reel from a long video about an NGO's education and community projects in Syria. The reel's goal is «" + String(crM.goal || "") + "» (" + (MOMENTS_GOALS[crM.goal] || "a clear structure") + "); the idea it must get across: " + String(crM.topic || "").slice(0, 200) + "\n" +
+"A viewer who knew nothing about the video heard your current cut and told you what they understood and what went wrong. Revise the cut so that the idea comes across clearly to such a viewer.\n" +
+"Compare what the viewer understood with the idea: whatever did not come across needs a clearer or added moment. Fix every issue: a cut word or sentence means widening the run to the sentence's real start or end; missing context means adding the sentence that introduces it, or dropping the moment; weak or unclear moments are replaced by stronger ones from the transcript; fix the order when the flow breaks. Keep the moments that work.\n" +
+"You get the full transcript as numbered segments: number [start-end seconds, length] words.\n" +
+"'plan': a few short lines on what you change and why, with segment numbers and seconds; add up the seconds. 'moments': the revised runs, in the order the reel plays them.\n" +
+momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
+            contents: [{ role: "user", parts: [{ text: "Transcript:\n" + momentsLines(crSegs, crText).join("\n") + "\n\nCurrent cut:\n" + crNow +
+              "\n\nThe viewer understood: " + critique.understood + "\nScores: " + JSON.stringify(critique.scores) + ", overall " + critique.overall + "/10\nIssues:\n" +
+              critique.issues.map(function (x) { return "- moment " + x.moment + " [" + x.kind + "]: " + x.problem; }).join("\n") }] }],
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: {
+              type: "OBJECT", required: ["plan", "moments"], propertyOrdering: ["plan", "moments"], properties: { plan: { type: "STRING" }, moments: MOMENTS_RUNS_SCHEMA } } }
+          }, "revise");
+          var crNew = crE.error ? [] : momentsRuns(crE.data.moments, crSegs, crText);
+          return { ok: true, critique: critique, moments: crNew.length ? crNew : null, plan: crE.error ? "" : String(crE.data.plan || "").slice(0, 1200) };
+        });
       }
 
       /* ---- 7c) تدقيق إملائي/نحوي عبر Gemini (يعيد نصًّا مصحَّحًا لكل حقل) ---- */

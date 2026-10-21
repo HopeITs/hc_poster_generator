@@ -1248,7 +1248,7 @@
       if (m.kind !== "video") throw new Error(file.name);
       $("rgLongName").textContent = file.name; $("rgLongInfo").textContent = "المدة " + fmt(m.srcDur) + " · ⁦" + m.w + "×" + m.h + "⁩";   // isolated so RTL does not flip it to h×w
       var miss = S.items.filter(function (it) { return it.missing && it.sum && it.name === file.name; });
-      S.sumData = { m: m, els: [m.el], samples: null };
+      S.sumData = { m: m, els: [m.el], samples: null }; $("rgCritic").hidden = true;
       $("rgAnalyse").disabled = false;
       if (miss.length) {   // re-link a reopened project: every moment gets its own element on the file
         return Promise.all(miss.map(function (it, i) {
@@ -1261,7 +1261,7 @@
   }
   function analyseLong() {
     var D = S.sumData; if (!D) return;
-    var btn = $("rgAnalyse"); btn.disabled = true; stop();
+    var btn = $("rgAnalyse"); btn.disabled = true; stop(); $("rgCritic").hidden = true;
     var job = D.samples ? Promise.resolve() : thumbQueue.catch(function () {}).then(function () {   // shares the queue: a re-linked moment may use the same element
       return sampleAudio(D).then(function () { return sampleFrames(D); });
     });
@@ -1514,11 +1514,20 @@
       return new Blob(pages, { type: "audio/ogg" });
     });
   }
+  /* [4-byte JSON length][JSON][audio] to a Reels route. The long routes stream
+     their answer (spaces while Gemini works, then the JSON), and an error can
+     come back in the JSON with a 200. */
+  function postAudio(path, meta, audio) {
+    var m = new TextEncoder().encode(JSON.stringify(meta)), hdr = new Uint8Array(4); new DataView(hdr.buffer).setUint32(0, m.length);
+    return fetch(WORKER + path, { method: "POST", headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/octet-stream" }, body: new Blob(audio ? [hdr, m, audio] : [hdr, m]) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || d.error) { var e = new Error(d.error || "HTTP " + r.status); e.data = d; throw e; } return d; }); });
+  }
+  function segList(D) { return D.speech.segs.map(function (s) { return [+s[0].toFixed(2), +s[1].toFixed(2)]; }); }
+  /* Once a video is transcribed, a new length or a second try sends the text, not the sound: one Gemini request instead of two. */
+  function haveTranscript(D) { return !!(D.transcript && D.transcript.length === D.speech.segs.length); }
   function askMoments(D, room) {
-    var meta = new TextEncoder().encode(JSON.stringify({ seconds: Math.round(room), segments: D.speech.segs.map(function (s) { return [+s[0].toFixed(2), +s[1].toFixed(2)]; }) }));
-    var hdr = new Uint8Array(4); new DataView(hdr.buffer).setUint32(0, meta.length);
-    return fetch(WORKER + "/reels/moments", { method: "POST", headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/octet-stream" }, body: new Blob([hdr, meta, D.ogg]) })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw new Error(d.error || "HTTP " + r.status); return d; }); });
+    return haveTranscript(D) ? postAudio("/reels/moments", { seconds: Math.round(room), segments: segList(D), transcript: D.transcript }, null)
+                             : postAudio("/reels/moments", { seconds: Math.round(room), segments: segList(D) }, D.ogg);
   }
   /* Whole sentences on the device: runs that start and end on a real pause,
      4–15 s, with no long silence inside; scored on how full of speech they
@@ -1546,39 +1555,125 @@
     });
     return picked.sort(function (x, y) { return x.a - y.a; }).map(function (c) { return { from: c.from, to: c.to, text: "", why: "" }; });
   }
+  /* A run must hold whole sentences, whatever the model said: with a
+     transcript, its start moves back while the segment before it does not end
+     a sentence, and its end moves on while its last segment does not — never
+     across a real pause (0.7 s) or past 20 s. */
+  function endsSentence(t) { return /[.!?؟…]["»”')]?\s*$/.test(t || ""); }
+  function wholeSentences(D, x) {
+    var segs = D.speech.segs, tr = D.transcript, f = x.from - 1, t = x.to - 1, k;
+    for (k = 0; k < 4 && f > 0 && tr[f - 1] && !endsSentence(tr[f - 1]) && segs[f][0] - segs[f - 1][1] < 0.7 && segs[t][1] - segs[f - 1][0] <= 20; k++) f--;
+    for (k = 0; k < 4 && t + 1 < segs.length && !endsSentence(tr[t]) && tr[t + 1] && segs[t + 1][0] - segs[t][1] < 0.7 && segs[t + 1][1] - segs[f][0] <= 20; k++) t++;
+    return { from: f + 1, to: t + 1, why: x.why };
+  }
+  function runsSecs(D, list) { var segs = D.speech.segs; return list.reduce(function (s, x) { return s + segs[x.to - 1][1] - segs[x.from - 1][0]; }, 0); }
+  /* Whole runs only, never the same words twice, each with its transcribed
+     words; too long: drop from the middle, keeping the opening and the close. */
+  function tidyRuns(D, runs, room) {
+    var segs = D.speech.segs, tr = D.transcript || [], used = {}, list = [], said = 0;
+    runs.forEach(function (x) {
+      if (!(x.from >= 1 && x.to >= x.from && x.to <= segs.length)) return;
+      if (haveTranscript(D)) x = wholeSentences(D, x);
+      for (var k = x.from; k <= x.to; k++) if (used[k]) return;
+      for (k = x.from; k <= x.to; k++) used[k] = true;
+      list.push({ from: x.from, to: x.to, why: x.why || "", text: tr.slice(x.from - 1, x.to).filter(Boolean).join(" ") });
+      said += segs[x.to - 1][1] - segs[x.from - 1][0];
+    });
+    while (said > room + 2 && list.length > 2) { var cut = list.splice(list.length - 2, 1)[0]; said -= segs[cut.to - 1][1] - segs[cut.from - 1][0]; }
+    return list;
+  }
+  /* A breath before the first word and after the last, short of the next voice. */
+  function runSpan(segs, x, dur) {
+    var f = x.from - 1, t = x.to - 1;
+    return [Math.max(f ? segs[f - 1][1] + 0.05 : 0, segs[f][0] - 0.15), Math.min(t + 1 < segs.length ? segs[t + 1][0] - 0.05 : dur - 0.05, segs[t][1] + 0.25)];
+  }
+  /* ---------- the critic ----------
+     A viewer who knows nothing about the video hears the reel as it will be
+     cut — the chosen moments back to back, a short gap at each cut — and is
+     told only where each moment starts (/reels/critique). Below 8/10 the
+     editor revises the runs with that critique in the same request. Each
+     hearing is two Gemini requests on a free daily quota, so there is one:
+     the revised cut is used as it is, without a second hearing (raise
+     CRITIC_ROUNDS to hear it again and keep the best-scored version). */
+  var CRITIC_ROUNDS = 1, CRITIC_GAP = 0.3;
+  function reelSound(D, list) {
+    var pcm = D.pcm, sr = pcm.sampleRate, x = pcm.getChannelData(0), gap = Math.round(CRITIC_GAP * sr), spans = list.map(function (r) { return runSpan(D.speech.segs, r, D.m.srcDur); });
+    var n = spans.reduce(function (s, p) { return s + Math.round((p[1] - p[0]) * sr) + gap; }, 0), out = new Float32Array(n), o = 0, starts = [];
+    spans.forEach(function (p) {
+      var a = Math.round(p[0] * sr), b = Math.round(p[1] * sr), fe = Math.round(0.01 * sr);
+      starts.push(o / sr);
+      for (var i = a; i < b; i++) out[o + i - a] = x[i] * Math.min(1, (i - a) / fe, (b - i) / fe);   // 10 ms edges, as the cut will sound
+      o += b - a + gap;
+    });
+    return { buf: { sampleRate: sr, getChannelData: function () { return out; } }, starts: starts };
+  }
+  function askCritique(D, list, room, starts, ogg) {
+    return postAudio("/reels/critique", { seconds: Math.round(room), goal: D.goal, topic: D.topic, revise: true, starts: starts.map(function (t) { return +t.toFixed(2); }),
+      segments: segList(D), transcript: D.transcript, moments: list.map(function (r) { return { from: r.from, to: r.to, why: r.why }; }) }, ogg);
+  }
+  function criticLoop(D, list, room) {
+    var report = [], best = null, cur = list, revised = null, rejected = null;
+    function hear(r) {
+      var snd = reelSound(D, cur), say = "…الناقد عم يسمع الريل كمشاهد عادي" + (CRITIC_ROUNDS > 1 ? " — الدورة " + r + " من " + CRITIC_ROUNDS : "") + "، وبيعدّل المحرّر حسب نقده";
+      sumSt(say);
+      return speechOgg(snd.buf).then(function (ogg) { sumSt(say); return askCritique(D, cur, room, snd.starts, ogg); }).then(function (d) {
+        var c = d.critique; report.push({ round: r, overall: c.overall, understood: c.understood, scores: c.scores, issues: c.issues, list: cur, plan: d.plan || "" });
+        if (!best || c.overall > best.score) best = { list: cur, score: c.overall, round: r };
+        if (c.overall >= 8 || !d.moments) return;
+        var next = tidyRuns(D, d.moments, room); if (!next.length) return;
+        if (r >= CRITIC_ROUNDS) {   // the editor's last word, unheard: taken only when it does not shrink the reel
+          var was = runsSecs(D, cur), now = runsSecs(D, next);
+          if (now >= Math.min(was, room * 0.85) - 0.5) revised = { list: next, plan: d.plan || "", after: c.overall };
+          else rejected = { plan: d.plan || "", was: was, now: now };
+          return;
+        }
+        cur = next; return hear(r + 1);
+      });
+    }
+    return hear(1).then(function () { return { list: revised ? revised.list : best.list, best: best, report: report, revised: revised, rejected: rejected }; },
+                        function (e) { var msg = e && e.message || String(e); return best ? { list: best.list, best: best, report: report, err: msg } : { list: list, best: null, report: report, err: msg }; });
+  }
+  var CRITIC_LABELS = { clarity: "الوضوح", completeness: "اكتمال الجمل", context: "السياق", opening: "البداية", ending: "النهاية", flow: "الترابط" };
+  function showCritic(c) {
+    var box = $("rgCritic"); if (!c.report.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '<div class="sec" style="margin:0 0 4px">تقرير الناقد</div>' + c.report.map(function (r) {
+      var kept = !c.revised && c.best && c.best.round === r.round;
+      return '<div class="crit' + (kept ? " kept" : "") + '"><b>' + (c.report.length > 1 ? "الدورة " + r.round + " · " : "") + r.overall + "/10" + (kept ? " — اعتُمدت" : "") + "</b>" +
+        '<div>فهم: «' + esc(r.understood) + '»</div>' +
+        '<div class="hint">' + Object.keys(CRITIC_LABELS).map(function (k) { return CRITIC_LABELS[k] + " " + (r.scores[k] || "-"); }).join(" · ") + "</div>" +
+        (r.issues.length ? "<ul>" + r.issues.map(function (x) { return "<li>" + (x.moment ? "لحظة " + x.moment + ": " : "") + esc(x.problem) + "</li>"; }).join("") + "</ul>" : "") + "</div>";
+    }).join("") + (c.revised ? '<div class="crit kept"><b>تعديل المحرّر حسب النقد — اعتُمد</b>' + (c.revised.plan ? '<div class="hint">' + esc(c.revised.plan) + "</div>" : "") + "</div>"
+                 : c.rejected ? '<div class="crit"><b>تعديل المحرّر — ما اعتُمد</b><div class="hint">قصّر الريل من ' + Math.round(c.rejected.was) + " لـ " + Math.round(c.rejected.now) + " ث، فبقيت النسخة اللي سمعها الناقد</div></div>" : "");
+  }
   function buildTalk() {
     var D = S.sumData, st = recipe();
     if (!D.speech || !D.speech.segs.length) { sumSt(D.pcm ? "ما لقيت كلام بالفيديو — جرّب «لقطات على الإيقاع»" : "تعذّر قراءة صوت الفيديو (الملف أكبر من " + Math.round(SUM_AUDIO_MAX / 1048576) + " MB أو صيغة الصوت غير مدعومة)", true); return Promise.resolve(); }
     var cards = S.items.map(function (it, i) { return { it: it, i: i }; }).filter(function (x) { return x.it.kind === "card"; });
     var room = reelLen() - st.end - cards.reduce(function (s, x) { return s + x.it.len; }, 0);
-    sumSt("…جارٍ تجهيز الصوت");
-    return (D.ogg ? Promise.resolve() : speechOgg(D.pcm).then(function (o) { D.ogg = o; }))
-      .then(function () { sumSt("…Gemini عم يفرّغ الكلام، وبعدين بيختار أفكار كاملة (فيديو ساعة ممكن ياخد دقيقتين)"); return askMoments(D, room); })
+    sumSt("…جارٍ تجهيز الصوت"); $("rgCritic").hidden = true;
+    return (D.ogg || haveTranscript(D) ? Promise.resolve() : speechOgg(D.pcm).then(function (o) { D.ogg = o; }))
+      .then(function () { sumSt(haveTranscript(D) ? "…Gemini عم يختار أفكار كاملة من التفريغ" : "…Gemini عم يفرّغ الكلام، وبعدين بيختار أفكار كاملة (فيديو ساعة ممكن ياخد دقيقتين)"); return askMoments(D, room); })
       .then(function (d) {
         var tr = Array.isArray(d.transcript) ? d.transcript : [];
         D.transcript = tr; D.goal = d.goal || ""; D.topic = d.topic || "";
-        (d.moments || []).forEach(function (x) { x.text = tr.slice(x.from - 1, x.to).filter(Boolean).join(" "); });   // the words as transcribed, segment by segment
-        return { list: d.moments || [], topic: d.topic || "", goal: d.goal || "", ai: true };
+        var res = { list: tidyRuns(D, d.moments || [], room), topic: d.topic || "", goal: d.goal || "", ai: true };
+        if (!res.list.length || !$("rgCriticOn").checked) return res;
+        return criticLoop(D, res.list, room).then(function (c) { res.list = c.list; res.critic = c; return res; });
       },
-            function (e) { return { list: localThoughts(D, room), ai: false, err: e && e.message || String(e) }; })
+            function (e) {
+              if (e && e.data && Array.isArray(e.data.transcript) && e.data.transcript.length === D.speech.segs.length) D.transcript = e.data.transcript;   // transcribed, then the choice failed: keep the words for the next try
+              return { list: tidyRuns(D, localThoughts(D, room), room), ai: false, err: e && e.message || String(e) };
+            })
       .then(function (res) {
-        var segs = D.speech.segs, used = {}, list = [], said = 0;
-        res.list.forEach(function (x) {   // whole runs only, never the same words twice
-          if (!(x.from >= 1 && x.to >= x.from && x.to <= segs.length)) return;
-          for (var k = x.from; k <= x.to; k++) if (used[k]) return;
-          for (k = x.from; k <= x.to; k++) used[k] = true;
-          list.push(x); said += segs[x.to - 1][1] - segs[x.from - 1][0];
-        });
-        while (said > room + 2 && list.length > 2) {   // too long: drop from the middle, keep the opening and the close
-          var cut = list.splice(list.length - 2, 1)[0]; said -= segs[cut.to - 1][1] - segs[cut.from - 1][0];
-        }
+        var segs = D.speech.segs, list = res.list;
+        if (res.critic) showCritic(res.critic);
         if (!list.length) { sumSt(res.ai ? "Gemini ما لقى كلام واضح بالفيديو — جرّب «لقطات على الإيقاع»" : "ما لقيت جمل واضحة بالفيديو", true); return; }
         sumSt("…جارٍ تجهيز اللحظات");
         return Promise.all(list.map(function (x, i) { return sumEl(i); })).then(function (els) {
           var m = D.m;
           var shots = list.map(function (x, i) {
-            var f = x.from - 1, t = x.to - 1;   // a breath before the first word and after the last, short of the next voice
-            var lo = Math.max(f ? segs[f - 1][1] + 0.05 : 0, segs[f][0] - 0.15), hi = Math.min(t + 1 < segs.length ? segs[t + 1][0] - 0.05 : m.srcDur - 0.05, segs[t][1] + 0.25);
+            var sp = runSpan(segs, x, m.srcDur), lo = sp[0], hi = sp[1];
             return { id: nextId++, name: m.file.name, kind: "video", el: els[i], url: m.url, file: m.file, w: m.w, h: m.h, srcDur: m.srcDur, fps: m.fps,
                      rot: 0, tint: false, sound: false, missing: false, sum: true, talk: true, say: x.text || "", role: x.why || "",
                      lo: lo, hi: hi, center: (lo + hi) / 2, start: lo, len: hi - lo };
@@ -1586,13 +1681,17 @@
           cards.forEach(function (x) { shots.splice(Math.min(x.i, shots.length), 0, x.it); });
           S.items = shots; S.t = 0;
           relayout();
-          sumSt((res.ai ? "✓ " + (res.goal ? "هدف الريل: " + res.goal + " · " : "") + "اختار Gemini " + list.length + " أفكار كاملة" + (res.topic ? " — " + res.topic : "")
+          var cb = res.critic && res.critic.best;
+          sumSt((res.ai ? "✓ " + (res.goal ? "هدف الريل: " + res.goal + " · " : "") + "اختار Gemini " + list.length + " أفكار كاملة" + (res.topic ? " — " + res.topic : "") +
+                          (cb ? " · تقييم الناقد " + cb.score + "/10" + (res.critic.revised ? "، وعدّل المحرّر حسب نقده" : res.critic.report.length > 1 ? " (الدورة " + cb.round + " من " + res.critic.report.length + ")" : "") : "") +
+                          (res.critic && res.critic.err ? " · الناقد توقّف: " + res.critic.err : "")
                         : "Gemini ما اشتغل (" + res.err + ") — اخترت " + list.length + " جمل كاملة على السكتات، بس بدون فهم للمحتوى") +
                 " · " + fmt(total()), !res.ai);
         });
       });
   }
   function kindHint() {
+    $("rgCriticRow").hidden = $("rgSumKind").value !== "talk";
     $("rgSumKindHint").textContent = $("rgSumKind").value === "talk"
       ? "Gemini بيسمع الكلام وبيختار أفكار كاملة بدون ما يقطع جملة — صوت الفيديو بيترفع لـ Google لهالغرض وبينحذف بعدها؛ والموسيقى، إذا اخترتها، بتنخفض تحت الكلام"
       : "لقطات قصيرة على إيقاع الموسيقى؛ بدون موسيقى بيضل صوت الفيديو الأصلي";

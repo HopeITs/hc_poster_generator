@@ -22,6 +22,9 @@ store and survive deploys:
 
 - `RESEND_API_KEY` — email sending for `/notify`
 - `SETUP_SECRET` — guards `/setup-owner` and `/change-owner-email`
+- `REELS_GEMINI_KEY` (optional) — a Gemini key from a separate Google project
+  for the Reels Gen routes, so their free daily quota is not shared with the
+  other tools; they use `GEMINI_API_KEY` until it is set
 
 ## Deploying
 
@@ -63,6 +66,7 @@ wrangler d1 export studyzone-db --remote --output backup.sql
 | POST | `/reels/script` | `reels-gen` access |
 | POST | `/reels/voice` | `reels-gen` access |
 | POST | `/reels/moments` | `reels-gen` access |
+| POST | `/reels/critique` | `reels-gen` access |
 
 The Reels Gen routes log each call in `ai_usage` and cap it per user per 24 h.
 `/reels/script` and `/reels/moments` use `GEMINI_API_KEY`; `/reels/music` and `/reels/voice` use
@@ -75,6 +79,10 @@ segments the browser found, and works in two steps: Gemini transcribes each
 segment from the audio (uploaded through the Files API and deleted right
 after), then, from the text alone, picks the reel's goal from a fixed list and
 the runs of segments that make whole thoughts in that goal's structure.
+`/reels/critique` hears the cut reel's sound like a viewer who knows nothing
+about the video (it is told only where each moment starts), says what it
+understood, scores it and lists the problems by moment; below 8/10 the editor
+revises the runs from the transcript with that critique in hand.
 
 Photo endpoints take the email from the session, never from the request body,
 so a user cannot modify anyone else's photo. Deletion is a `POST` because
