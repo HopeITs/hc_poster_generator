@@ -1,0 +1,325 @@
+{
+  "note": "Bundled fallback music for Reels Gen: 5 tracks per editing style, from Pixabay (Pixabay Content License: free for commercial use, no attribution required). None was Content ID registered when picked (2026-10-21). Each file is the first 61 s, levelled to about -16 dBFS RMS with a 2 s fade-out, AAC 128 kbps.",
+  "styles": {
+    "youth": [
+      {
+        "file": "youth-1.m4a",
+        "title": "90S Hip Hop",
+        "artist": "AtlasAudio",
+        "page": "https://pixabay.com/music/old-school-hip-hop-90s-hip-hop-617537/"
+      },
+      {
+        "file": "youth-2.m4a",
+        "title": "Experimental Cinematic Hip-Hop",
+        "artist": "Rockot",
+        "page": "https://pixabay.com/music/beats-experimental-cinematic-hip-hop-315904/"
+      },
+      {
+        "file": "youth-3.m4a",
+        "title": "Hip-Hop Beat",
+        "artist": "prettyjohn1",
+        "page": "https://pixabay.com/music/old-school-hip-hop-hip-hop-hip-hop-beat-527067/"
+      },
+      {
+        "file": "youth-4.m4a",
+        "title": "Hip-Hop Beat",
+        "artist": "prettyjohn1",
+        "page": "https://pixabay.com/music/old-school-hip-hop-hip-hop-hip-hop-beat-525029/"
+      },
+      {
+        "file": "youth-5.m4a",
+        "title": "Urban Hip-Hop Beat",
+        "artist": "prettyjohn1",
+        "page": "https://pixabay.com/music/old-school-hip-hop-urban-hip-hop-beat-523746/"
+      }
+    ],
+    "doc": [
+      {
+        "file": "doc-1.m4a",
+        "title": "Documentary Discovery Wide Horizon",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/celtic-documentary-discovery-wide-horizon-573939/"
+      },
+      {
+        "file": "doc-2.m4a",
+        "title": "Calm Ambient Dreamscape",
+        "artist": "morgan-ambient",
+        "page": "https://pixabay.com/music/ambient-calm-ambient-dreamscape-529861/"
+      },
+      {
+        "file": "doc-3.m4a",
+        "title": "Ambient Techno",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/beats-ambient-techno-601098/"
+      },
+      {
+        "file": "doc-4.m4a",
+        "title": "Ambient Lofi Cinematic Background Music",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/ambient-ambient-lofi-cinematic-background-music-587393/"
+      },
+      {
+        "file": "doc-5.m4a",
+        "title": "Piano Music",
+        "artist": "PaulYudin",
+        "page": "https://pixabay.com/music/solo-piano-piano-piano-music-508963/"
+      }
+    ],
+    "story": [
+      {
+        "file": "story-1.m4a",
+        "title": "Indie Acoustic",
+        "artist": "JonasBlakewood",
+        "page": "https://pixabay.com/music/folk-indie-acoustic-619516/"
+      },
+      {
+        "file": "story-2.m4a",
+        "title": "Acoustic Indie Folk",
+        "artist": "JonasBlakewood",
+        "page": "https://pixabay.com/music/folk-acoustic-indie-folk-619515/"
+      },
+      {
+        "file": "story-3.m4a",
+        "title": "Emotive Inspiring Background Acoustic Music",
+        "artist": "Music_for_Creators",
+        "page": "https://pixabay.com/music/acoustic-group-emotive-inspiring-background-acoustic-music-341937/"
+      },
+      {
+        "file": "story-4.m4a",
+        "title": "Joyful Acoustic Background",
+        "artist": "JorisVermeer",
+        "page": "https://pixabay.com/music/folk-joyful-acoustic-background-598592/"
+      },
+      {
+        "file": "story-5.m4a",
+        "title": "Warm Acoustic Guitar",
+        "artist": "Universfield",
+        "page": "https://pixabay.com/music/acoustic-group-warm-acoustic-guitar-232912/"
+      }
+    ],
+    "promo": [
+      {
+        "file": "promo-1.m4a",
+        "title": "Upbeat Corporate",
+        "artist": "The_Mountain",
+        "page": "https://pixabay.com/music/corporate-upbeat-corporate-576594/"
+      },
+      {
+        "file": "promo-2.m4a",
+        "title": "Corporate Upbeat",
+        "artist": "The_Mountain",
+        "page": "https://pixabay.com/music/corporate-corporate-upbeat-610127/"
+      },
+      {
+        "file": "promo-3.m4a",
+        "title": "Corporate Music",
+        "artist": "prettyjohn1",
+        "page": "https://pixabay.com/music/corporate-corporate-corporate-music-483403/"
+      },
+      {
+        "file": "promo-4.m4a",
+        "title": "Corporate Explainer Video",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/corporate-corporate-explainer-video-568180/"
+      },
+      {
+        "file": "promo-5.m4a",
+        "title": "Upbeat Corporate",
+        "artist": "ElectroAnimals",
+        "page": "https://pixabay.com/music/corporate-upbeat-corporate-591274/"
+      }
+    ],
+    "cine": [
+      {
+        "file": "cine-1.m4a",
+        "title": "Cinematic Epic",
+        "artist": "The_Mountain",
+        "page": "https://pixabay.com/music/build-up-scenes-cinematic-epic-576562/"
+      },
+      {
+        "file": "cine-2.m4a",
+        "title": "Cinematic Promo",
+        "artist": "Kulakovka",
+        "page": "https://pixabay.com/music/build-up-scenes-cinematic-promo-571169/"
+      },
+      {
+        "file": "cine-3.m4a",
+        "title": "Cinematic",
+        "artist": "Kulakovka",
+        "page": "https://pixabay.com/music/main-title-cinematic-277927/"
+      },
+      {
+        "file": "cine-4.m4a",
+        "title": "Cinematic Background",
+        "artist": "AtlasAudio",
+        "page": "https://pixabay.com/music/orchestral-cinematic-background-621553/"
+      },
+      {
+        "file": "cine-5.m4a",
+        "title": "Epic Cinematic",
+        "artist": "The_Mountain",
+        "page": "https://pixabay.com/music/build-up-scenes-epic-cinematic-576567/"
+      }
+    ],
+    "memory": [
+      {
+        "file": "memory-1.m4a",
+        "title": "Lofi Restaurant",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/lofi-lofi-restaurant-568157/"
+      },
+      {
+        "file": "memory-2.m4a",
+        "title": "Lofi Chill Vlog Beats",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/lofi-lofi-chill-vlog-beats-573883/"
+      },
+      {
+        "file": "memory-3.m4a",
+        "title": "LoFi Music",
+        "artist": "prettyjohn1",
+        "page": "https://pixabay.com/music/lofi-lofi-lofi-music-587176/"
+      },
+      {
+        "file": "memory-4.m4a",
+        "title": "Lofi Cocktail Bar",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/lofi-lofi-cocktail-bar-568153/"
+      },
+      {
+        "file": "memory-5.m4a",
+        "title": "Lofi Sunny Cafe",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/lofi-lofi-sunny-cafe-568156/"
+      }
+    ],
+    "event": [
+      {
+        "file": "event-1.m4a",
+        "title": "Dark Electronic",
+        "artist": "alex-morgan",
+        "page": "https://pixabay.com/music/dubstep-dark-electronic-601096/"
+      },
+      {
+        "file": "event-2.m4a",
+        "title": "Electronic - Golden_91Sec",
+        "artist": "Easy_Eva",
+        "page": "https://pixabay.com/music/electronic-electronic-golden-91sec-564089/"
+      },
+      {
+        "file": "event-3.m4a",
+        "title": "Sport Music",
+        "artist": "prettyjohn1",
+        "page": "https://pixabay.com/music/rock-sport-sport-music-484392/"
+      },
+      {
+        "file": "event-4.m4a",
+        "title": "Sport",
+        "artist": "Sub_Clair",
+        "page": "https://pixabay.com/music/beats-sport-571896/"
+      },
+      {
+        "file": "event-5.m4a",
+        "title": "Sport Hip-Hop Trap",
+        "artist": "prettyjohn1",
+        "page": "https://pixabay.com/music/beats-sport-hip-hop-trap-520387/"
+      }
+    ],
+    "question": [
+      {
+        "file": "question-1.m4a",
+        "title": "Inspiring",
+        "artist": "prettyjohn1",
+        "page": "https://pixabay.com/music/modern-classical-inspiring-604469/"
+      },
+      {
+        "file": "question-2.m4a",
+        "title": "Inspiring Emotional",
+        "artist": "Easy_Eva",
+        "page": "https://pixabay.com/music/small-emotions-inspiring-emotional-605990/"
+      },
+      {
+        "file": "question-3.m4a",
+        "title": "Inspiring Electronica",
+        "artist": "Kulakovka",
+        "page": "https://pixabay.com/music/electronic-inspiring-electronica-614881/"
+      },
+      {
+        "file": "question-4.m4a",
+        "title": "Inspiring Background",
+        "artist": "Kulakovka",
+        "page": "https://pixabay.com/music/ambient-inspiring-background-620576/"
+      },
+      {
+        "file": "question-5.m4a",
+        "title": "Inspiring Interview",
+        "artist": "Kulakovka",
+        "page": "https://pixabay.com/music/corporate-inspiring-interview-614874/"
+      }
+    ],
+    "steps": [
+      {
+        "file": "steps-1.m4a",
+        "title": "Corporate Background",
+        "artist": "Kulakovka",
+        "page": "https://pixabay.com/music/corporate-corporate-background-609167/"
+      },
+      {
+        "file": "steps-2.m4a",
+        "title": "Corporate Background",
+        "artist": "The_Mountain",
+        "page": "https://pixabay.com/music/corporate-corporate-background-576564/"
+      },
+      {
+        "file": "steps-3.m4a",
+        "title": "Technology",
+        "artist": "The_Mountain",
+        "page": "https://pixabay.com/music/techno-trance-technology-562622/"
+      },
+      {
+        "file": "steps-4.m4a",
+        "title": "Tech Technology",
+        "artist": "BombinSound",
+        "page": "https://pixabay.com/music/corporate-technology-tech-technology-499582/"
+      },
+      {
+        "file": "steps-5.m4a",
+        "title": "Digital Technology",
+        "artist": "AtlasAudio",
+        "page": "https://pixabay.com/music/corporate-digital-technology-617560/"
+      }
+    ],
+    "kids": [
+      {
+        "file": "kids-1.m4a",
+        "title": "Sunny Ukulele",
+        "artist": "331music",
+        "page": "https://pixabay.com/music/happy-childrens-tunes-sunny-ukulele-590555/"
+      },
+      {
+        "file": "kids-2.m4a",
+        "title": "Playful Summer Ukulele 01",
+        "artist": "vjgalaxy",
+        "page": "https://pixabay.com/music/happy-childrens-tunes-playful-summer-ukulele-01-618375/"
+      },
+      {
+        "file": "kids-3.m4a",
+        "title": "Happy Ukulele",
+        "artist": "ElectroAnimals",
+        "page": "https://pixabay.com/music/happy-childrens-tunes-happy-ukulele-600364/"
+      },
+      {
+        "file": "kids-4.m4a",
+        "title": "Kids Ukulele Music",
+        "artist": "331music",
+        "page": "https://pixabay.com/music/happy-childrens-tunes-kids-ukulele-music-600484/"
+      },
+      {
+        "file": "kids-5.m4a",
+        "title": "Ukulele Happy",
+        "artist": "331music",
+        "page": "https://pixabay.com/music/happy-childrens-tunes-ukulele-happy-595411/"
+      }
+    ]
+  }
+}

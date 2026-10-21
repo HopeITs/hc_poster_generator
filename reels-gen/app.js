@@ -92,7 +92,7 @@
   };
 
   var S = { items: [], recipe: "question", project: "disc", logo: null, logoNavy: null,
-            music: null, musicBlob: null, musicLabel: "", beats: null,
+            music: null, musicBlob: null, musicLabel: "", musicTrack: null, beats: null,
             lines: [], voice: null, endLen: null, regs: [], plan: [],
             t: 0, playing: false, clock: 0, seq: 0, exporting: false };
 
@@ -620,6 +620,7 @@
      their own sound, as in the export. */
   function play() {
     if (!ready().length) return;
+    stopPreview();
     if (S.t >= total() - 0.05) S.t = 0;
     S.playing = true; $("rgPlay").textContent = "❚❚"; $("rgPlay").classList.add("playing"); S.clock = performance.now() - S.t * 1000; S.regs = duckRegions(); S.plan = voicePlan();
     ready().forEach(function (it) { if (it.kind === "video") it.el.muted = !(it.sound && rateOf(it) === 1); });   // sped-up or slowed clips play silent
@@ -739,7 +740,8 @@
 
   /* ---------- music ---------- */
   function setMusic(blob, label) {
-    S.musicBlob = blob; S.music = null; S.musicLabel = label; S.beats = null;
+    S.musicBlob = blob; S.music = null; S.musicLabel = label; S.beats = null; S.musicTrack = null;
+    renderTracks();   // any other music clears the ✓ on the bundled list
     var mp = $("rgMusicPlayer");
     if (!blob) { mp.hidden = true; mp.removeAttribute("src"); $("rgMusicSt").textContent = "بدون موسيقى"; return Promise.resolve(); }
     mp.src = URL.createObjectURL(blob); mp.hidden = false;
@@ -758,6 +760,49 @@
     $("rgMusicSt").textContent = "✓ " + S.musicLabel + " · " + S.music.duration.toFixed(1) + " ث · " + Math.round(S.bpm) + " BPM" +
       (short ? " — أقصر من الريل (" + total().toFixed(1) + " ث)، أعد التوليد" : $("rgBeatSync").checked ? " · القطع على الإيقاع" : "");
     $("rgMusicSt").style.color = short ? "var(--accent)" : "";
+  }
+  /* ---------- bundled music ----------
+     Five tracks per style in music/ (see music/index.json), for when there is
+     no ElevenLabs credit or no time to generate. ▶ previews a track; clicking
+     the row uses it. A bundled choice follows the style: changing the style
+     loads the new style's first track (generated or uploaded music stays). */
+  var TRACKS = null, trackAudio = new Audio(), trackPlaying = null;
+  trackAudio.onended = function () { trackPlaying = null; renderTracks(); };
+  function loadTracks() {
+    return fetch("music/index.json").then(function (r) { return r.json(); })
+      .then(function (j) { TRACKS = j.styles; renderTracks(); })
+      .catch(function () { $("rgTracks").innerHTML = '<div class="hint">تعذّر تحميل الموسيقى الجاهزة</div>'; });
+  }
+  function renderTracks() {
+    var box = $("rgTracks"); if (!TRACKS) return; box.innerHTML = "";
+    (TRACKS[S.recipe] || []).forEach(function (t) {
+      var key = S.recipe + "/" + t.file, row = document.createElement("div");
+      row.className = "trk" + (S.musicTrack === key ? " on" : "");
+      row.title = t.title + " — " + t.artist;
+      row.innerHTML = '<button type="button" title="استماع">' + (trackPlaying === key ? "❚❚" : "▶") + '</button>' +
+        '<div class="nm">' + esc(t.title) + ' · <span class="ar">' + esc(t.artist) + '</span></div>' + (S.musicTrack === key ? '<span class="ok">✓</span>' : "");
+      row.querySelector("button").onclick = function (e) { e.stopPropagation(); previewTrack(key); };
+      row.onclick = function () { if (S.musicTrack !== key) useTrack(S.recipe, t); };
+      box.appendChild(row);
+    });
+  }
+  function previewTrack(key) {
+    if (trackPlaying === key) { trackAudio.pause(); trackPlaying = null; renderTracks(); return; }
+    if (S.playing) stop();
+    trackAudio.src = "music/" + key.split("/")[1]; trackAudio.play().catch(function () {});
+    trackPlaying = key; renderTracks();
+  }
+  function stopPreview() { if (trackPlaying) { trackAudio.pause(); trackPlaying = null; renderTracks(); } }
+  function useTrack(style, t) {
+    var key = style + "/" + t.file;
+    $("rgMusicSt").textContent = "…جارٍ تحميل «" + t.title + "»";
+    return fetch("music/" + t.file).then(function (r) { return r.blob(); })
+      .then(function (b) { return setMusic(b, t.title); })
+      .then(function () { if (S.musicBlob) { S.musicTrack = key; renderTracks(); } });
+  }
+  function findTrack(key) {
+    var p = String(key || "").split("/"), list = TRACKS && TRACKS[p[0]];
+    return list ? list.filter(function (t) { return t.file === p[1]; })[0] : null;
   }
   function genMusic() {
     var secs = REEL_LEN + 1, btn = $("rgGenMusic");   // the reel is always REEL_LEN; +1 s so the music never runs out early
@@ -1261,7 +1306,7 @@
   /* ---------- projects (settings only; media is re-linked by file name) ---------- */
   function saveProject() {
     var d = { app: "reels-gen", v: 3, recipe: S.recipe, project: S.project,
-              beatSync: $("rgBeatSync").checked, endLen: S.endLen, script: $("rgScript").value, lines: S.lines,
+              beatSync: $("rgBeatSync").checked, endLen: S.endLen, musicTrack: S.musicTrack, script: $("rgScript").value, lines: S.lines,
               voice: S.voice ? { data: S.voice.data, times: S.voice.times, dur: S.voice.dur } : null,   // the paid-for voiceover travels with the project
               items: S.items.map(function (it) {
                 return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
@@ -1285,6 +1330,7 @@
     $("rgScript").value = d.script || ""; S.lines = Array.isArray(d.lines) ? d.lines.map(function (l) { return { voice: String(l.voice || ""), card: String(l.card || "") }; }) : [];
     renderLines(); S.voice = null; $("rgVoicePlayer").hidden = true; $("rgArrange").hidden = true; voiceSt("");
     if (d.voice && d.voice.data) setVoice(d.voice.data, d.voice.times || [], d.voice.dur).then(function () { voiceSt("✓ تعليق صوتي · " + S.voice.dur.toFixed(1) + " ث"); }, function () { voiceSt("تعذّرت قراءة التعليق المحفوظ", true); });
+    var mt = findTrack(d.musicTrack); if (mt) useTrack(d.musicTrack.split("/")[0], mt);   // a bundled track comes back by itself
     S.t = 0; renderClips(); drawAt(0);
     status("✓ تم فتح المشروع — أضف الملفات (" + S.items.length + ") من «المواد» وستُربط بأسمائها");
   }
@@ -1293,6 +1339,7 @@
   function setStyle(key) {
     S.recipe = RECIPES[key] ? key : "question"; $("rgRecipe").value = S.recipe;
     $("rgStyleHint").textContent = recipe().hint; $("rgMood").value = recipe().mood;
+    stopPreview(); renderTracks();
   }
   /* Load both logos of the chosen project; a late load from an earlier pick is dropped. */
   function setProject(key) {
@@ -1316,9 +1363,11 @@
     drop.addEventListener("drop", function (e) { addFiles(e.dataTransfer.files); });
     $("rgRecipe").innerHTML = Object.keys(RECIPES).map(function (k, i) { return '<option value="' + k + '">' + (i + 1) + ". " + RECIPES[k].name + "</option>"; }).join("");
     function applyStyle(key) {   // re-lay the reel for the style's pace and speeds (text cards keep their length)
+      var bundled = !!S.musicTrack;
       setStyle(key); S.endLen = null;
       S.items.forEach(function (it) { if (it.kind !== "card") { it.len = recipe().len; clampItem(it); } });
       relayout();
+      if (bundled && TRACKS && TRACKS[S.recipe]) useTrack(S.recipe, TRACKS[S.recipe][0]);   // keep the music in step with the style
     }
     $("rgRecipe").addEventListener("change", function () { applyStyle(this.value); });
     $("rgDraft").onclick = draft;
@@ -1352,6 +1401,7 @@
     });
     window.addEventListener("beforeunload", function (e) { if (S.exporting) { e.preventDefault(); e.returnValue = ""; } });
     setProject($("rgProject").value); setStyle(project().style);
+    loadTracks();
     renderClips(); drawAt(0);
   }
 

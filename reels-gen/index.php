@@ -115,6 +115,14 @@
   .line button:hover{color:var(--accent);}
   .line-tools{margin-top:6px;justify-content:space-between;}
   .clip.off{opacity:.5;}
+  .tracks{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+  .trk{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:6px 8px;cursor:pointer;background:#fff;transition:.15s;}
+  .trk:hover{border-color:var(--accent);}
+  .trk.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);}
+  .trk button{width:26px;height:26px;border-radius:50%;border:none;background:var(--navy);color:#fff;font-size:10px;line-height:26px;padding:0;cursor:pointer;flex:0 0 auto;}
+  .trk .nm{flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr;text-align:left;}
+  .trk .ar{font-weight:500;color:var(--muted);}
+  .trk .ok{flex:0 0 auto;font-size:12px;color:var(--accent);font-weight:900;}
   .clip[draggable="true"]{cursor:grab;}
   .clip.dragging{opacity:.35;}
   .clip.drop-before{box-shadow:inset -4px 0 0 var(--accent);}
@@ -179,7 +187,9 @@
             <div class="music-st" id="rgVoiceSt"></div>
           </div>
           <div class="field">
-            <div class="sec">الموسيقى</div>
+            <div class="sec">الموسيقى <span class="hint">جاهزة للأسلوب — اضغط ▶ للاستماع، واضغط على المقطوعة لاستعمالها</span></div>
+            <div class="tracks" id="rgTracks"><div class="hint">…جارٍ تحميل الموسيقى</div></div>
+            <div class="hint" style="margin:2px 0 6px">أو ولّد موسيقى جديدة:</div>
             <div class="row">
               <select id="rgMood">
                 <option value="hopeful">ملهمة ومتفائلة</option>
