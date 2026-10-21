@@ -1,6 +1,7 @@
 <?php
 /**
- * Reels Gen (Beta) — vertical reels from photos and video clips, edited and
+ * Reels Gen (Beta) — vertical reels from photos and video clips (or a summary
+ * reel of one long video), edited and
  * encoded entirely in the browser (WebCodecs + mp4-muxer). Media is never
  * uploaded: only the script text, the voiceover lines and the music request go
  * to the auth Worker (the Gemini and ElevenLabs keys stay there).
@@ -150,6 +151,13 @@
       <div class="layout">
         <div class="card side">
           <div class="field">
+            <div class="sec">نوع العمل</div>
+            <select id="rgMode">
+              <option value="create">إنشاء ريل</option>
+              <option value="sum">تلخيص فيديو لريل</option>
+            </select>
+          </div>
+          <div class="field">
             <div class="sec">اسم المشروع</div>
             <select id="rgProject">
               <option value="sz">Study Zone</option>
@@ -163,7 +171,25 @@
             <select id="rgRecipe"></select>
             <div class="hint" id="rgStyleHint" style="margin-top:6px"></div>
           </div>
-          <div class="field">
+          <div class="field" id="rgSumField" hidden>
+            <div class="sec">الفيديو الطويل <span class="hint">فيديو واحد يتلخّص بريل بموسيقى</span></div>
+            <label class="drop" id="rgLongDrop">
+              <div class="t" id="rgLongName">اسحب الفيديو هنا أو اضغط للاختيار</div>
+              <div class="h" id="rgLongInfo">MP4 · MOV · WEBM — المعالجة على جهازك، لا شيء يُرفع</div>
+              <input type="file" id="rgLongFile" accept="video/*">
+            </label>
+            <div class="row" style="margin-top:8px">
+              <select id="rgSumLen">
+                <option value="30">ريل 30 ثانية</option>
+                <option value="45">ريل 45 ثانية</option>
+                <option value="60">ريل 60 ثانية</option>
+              </select>
+              <button type="button" class="btn-line" id="rgAnalyse" disabled>تحليل وتلخيص</button>
+            </div>
+            <div class="bar" id="rgSumBar" hidden><i id="rgSumFill"></i></div>
+            <div class="music-st" id="rgSumSt"></div>
+          </div>
+          <div class="field" id="rgFilesField">
             <div class="sec">المواد <span class="hint">صور ومقاطع فيديو</span></div>
             <label class="drop" id="rgDrop">
               <div class="t">اسحب الصور والمقاطع هنا أو اضغط للاختيار</div>

@@ -8,6 +8,8 @@
    Gemini), read by Mazen Lawand (/reels/voice, ElevenLabs); the lines are laid
    over the shots for a one-minute reel (the voice pauses on each text card) and
    the cuts land on the music's beat.
+   The other kind of work, "تلخيص فيديو لريل", turns one long video into a
+   music-only summary reel: its strongest moments, cropped to follow the action.
    Media never leaves the device; only text and the music request go to the
    auth Worker. */
 (function () {
@@ -19,7 +21,7 @@
   var W = 1080, H = 1920, FPS = 25, VIDEO_BPS = 14000000;
   var NAVY = "#0a3c55", TINT = "rgba(10,60,85,.45)";
   var CARD_BG = "#ebeaf0", CARD_INK = "#105063", CARD_LEN = 3;   // measured from an approved DISC reel
-  var SR = 44100, REEL_LEN = 60;   // every reel is one minute
+  var SR = 44100, REEL_LEN = 60;   // a reel made from shots is one minute; a summary takes the length picked for it (reelLen)
   var VO_OFFSET = 0.4;             // a voiceover that opens without a card starts this far in
   var VO_GAP = 0.35;               // after a card the voice resumes this long past the cut, once the dissolve is over
   var CARD_MAX = 3.5;   // longest a silent card stays on screen (s)
@@ -91,7 +93,7 @@
     corporate:   "Light modern corporate instrumental: clean plucked guitar, soft piano, light percussion and claps, positive and clear, steady 105 BPM, clear ending."
   };
 
-  var S = { items: [], recipe: "question", project: "disc", logo: null, logoNavy: null,
+  var S = { items: [], recipe: "question", project: "disc", logo: null, logoNavy: null, mode: "create", sum: null, sumData: null,
             music: null, musicBlob: null, musicLabel: "", musicTrack: null, beats: null,
             lines: [], voice: null, endLen: null, regs: [], plan: [],
             t: 0, playing: false, clock: 0, seq: 0, exporting: false };
@@ -115,6 +117,7 @@
 
   /* ---------- timeline ---------- */
   function recipe() { return RECIPES[S.recipe] || RECIPES.question; }
+  function reelLen() { return S.mode === "sum" ? (+$("rgSumLen").value || 30) : REEL_LEN; }
   function ready() { return S.items.filter(function (it) { return !it.missing && !it.off && !it.skip; }); }
   /* Everything on the timeline in order: shots, text cards, then the end card. */
   function segs() { var l = ready(); return l.length ? l.concat([{ kind: "end", len: S.endLen || recipe().end }]) : []; }
@@ -177,11 +180,17 @@
   }
 
   /* ---------- drawing (shared by preview, thumbnails and export) ---------- */
-  /* Cover the frame with the shot, scaled by zoom (≥ 1) and turned by sway degrees. */
+  /* Cover the frame with the shot, scaled by zoom (≥ 1) and turned by sway degrees.
+     A shot cut from a long video slides sideways to keep its focus (see
+     focusAt) in the middle, as far as the picture reaches. */
   function drawMedia(g, w, h, it, zoom, sway) {
     var el = it.el, sw = it.w, sh = it.h, rot = it.rot % 180 !== 0;
-    var rw = rot ? sh : sw, rh = rot ? sw : sh, s = Math.max(w / rw, h / rh) * zoom;
-    g.save(); g.translate(w / 2, h / 2); g.rotate(((it.rot || 0) + (sway || 0)) * Math.PI / 180);
+    var rw = rot ? sh : sw, rh = rot ? sw : sh, s = Math.max(w / rw, h / rh) * zoom, dx = 0;
+    if (it.sum && !it.rot && S.sum && S.sum.name === it.name) {
+      var lim = Math.max(0, (sw * s - w) / 2);
+      dx = Math.max(-lim, Math.min(lim, (0.5 - focusAt(el.currentTime)) * sw * s));
+    }
+    g.save(); g.translate(w / 2 + dx, h / 2); g.rotate(((it.rot || 0) + (sway || 0)) * Math.PI / 180);
     g.drawImage(el, -sw * s / 2, -sh * s / 2, sw * s, sh * s); g.restore();
   }
   /* A shot as the style shows it: graded, pushed in, pulsing on the beat, with
@@ -498,10 +507,14 @@
   function clampItem(it) {
     it.len = Math.max(1, Math.min(15, +it.len || (it.kind === "card" ? CARD_LEN : recipe().len)));
     if (it.kind === "video") {
-      it.len = Math.min(it.len, Math.max(1, Math.floor((it.srcDur - 0.1) / rateOf(it) * 10) / 10));
-      it.start = Math.max(0, Math.min(+it.start || 0, it.srcDur - span(it, it.len) - 0.05));
+      it.len = Math.min(it.len, Math.max(1, Math.floor((srcRoom(it) - 0.1) / rateOf(it) * 10) / 10));
+      if (it.center != null) it.start = it.center - span(it, it.len) / 2;   // a summary moment stays centred on its best second
+      var lo = it.hi != null ? it.lo : 0, hi = it.hi != null ? it.hi : it.srcDur;
+      it.start = Math.max(lo, Math.min(+it.start || 0, hi - span(it, it.len) - 0.05));
     }
   }
+  /* Source seconds a clip may use: a summary moment stays inside its scene (lo…hi). */
+  function srcRoom(it) { return it.hi != null ? it.hi - it.lo : it.srcDur; }
 
   /* ---------- clip cards ---------- */
   function countText() {
@@ -527,11 +540,11 @@
         var ta = c.querySelector("textarea");
         ta.addEventListener("input", function () { it.text = ta.value; thumb(it, c); drawAt(S.t); });
       } else {
-        c.innerHTML = '<div class="thumb"><canvas width="180" height="320"></canvas><span class="num">' + (i + 1) + '</span><span class="kind">' + (it.kind === "video" ? "VIDEO " + it.srcDur.toFixed(1) + "s" + (it.ramp ? " · RAMP" : it.speed && it.speed !== 1 ? " · ×" + it.speed : "") : "PHOTO") + '</span></div>' +
+        c.innerHTML = '<div class="thumb"><canvas width="180" height="320"></canvas><span class="num">' + (i + 1) + '</span><span class="kind">' + (it.kind === "video" ? (it.sum ? "VIDEO @ " + fmt(it.start) : "VIDEO " + it.srcDur.toFixed(1) + "s") + (it.ramp ? " · RAMP" : it.speed && it.speed !== 1 ? " · ×" + it.speed : "") : "PHOTO") + '</span></div>' +
           '<div class="row">' + lenField +
           (it.kind === "video" ? '<div style="flex:1"><label class="l">البداية (ث)</label><input type="number" data-f="start" min="0" step="0.5" value="' + it.start.toFixed(1) + '"></div>' : "") + '</div>' +
           '<div class="row"><label class="chk"><input type="checkbox" data-f="tint"' + (it.tint ? " checked" : "") + '> طبقة كحلية</label>' +
-          (it.kind === "video" ? '<label class="chk"><input type="checkbox" data-f="sound"' + (it.sound ? " checked" : "") + '> الصوت الأصلي</label>' : "") + '</div>' +
+          (it.kind === "video" && !it.sum ? '<label class="chk"><input type="checkbox" data-f="sound"' + (it.sound ? " checked" : "") + '> الصوت الأصلي</label>' : "") + '</div>' +
           (it.skip ? '<div class="hint" style="color:var(--accent)">مستبعدة' + (it.why ? " — " + esc(it.why) : "") + '</div>'
                    : it.off ? '<div class="hint" style="color:var(--accent)">خارج الريل — الوقت ما بيكفي</div>' : "") +
           '<div class="tools"><button type="button" data-a="card" title="كرت نص قبل هذه اللقطة">+ نص</button><button type="button" data-a="rot" title="تدوير 90°">↻</button>' +
@@ -541,6 +554,7 @@
         [].forEach.call(c.querySelectorAll("input[data-f]"), function (inp) {
           inp.addEventListener("change", function () {
             if (inp.dataset.f === "tint") it.tint = inp.checked; else if (inp.dataset.f !== "sound") it[inp.dataset.f] = +inp.value;
+            if (inp.dataset.f === "start" && it.center != null) { it.center = it.start + span(it, it.len) / 2; it.lo = it.hi = undefined; }   // moved by hand: free of its scene
             if (inp.dataset.f === "sound") { setSound(it, inp); return; }
             clampItem(it); if (inp.dataset.f !== "tint") inp.value = inp.dataset.f === "start" ? it.start.toFixed(1) : +it.len.toFixed(2);
             thumb(it, c); $("rgCount").textContent = countText(); drawAt(S.t);
@@ -805,7 +819,7 @@
     return list ? list.filter(function (t) { return t.file === p[1]; })[0] : null;
   }
   function genMusic() {
-    var secs = REEL_LEN + 1, btn = $("rgGenMusic");   // the reel is always REEL_LEN; +1 s so the music never runs out early
+    var secs = reelLen() + 1, btn = $("rgGenMusic");   // +1 s so the music never runs out early
     btn.disabled = true; $("rgMusicSt").textContent = "…جارٍ توليد موسيقى " + secs + " ثانية";
     fetch(WORKER + "/reels/music", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token() },
       body: JSON.stringify({ prompt: MOODS[$("rgMood").value], seconds: secs }) })
@@ -857,7 +871,7 @@
      its middle lands on the beat). Cards stay within 0.3 s of their voiceover
      line; a cut stays where it is if moving it would make a segment shorter
      than 1 s or ask a clip for more footage than it has. With a voiceover the
-     end card takes up the difference so the reel stays REEL_LEN long. */
+     end card takes up the difference so the reel keeps its length. */
   function snapToBeats() {
     var list = ready(); if (!S.beats || !S.beats.length || list.length < 2) return false;
     var lens = list.map(function (it) { return it.len; }), endLen = S.endLen;
@@ -877,17 +891,17 @@
       var nextIt = list[i + 1], card = it.kind === "card" || (nextIt && nextIt.kind === "card");
       var nb = card ? (cardTol ? nearestBeat(acc, cardTol, grid) : null) : nearestBeat(acc, Math.min(0.6 * st.every, period * st.every * 0.55), grid);
       if (nb === null || nb - prev < minLen) nb = acc;
-      if (it.kind === "video" && (nb - prev) * rateOf(it) > it.srcDur - 0.15) nb = acc;
+      if (it.kind === "video" && (nb - prev) * rateOf(it) > srcRoom(it) - 0.15) nb = acc;
       cuts.push(nb); prev = nb;
     });
     prev = 0;
     list.forEach(function (it, i) { it.len = cuts[i] - prev; prev = cuts[i]; if (it.kind === "video") clampItem(it); });
     // a clip that ran out of footage was trimmed above: the end card takes up the difference
-    if (S.endLen) S.endLen = Math.max(2, REEL_LEN - list.reduce(function (s, it) { return s + it.len; }, 0));
+    if (S.endLen) S.endLen = Math.max(2, reelLen() - list.reduce(function (s, it) { return s + it.len; }, 0));
   }
 
   /* ---------- script → voiceover lines and cards ---------- */
-  function voiceBudget() { return REEL_LEN - recipe().end - 3 * (2.8 + VO_GAP) - 1.5; }   // room left for speech beside ~3 silent cards
+  function voiceBudget() { return reelLen() - recipe().end - 3 * (2.8 + VO_GAP) - 1.5; }   // room left for speech beside ~3 silent cards
   function voiceSt(t, err) { var e = $("rgVoiceSt"); e.textContent = t || ""; e.style.color = err ? "var(--accent)" : ""; }
   function lineStat() {
     var words = S.lines.reduce(function (s, l) { return s + (l.voice.trim() ? l.voice.trim().split(/\s+/).length : 0); }, 0);
@@ -1003,7 +1017,7 @@
     if (S.items.some(function (it) { return it.missing; })) { voiceSt("أضف الملفات الناقصة أولاً", true); return; }
     if (S.voice.times.length !== S.lines.length) { voiceSt("عدد الجمل تغيّر — أعد توليد الصوت أولاً", true); return; }
     var shots = S.items.filter(function (it) { return it.kind !== "card" && !it.skip; }), skipped = S.items.filter(function (it) { return it.skip; });
-    var C = REEL_LEN - recipe().end, blocks = voiceBlocks(), wins = [], gaps = [], t = 0;
+    var C = reelLen() - recipe().end, blocks = voiceBlocks(), wins = [], gaps = [], t = 0;
     function lead(b) { return b.card ? VO_GAP : b.a === 0 ? VO_OFFSET : 0.3; }
     var need = blocks.reduce(function (s, b) { return s + (b.card ? cardLen(b.card) : 0) + lead(b) + b.dur; }, 0), slack = C - need;
     if (slack < 0) { voiceSt("التعليق مع الكروت " + need.toFixed(1) + " ث — أطول من الريل بـ " + (-slack).toFixed(1) + " ث. اختصر الجمل أو الكروت وأعد توليد الصوت.", true); return; }
@@ -1036,7 +1050,7 @@
     var off = pool;
     off.forEach(function (it) { it.off = true; }); use.forEach(function (it) { it.off = false; });
     S.items = [].concat.apply([], pieces.map(function (p) { return p.items; })).concat(off, skipped);
-    S.endLen = REEL_LEN - S.items.filter(function (it) { return !it.off; }).reduce(function (s, it) { return s + it.len; }, 0);
+    S.endLen = reelLen() - S.items.filter(function (it) { return !it.off; }).reduce(function (s, it) { return s + it.len; }, 0);
     var synced = $("rgBeatSync").checked && snapToBeats();
     stop(); S.t = 0; renderClips(); drawAt(0);
     voiceSt("✓ تم توزيع " + S.lines.length + " جمل على " + use.length + " لقطة و" + wins.length + " كروت" + (synced ? " · القطع على الإيقاع" : "") +
@@ -1047,7 +1061,7 @@
      Returns the time no shot could cover. */
   function fill(len, shots) {
     var free = shots.slice(), rest = len;
-    function cap(it) { return it.kind === "video" ? Math.max(1, (it.srcDur - 0.15) / rateOf(it)) : Infinity; }
+    function cap(it) { return it.kind === "video" ? Math.max(1, (srcRoom(it) - 0.15) / rateOf(it)) : Infinity; }
     while (free.length) {
       var share = rest / free.length, capped = free.filter(function (it) { return cap(it) < share; });
       if (!capped.length) { free.forEach(function (it) { it.len = share; clampItem(it); }); return 0; }
@@ -1057,7 +1071,7 @@
     return Math.max(0, rest);
   }
 
-  /* Without a voiceover the reel is still REEL_LEN long: text cards keep their
+  /* Without a voiceover the reel still keeps its length: text cards keep their
      length and the shots share the rest in their order, about the style's shot
      length each (shots that do not fit wait at the end, marked "خارج الريل"). */
   function fitReel() {
@@ -1065,14 +1079,14 @@
     var cards = S.items.filter(function (it) { return !it.missing && it.kind === "card"; });
     var skipped = S.items.filter(function (it) { return it.skip; });
     if (!shots.length) { S.endLen = null; return 0; }
-    var room = Math.max(1.5, REEL_LEN - recipe().end - cards.reduce(function (s, c) { return s + c.len; }, 0));
+    var room = Math.max(1.5, reelLen() - recipe().end - cards.reduce(function (s, c) { return s + c.len; }, 0));
     assignSpeeds(shots);
-    var n = Math.max(1, Math.min(shots.length, Math.round(room / recipe().len))), use = shots.slice(0, n), pool = shots.slice(n);
+    var n = S.mode === "sum" ? shots.length : Math.max(1, Math.min(shots.length, Math.round(room / recipe().len))), use = shots.slice(0, n), pool = shots.slice(n);   // a summary already chose its count
     var sh = fill(room, use);
     while (sh > 0.05 && pool.length) { use.push(pool.shift()); sh = fill(room, use); }
     use.forEach(function (it) { it.off = false; }); pool.forEach(function (it) { it.off = true; });
     S.items = S.items.filter(function (it) { return !it.off && !it.skip; }).concat(pool, skipped);
-    S.endLen = REEL_LEN - ready().reduce(function (s, it) { return s + it.len; }, 0);
+    S.endLen = reelLen() - ready().reduce(function (s, it) { return s + it.len; }, 0);
     return sh;
   }
   function voiceReady() { return !!(S.voice && !S.voice.stale && S.voice.times.length === S.lines.length); }
@@ -1162,7 +1176,7 @@
     });
     var cardTime = voiceReady() ? voiceBlocks().reduce(function (s, b) { return s + (b.card ? cardLen(b.card) : 0); }, 0)
                                 : S.items.filter(function (it) { return it.kind === "card"; }).reduce(function (s, c) { return s + c.len; }, 0);
-    var N = Math.max(1, Math.round((REEL_LEN - recipe().end - cardTime) / recipe().len));
+    var N = Math.max(1, Math.round((reelLen() - recipe().end - cardTime) / recipe().len));
     var good = shots.filter(function (it) { return !it.why; }).sort(function (a, b) { return b.q.score - a.q.score; });
     good.slice(N).forEach(function (it) { it.why = "أضعف من غيرها"; });
     shots.forEach(function (it) { it.skip = !!it.why; });
@@ -1172,6 +1186,220 @@
     var parts = [["ضبابية", count("ضبابية أو مهزوزة")], ["متشابهة", count("بتشبه لقطة أوضح منها")], ["إضاءة", count("معتمة") + count("فاتحة كتير")], ["أضعف", count("أضعف من غيرها")]]
       .filter(function (p) { return p[1]; }).map(function (p) { return p[1] + " " + p[0]; });
     status("✓ اخترت " + kept + " من " + shots.length + " لقطة" + (parts.length ? " · استبعدت: " + parts.join("، ") : "") + " — ↺ بيرجّع أي لقطة");
+  }
+
+  /* ---------- summary: one reel from a long video ----------
+     Everything is read on the device. The video is sampled every dt seconds
+     (at most SUM_MAX samples) on a tiny copy: exposure, sharpness, colour, the
+     change since the last sample (motion, and where in the frame it happens),
+     brightness and hue histograms (a jump in either marks a scene cut) and a
+     look-alike hash; the soundtrack, when it can be decoded, adds loud
+     noise-like stretches (applause, cheering) as a hint of what mattered.
+     Scenes are scored, the best window of each is a candidate, and the
+     strongest candidates that are neither near each other nor look-alikes
+     become the reel's shots: the very best opens the reel, the rest follow in
+     the video's order. The music is the only sound. Each shot keeps its moment
+     (center) and its scene (lo…hi) whatever length the timeline gives it, and
+     drawMedia slides the frame along the focus track
+     (motion, else detail) so a wide picture keeps its action in the 9:16 crop. */
+  var SUM_W = 96, SUM_MAX = 1200, SUM_SEGS = 40, SUM_AUDIO_MAX = 400 * 1048576;
+  function sumSt(t, err) { var e = $("rgSumSt"); e.textContent = t || ""; e.style.color = err ? "var(--accent)" : ""; }
+  function sumBar(p) { $("rgSumBar").hidden = p == null; $("rgSumFill").style.width = Math.round((p || 0) * 100) + "%"; }
+  function median(a) { var s = a.filter(function (x) { return isFinite(x); }).sort(function (x, y) { return x - y; }); return s.length ? s[Math.floor(s.length / 2)] : 0; }
+  /* The shot's focus (0 left … 1 right) at source time t, between samples. */
+  function focusAt(t) {
+    var f = S.sum.fx, i = Math.max(0, Math.min(f.length - 1, t / S.sum.dt)), a = Math.floor(i), b = Math.min(f.length - 1, a + 1);
+    return f[a] + (f[b] - f[a]) * (i - a);
+  }
+  /* Another element on the same file for each shot (a dissolve shows two moments at once). */
+  function sumEl(i) {
+    var D = S.sumData; if (D.els[i]) return Promise.resolve(D.els[i]);
+    return new Promise(function (res, rej) {
+      var v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto";
+      v.onloadeddata = function () { D.els[i] = v; res(v); }; v.onerror = function () { rej(new Error(D.m.file.name)); }; v.src = D.m.url;
+    });
+  }
+  function setLong(file) {
+    if (!file) return;
+    stop(); $("rgAnalyse").disabled = true; sumSt("…جارٍ فتح الفيديو");
+    loadMedia(file).then(function (m) {
+      if (m.kind !== "video") throw new Error(file.name);
+      $("rgLongName").textContent = file.name; $("rgLongInfo").textContent = "المدة " + fmt(m.srcDur) + " · ⁦" + m.w + "×" + m.h + "⁩";   // isolated so RTL does not flip it to h×w
+      var miss = S.items.filter(function (it) { return it.missing && it.sum && it.name === file.name; });
+      S.sumData = { m: m, els: [m.el], samples: null };
+      $("rgAnalyse").disabled = false;
+      if (miss.length) {   // re-link a reopened project: every moment gets its own element on the file
+        return Promise.all(miss.map(function (it, i) {
+          return sumEl(i).then(function (el) { Object.assign(it, { el: el, url: m.url, file: file, w: m.w, h: m.h, srcDur: m.srcDur, fps: m.fps, missing: false }); clampItem(it); });
+        })).then(function () { sumSt("✓ رجعت " + miss.length + " لحظة من الفيديو — «تحليل وتلخيص» بيعيد الاختيار"); relayout(); });
+      }
+      S.items = S.items.filter(function (it) { return it.kind === "card"; }); S.sum = null; relayout();
+      sumSt(m.srcDur < reelLen() * 1.5 ? "الفيديو قصير على التلخيص — الأفضل «إنشاء ريل»، أو اضغط «تحليل وتلخيص» على كل حال" : "اختار الطول والأسلوب واضغط «تحليل وتلخيص»", m.srcDur < reelLen() * 1.5);
+    }).catch(function () { sumSt("تعذّر فتح الفيديو — صيغة غير مدعومة بالمتصفح", true); });
+  }
+  function analyseLong() {
+    var D = S.sumData; if (!D) return;
+    var btn = $("rgAnalyse"); btn.disabled = true; stop();
+    var job = D.samples ? Promise.resolve() : thumbQueue.catch(function () {}).then(function () {   // shares the queue: a re-linked moment may use the same element
+      return sampleAudio(D).then(function () { return sampleFrames(D); });
+    });
+    thumbQueue = job.catch(function () {});
+    job.then(function () { sumBar(null); return buildSummary(); })
+      .catch(function (e) { sumBar(null); sumSt("تعذّر تحليل الفيديو: " + (e && e.message || e), true); })
+      .then(function () { btn.disabled = false; });
+  }
+  /* Loudness and zero-crossing rate per sample, read at 8 kHz; null when the
+     file is too big to decode at once or has no readable sound. */
+  function sampleAudio(D) {
+    var m = D.m; D.dt = Math.max(0.5, m.srcDur / SUM_MAX); D.n = Math.floor((m.srcDur - 0.1) / D.dt) + 1; D.aud = null;
+    if (m.file.size > SUM_AUDIO_MAX) return Promise.resolve();
+    sumSt("…جارٍ قراءة صوت الفيديو"); sumBar(0);
+    return m.file.arrayBuffer().then(function (ab) { return new OfflineAudioContext(1, 1, 8000).decodeAudioData(ab); }).then(function (buf) {
+      var x = buf.getChannelData(0), sr = buf.sampleRate, db = new Float32Array(D.n), zc = new Float32Array(D.n);
+      for (var i = 0; i < D.n; i++) {
+        var a = Math.floor(i * D.dt * sr), b = Math.min(x.length, Math.floor((i + 1) * D.dt * sr)), e = 0, z = 0;
+        for (var k = a + 1; k < b; k++) { e += x[k] * x[k]; if ((x[k] >= 0) !== (x[k - 1] >= 0)) z++; }
+        db[i] = 20 * Math.log10(Math.sqrt(e / Math.max(1, b - a)) + 1e-5); zc[i] = z / Math.max(1, b - a);
+      }
+      D.aud = { db: db, zc: zc };
+    }).catch(function () { D.aud = null; });
+  }
+  function sampleFrames(D) {
+    var m = D.m, el = m.el, w = SUM_W, h = Math.max(8, Math.round(SUM_W * m.h / m.w)), N = w * h, out = [], prev = null, prevHist = null;
+    var x = new OffscreenCanvas(w, h).getContext("2d", { willReadFrequently: true }), hx = new OffscreenCanvas(9, 8).getContext("2d", { willReadFrequently: true });
+    var t0 = performance.now();
+    function one(i) {
+      if (i >= D.n) { D.samples = out; return Promise.resolve(); }
+      return seekTo(el, Math.min(m.srcDur - 0.05, i * D.dt)).then(function () {
+        x.drawImage(el, 0, 0, w, h);
+        var d = x.getImageData(0, 0, w, h).data, gy = new Float32Array(N), hist = new Float32Array(28), sum = 0, col = 0, k;   // 16 luma bins, then 12 hue bins
+        for (k = 0; k < N; k++) {
+          var r = d[k * 4], gg = d[k * 4 + 1], b = d[k * 4 + 2], y = 0.299 * r + 0.587 * gg + 0.114 * b;
+          gy[k] = y; sum += y; hist[Math.min(15, y >> 4)]++; col += Math.abs(r - gg) + Math.abs((r + gg) / 2 - b);
+          var hi3 = Math.max(r, gg, b), ch = hi3 - Math.min(r, gg, b);
+          if (ch > 20) hist[16 + Math.min(11, Math.floor(2 * (hi3 === r ? ((gg - b) / ch + 6) % 6 : hi3 === gg ? (b - r) / ch + 2 : (r - gg) / ch + 4)))]++;
+        }
+        var n = 0, mm = 0, m2 = 0, ex = 0, ew = 0;
+        for (var yy = 1; yy < h - 1; yy++) for (var c = 1; c < w - 1; c++) {
+          k = yy * w + c; var lap = 4 * gy[k] - gy[k - 1] - gy[k + 1] - gy[k - w] - gy[k + w];
+          n++; mm += lap; m2 += lap * lap; ex += Math.abs(lap) * c; ew += Math.abs(lap);
+        }
+        var mot = 0, mx = 0, mw = 0, mc = 0, hd = 2;
+        if (prev) {
+          for (k = 0; k < N; k++) { var dd = Math.abs(gy[k] - prev[k]); mot += dd; if (dd > 12) { mx += dd * (k % w); mw += dd; mc++; } }
+          var hl = 0, hh = 0; for (k = 0; k < 16; k++) hl += Math.abs(hist[k] - prevHist[k]) / N;
+          for (k = 16; k < 28; k++) hh += Math.abs(hist[k] - prevHist[k]) / N;
+          hd = Math.max(hl, hh);   // a cut changes the brightness, or only the colours
+        }
+        hx.drawImage(x.canvas, 0, 0, 9, 8);
+        var hp = hx.getImageData(0, 0, 9, 8).data, bits = [];
+        for (var rr = 0; rr < 8; rr++) for (var q = 0; q < 8; q++) { var o = (rr * 9 + q) * 4; bits.push(hp[o] + hp[o + 1] + hp[o + 2] > hp[o + 4] + hp[o + 5] + hp[o + 6] ? 1 : 0); }
+        out.push({ t: i * D.dt, bright: sum / N, sharp: n ? m2 / n - (mm / n) * (mm / n) : 0, col: col / N, mot: prev ? mot / N : 0, hd: hd,
+                   fx: mc > N * 0.02 ? mx / mw / (w - 1) : null, ex: ew ? ex / ew / (w - 1) : 0.5, hash: bits });
+        prev = gy; prevHist = hist;
+        if (i % 10 === 0) {
+          var p = (i + 1) / D.n, left = (performance.now() - t0) / 1000 / p * (1 - p);
+          sumBar(p); sumSt("…جارٍ تحليل الفيديو " + Math.round(p * 100) + "%" + (i > 30 ? " · باقي تقريباً " + fmt(left) : ""));
+        }
+        return one(i + 1);
+      });
+    }
+    return one(0).then(function () { scoreSamples(D); });
+  }
+  /* Scenes, a score per sample, and the focus track. */
+  function scoreSamples(D) {
+    var sm = D.samples, n = sm.length, i, dur = D.m.srcDur, trim = Math.min(10, dur * 0.03);
+    sm.forEach(function (s, j) { s.cut = j === 0 || s.hd > 0.5 || s.mot > 35; });
+    sm.forEach(function (s, j) { if (s.cut) { s.fx = null; s.mot = sm[j + 1] && !sm[j + 1].cut ? sm[j + 1].mot : 0; } });   // a cut is not motion
+    var scenes = []; for (i = 0; i < n; i++) { if (sm[i].cut) scenes.push([i, i + 1]); else scenes[scenes.length - 1][1] = i + 1; }
+    var mMot = Math.max(0.5, median(sm.map(function (s) { return s.mot; }))), mSh = Math.max(1, median(sm.map(function (s) { return s.sharp; }))), mCol = Math.max(1, median(sm.map(function (s) { return s.col; })));
+    var A = D.aud, mDb = A ? median(Array.from(A.db)) : 0;
+    sm.forEach(function (s, j) {
+      var mo = Math.min(s.mot / mMot, 3) / 3, sh = Math.min(s.sharp / mSh, 2) / 2, co = Math.min(s.col / mCol, 2) / 2, au = 0;
+      if (A && j < A.db.length) au = Math.max(0, Math.min(1, (A.db[j] - mDb - 3) / 9)) * (A.zc[j] > 0.25 ? 1 : 0.5);
+      s.score = 0.45 * mo + 0.35 * sh + 0.2 * co + 0.35 * au;
+      s.still = s.mot < 0.2 * mMot;
+      if (s.still) s.score -= 0.25;                // a slide, or someone talking we will not hear
+      if (s.sharp < 0.35 * mSh) s.score -= 0.4;    // blurred or shaking
+      if (s.bright < 35 || s.bright > 225 || s.t < trim || s.t > dur - trim) s.score = -1;   // dark, blown out, or the intro / outro
+    });
+    var R = Math.max(1, Math.round(1.5 / D.dt)), fx = new Float32Array(n);
+    scenes.forEach(function (sc) {   // smooth within each scene only, so the frame jumps with the cut and glides otherwise
+      for (var j = sc[0]; j < sc[1]; j++) {
+        var su = 0, ws = 0;
+        for (var k = Math.max(sc[0], j - R); k <= Math.min(sc[1] - 1, j + R); k++) { var wt = sm[k].fx != null ? 1 : 0.3; su += (sm[k].fx != null ? sm[k].fx : sm[k].ex) * wt; ws += wt; }
+        fx[j] = ws ? su / ws : 0.5;
+      }
+    });
+    D.scenes = scenes; S.sum = { name: D.m.file.name, dt: D.dt, fx: fx };
+  }
+  /* Pick the moments for the current style and length, and lay them out. */
+  function buildSummary() {
+    var D = S.sumData, sm = D.samples, st = recipe();
+    var cards = S.items.map(function (it, i) { return { it: it, i: i }; }).filter(function (x) { return x.it.kind === "card"; });
+    var room = reelLen() - st.end - cards.reduce(function (s, x) { return s + x.it.len; }, 0);
+    var N = Math.max(1, Math.min(SUM_SEGS, Math.round(room / st.len)));
+    var rate = { fast: 1.3, light: 1.25, gentle: 0.8, slow: 0.65, ramp: 1.25 }[st.speed] || 1;   // the style's average clip speed
+    var trim = Math.min(10, D.m.srcDur * 0.03);
+    D.scenes.forEach(function (sc) { sc.lo = Math.max(trim, sc[0] * D.dt); sc.hi = Math.min(D.m.srcDur - trim, (sc[1] - 1) * D.dt + 0.01); });   // seconds surely inside the scene
+    var win = Math.max(1, Math.round(st.len * 1.3 / D.dt)), pre = [0], still = [0];
+    sm.forEach(function (s, i) { pre[i + 1] = pre[i] + s.score; still[i + 1] = still[i] + (s.still ? 1 : 0); });
+    function mean(a, b) { return (pre[b] - pre[a]) / (b - a) - ((still[b] - still[a]) / (b - a) > 0.5 ? 1 : 0); }   // mostly still: never a moment
+    var cands = [];
+    D.scenes.forEach(function (sc) {
+      var a = sc[0], b = sc[1];
+      if (sc.hi - sc.lo < 0.5) return;   // a flash between two cuts, or all intro / outro
+      if (b - a <= win) { cands.push({ c: (a + b - 1) / 2, sc: sc, score: mean(a, b) }); return; }
+      for (var c0 = a; c0 < b - win + 1; c0 += 3 * win) {   // a long scene gives one candidate per three shot-lengths
+        var best = c0, bs = -Infinity;
+        for (var p = c0; p <= Math.min(b - win, c0 + 3 * win - 1); p++) { var v = mean(p, p + win); if (v > bs) { bs = v; best = p; } }
+        cands.push({ c: best + (win - 1) / 2, sc: sc, score: bs });
+      }
+    });
+    cands.forEach(function (x) { x.t = x.c * D.dt; x.hash = sm[Math.round(x.c)].hash; });
+    cands.sort(function (a, b) { return b.score - a.score; });
+    /* Enough moments for the style's pace, and more while their scenes are too
+       short to fill the length between them (a moment never runs past its cut). */
+    var gap = Math.max(st.len * 1.3, (D.m.srcDur * 0.94) / (N * 2)), picked = [], cover = 0;
+    function enough() { return picked.length >= SUM_SEGS || (picked.length >= N && cover >= room); }
+    [[gap, true], [st.len * 1.3, false]].forEach(function (pass) {   // spread out and different first; if that leaves too few, only not overlapping
+      cands.forEach(function (x) {
+        if (enough() || x.score < -0.2 || picked.indexOf(x) >= 0) return;
+        if (picked.some(function (p) { return Math.abs(p.t - x.t) < pass[0] || (pass[1] && hamming(p.hash, x.hash) <= 8); })) return;
+        picked.push(x); cover += Math.min(st.len, (x.sc.hi - x.sc.lo) / rate);
+      });
+    });
+    if (!picked.length) { sumSt("ما لقيت لحظات واضحة بهالفيديو — جرّب فيديو تاني", true); return Promise.resolve(); }
+    picked.forEach(function (x) {   // moments sharing a scene split it halfway between them
+      var mates = picked.filter(function (y) { return y.sc === x.sc; }).sort(function (a, b) { return a.t - b.t; }), k = mates.indexOf(x);
+      x.lo = k ? (mates[k - 1].t + x.t) / 2 : x.sc.lo; x.hi = k < mates.length - 1 ? (x.t + mates[k + 1].t) / 2 : x.sc.hi;
+      x.t = Math.max(x.lo, Math.min(x.hi, x.t));
+    });
+    var hook = picked[0];
+    picked.sort(function (a, b) { return a.t - b.t; });
+    picked.splice(picked.indexOf(hook), 1); picked.unshift(hook);
+    sumSt("…جارٍ تجهيز اللقطات");
+    return Promise.all(picked.map(function (x, i) { return sumEl(i); })).then(function (els) {
+      var m = D.m;
+      var shots = picked.map(function (x, i) {
+        return { id: nextId++, name: m.file.name, kind: "video", el: els[i], url: m.url, file: m.file, w: m.w, h: m.h, srcDur: m.srcDur, fps: m.fps,
+                 rot: 0, tint: false, sound: false, missing: false, sum: true, center: x.t, lo: x.lo, hi: x.hi, start: 0, len: st.len };
+      });
+      cards.forEach(function (x) { shots.splice(Math.min(x.i, shots.length), 0, x.it); });   // the user's own text cards keep their place
+      S.items = shots; S.endLen = null; S.t = 0;
+      relayout();
+      var T = total();
+      sumSt("✓ اخترت " + picked.length + " لحظة من فيديو مدته " + fmt(m.srcDur) + " · أقوى لحظة بالبداية" +
+            (T < reelLen() - 0.5 ? " · اللحظات الواضحة بتكفي لريل " + Math.round(T) + " ث بس — جرّب طول أقصر" : ""), T < reelLen() - 0.5);
+    });
+  }
+  /* "Make a reel" and "summarise a video" share the timeline; switching clears it. */
+  function setMode(mode) {
+    S.mode = mode === "sum" ? "sum" : "create"; $("rgMode").value = S.mode;
+    var sum = S.mode === "sum";
+    $("rgSumField").hidden = !sum; $("rgFilesField").hidden = sum; $("rgPick").hidden = sum;
+    $("rgEmpty").innerHTML = sum ? "ارفع فيديو طويل واضغط<br>«تحليل وتلخيص»" : "أضف صوراً أو مقاطع فيديو<br>لتظهر المعاينة هنا";
+    try { localStorage.setItem("rg_mode", S.mode); } catch (e) {}
   }
 
   /* ---------- cover ----------
@@ -1219,7 +1447,7 @@
     if (S.lines.length && !voiceReady() &&
         !confirm(S.voice ? "نص التعليق تغيّر بعد توليد الصوت، فالصوت والكروت ما بيطابقوا النص. تصدير على كل حال؟"
                          : "التعليق الصوتي لسا ما تولّد، فالريل رح يطلع بلا صوت مازن وبلا كروت السكريبت. تصدير على كل حال؟")) return;
-    if (Math.abs(T - REEL_LEN) > 0.1 && confirm("طول الريل " + T.toFixed(1) + " ث مش " + REEL_LEN + ". ضبطه على " + REEL_LEN + " ث قبل التصدير؟")) relayout();
+    if (Math.abs(T - reelLen()) > 0.1 && confirm("طول الريل " + T.toFixed(1) + " ث مش " + reelLen() + ". ضبطه على " + reelLen() + " ث قبل التصدير؟")) relayout();
     stop(); status("…تحضير الصوت");
     Promise.all(ready().filter(function (it) { return it.sound; }).map(ensureAudio))
       .then(runExport, function () { status("تعذّر قراءة الصوت الأصلي لأحد المقاطع — ألغِ «الصوت الأصلي» له", true); });
@@ -1305,12 +1533,14 @@
 
   /* ---------- projects (settings only; media is re-linked by file name) ---------- */
   function saveProject() {
-    var d = { app: "reels-gen", v: 3, recipe: S.recipe, project: S.project,
+    var d = { app: "reels-gen", v: 3, recipe: S.recipe, project: S.project, mode: S.mode, sumLen: +$("rgSumLen").value,
+              sum: S.sum ? { name: S.sum.name, dt: S.sum.dt, fx: Array.from(S.sum.fx, function (x) { return Math.round(x * 1000) / 1000; }) } : null,   // the crop follows this track once the video is back
               beatSync: $("rgBeatSync").checked, endLen: S.endLen, musicTrack: S.musicTrack, script: $("rgScript").value, lines: S.lines,
               voice: S.voice ? { data: S.voice.data, times: S.voice.times, dur: S.voice.dur } : null,   // the paid-for voiceover travels with the project
               items: S.items.map(function (it) {
                 return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
-                                          : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, off: !!it.off, skip: !!it.skip, why: it.why || "" };
+                                          : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, off: !!it.off, skip: !!it.skip, why: it.why || "",
+                                              sum: !!it.sum, center: it.center != null ? it.center : null, lo: it.hi != null ? it.lo : null, hi: it.hi != null ? it.hi : null };
               }) };
     var a = document.createElement("a"); a.download = "Reel_project_" + project().name + ".json";
     a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: "application/json" })); a.click();
@@ -1319,12 +1549,16 @@
   function openProject(d) {
     if (!d || d.app !== "reels-gen" || !Array.isArray(d.items)) { status("الملف ليس مشروع Reels Gen", true); return; }
     stop(); setProject(PROJECTS[d.project] ? d.project : "disc");   // projects saved before the picker were DISC reels
+    setMode(d.mode); if (d.sumLen) $("rgSumLen").value = String(d.sumLen);
+    S.sumData = null; $("rgAnalyse").disabled = true; sumSt(""); $("rgLongName").textContent = "اسحب الفيديو هنا أو اضغط للاختيار";
+    S.sum = d.sum && Array.isArray(d.sum.fx) ? { name: String(d.sum.name || ""), dt: +d.sum.dt || 1, fx: Float32Array.from(d.sum.fx) } : null;
     setStyle(RECIPES[d.recipe] ? d.recipe : OLD_RECIPES[d.recipe] || project().style);
     S.items = [];
     d.items.forEach(function (x) {
       if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; S.items.push(c); return; }
       if (d.v === 1 && x.text && String(x.text).trim()) S.items.push(newCard(String(x.text)));   // v1 captions sat on the shot; they become a card before it
-      S.items.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true });
+      S.items.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true,
+                     sum: !!x.sum, center: x.center != null ? +x.center : undefined, lo: x.hi != null ? +x.lo : undefined, hi: x.hi != null ? +x.hi : undefined });
     });
     $("rgBeatSync").checked = d.beatSync !== false; S.endLen = +d.endLen || null;
     $("rgScript").value = d.script || ""; S.lines = Array.isArray(d.lines) ? d.lines.map(function (l) { return { voice: String(l.voice || ""), card: String(l.card || "") }; }) : [];
@@ -1332,7 +1566,9 @@
     if (d.voice && d.voice.data) setVoice(d.voice.data, d.voice.times || [], d.voice.dur).then(function () { voiceSt("✓ تعليق صوتي · " + S.voice.dur.toFixed(1) + " ث"); }, function () { voiceSt("تعذّرت قراءة التعليق المحفوظ", true); });
     var mt = findTrack(d.musicTrack); if (mt) useTrack(d.musicTrack.split("/")[0], mt);   // a bundled track comes back by itself
     S.t = 0; renderClips(); drawAt(0);
-    status("✓ تم فتح المشروع — أضف الملفات (" + S.items.length + ") من «المواد» وستُربط بأسمائها");
+    var longName = (S.items.filter(function (it) { return it.sum; })[0] || {}).name;
+    status(S.mode === "sum" && longName ? "✓ تم فتح المشروع — أضف الفيديو «" + longName + "» من «الفيديو الطويل» ليُربط"
+                                        : "✓ تم فتح المشروع — أضف الملفات (" + S.items.length + ") من «المواد» وستُربط بأسمائها");
   }
 
   /* A style sets the music mood too (the music is not regenerated). */
@@ -1365,8 +1601,8 @@
     function applyStyle(key) {   // re-lay the reel for the style's pace and speeds (text cards keep their length)
       var bundled = !!S.musicTrack;
       setStyle(key); S.endLen = null;
-      S.items.forEach(function (it) { if (it.kind !== "card") { it.len = recipe().len; clampItem(it); } });
-      relayout();
+      if (S.mode === "sum" && S.sumData && S.sumData.samples) buildSummary();   // a new pace needs a new count of moments
+      else { S.items.forEach(function (it) { if (it.kind !== "card") { it.len = recipe().len; clampItem(it); } }); relayout(); }
       if (bundled && TRACKS && TRACKS[S.recipe]) useTrack(S.recipe, TRACKS[S.recipe][0]);   // keep the music in step with the style
     }
     $("rgRecipe").addEventListener("change", function () { applyStyle(this.value); });
@@ -1388,6 +1624,21 @@
     $("rgMusicFile").addEventListener("change", function (e) { var f = e.target.files[0]; if (f) setMusic(f, f.name); e.target.value = ""; });
     $("rgNoMusic").onclick = function () { setMusic(null); };
     $("rgProject").addEventListener("change", function () { setProject(this.value); applyStyle(project().style); });
+    $("rgMode").addEventListener("change", function () {
+      if (S.items.length && !confirm("تبديل نوع العمل بيمسح اللقطات الحالية. متابعة؟")) { this.value = S.mode; return; }
+      stop(); S.items = []; S.sum = null; S.sumData = null; S.endLen = null; S.t = 0;
+      $("rgAnalyse").disabled = true; sumSt(""); $("rgLongName").textContent = "اسحب الفيديو هنا أو اضغط للاختيار"; $("rgLongInfo").textContent = "MP4 · MOV · WEBM — المعالجة على جهازك، لا شيء يُرفع";
+      setMode(this.value); relayout();
+    });
+    $("rgLongFile").addEventListener("change", function (e) { setLong(e.target.files[0]); e.target.value = ""; });
+    var longDrop = $("rgLongDrop");
+    ["dragenter", "dragover"].forEach(function (ev) { longDrop.addEventListener(ev, function (e) { e.preventDefault(); longDrop.classList.add("over"); }); });
+    ["dragleave", "drop"].forEach(function (ev) { longDrop.addEventListener(ev, function (e) { e.preventDefault(); longDrop.classList.remove("over"); }); });
+    longDrop.addEventListener("drop", function (e) { setLong(e.dataTransfer.files[0]); });
+    $("rgAnalyse").onclick = analyseLong;
+    $("rgSumLen").addEventListener("change", function () {
+      if (S.sumData && S.sumData.samples) buildSummary(); else { S.endLen = null; relayout(); }
+    });
     $("rgExport").onclick = exportMp4;
     $("rgCover").onclick = exportCover;
     $("rgGrid").addEventListener("change", function () { drawAt(S.t); });
@@ -1400,6 +1651,8 @@
       r.readAsText(f); e.target.value = "";
     });
     window.addEventListener("beforeunload", function (e) { if (S.exporting) { e.preventDefault(); e.returnValue = ""; } });
+    var lastMode = "create"; try { lastMode = localStorage.getItem("rg_mode") || "create"; } catch (e) {}
+    setMode(lastMode);
     setProject($("rgProject").value); setStyle(project().style);
     loadTracks();
     renderClips(); drawAt(0);
