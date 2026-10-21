@@ -9,7 +9,8 @@
    over the shots for a one-minute reel (the voice pauses on each text card) and
    the cuts land on the music's beat.
    The other kind of work, "تلخيص فيديو لريل", turns one long video into a
-   music-only summary reel: its strongest moments, cropped to follow the action.
+   summary reel: its strongest moments, cropped to follow the action, under
+   music or, without it, with the video's own sound.
    Media never leaves the device; only text and the music request go to the
    auth Worker. */
 (function () {
@@ -403,7 +404,7 @@
     var mode = recipe().speed, vi = 0;
     shots.forEach(function (it) {
       it.speed = 1; it.ramp = false;
-      if (it.kind !== "video") return;
+      if (it.kind !== "video" || (it.sum && !S.musicBlob)) return;   // a summary without music is heard, so it runs at its own speed
       var hi = (it.fps || 30) >= 48;   // 50/60 fps footage slows down cleanly at our 25 fps
       if (mode === "fast") it.speed = vi % 2 ? 1.6 : 1;
       else if (mode === "light") it.speed = 1.25;
@@ -414,6 +415,8 @@
     });
   }
   function vTime(it, local) { return Math.max(0, Math.min(it.srcDur - 0.04, it.start + span(it, local))); }
+  /* A clip is heard when the user keeps its sound, and every moment of a summary that has no music. */
+  function hears(it) { return it.kind === "video" && (it.sound || (it.sum && !S.musicBlob)); }
   function seekEl(it, local) {   // resolves once a video shows start+local (images and cards: at once)
     if (it.kind !== "video") return Promise.resolve();
     var target = vTime(it, local);
@@ -637,7 +640,7 @@
     stopPreview();
     if (S.t >= total() - 0.05) S.t = 0;
     S.playing = true; $("rgPlay").textContent = "❚❚"; $("rgPlay").classList.add("playing"); S.clock = performance.now() - S.t * 1000; S.regs = duckRegions(); S.plan = voicePlan();
-    ready().forEach(function (it) { if (it.kind === "video") it.el.muted = !(it.sound && rateOf(it) === 1); });   // sped-up or slowed clips play silent
+    ready().forEach(function (it) { if (it.kind === "video") it.el.muted = !(hears(it) && rateOf(it) === 1); });   // sped-up or slowed clips play silent
     var mp = $("rgMusicPlayer"); if (S.musicBlob) { mp.currentTime = S.t; mp.volume = musicGain(S.t, S.regs); mp.play().catch(function () {}); }
     requestAnimationFrame(tick);
   }
@@ -688,7 +691,7 @@
     voicePlan().forEach(function (b) {
       for (var i = b.a; i <= b.z; i++) { var tm = S.voice.times[i]; r.push({ a: b.at + tm.start - b.src0 - 0.1, b: b.at + tm.end - b.src0 + 0.2, l: DUCK_VOICE }); }
     });
-    positions().forEach(function (p) { if (p.seg.sound) r.push({ a: p.t0, b: p.t0 + p.seg.len, l: DUCK_SOUND }); });
+    positions().forEach(function (p) { if (hears(p.seg)) r.push({ a: p.t0, b: p.t0 + p.seg.len, l: DUCK_SOUND }); });
     return r;
   }
   function musicGain(t, regs) {
@@ -702,7 +705,7 @@
   function ensureAudio(it) {
     if (it.audio) return Promise.resolve(it.audio);
     if (!it.file) return Promise.reject(new Error("no file"));
-    return decode(it.file).then(function (b) { it.audio = b; return b; });
+    return (it.sum ? sumAudio() : decode(it.file)).then(function (b) { it.audio = b; return b; });   // the moments of a summary share one decode
   }
   function setSound(it, inp) {
     it.sound = inp.checked; it.el.muted = !it.sound;
@@ -736,14 +739,15 @@
       }
     });
     positions().forEach(function (p) {
-      var it = p.seg; if (!it.sound || !it.audio || rateOf(it) !== 1) return;   // changed speed: the clip stays silent
+      var it = p.seg; if (!hears(it) || !it.audio || rateOf(it) !== 1) return;   // changed speed: the clip stays silent
       any = true;
-      var a = it.audio, aL = a.getChannelData(0), aR = a.numberOfChannels > 1 ? a.getChannelData(1) : aL;
+      var a = it.audio, aL = a.getChannelData(0), aR = a.numberOfChannels > 1 ? a.getChannelData(1) : aL, ar = a.sampleRate;   // a summary's sound is decoded at SUM_SR
       var s0 = Math.max(0, Math.round((p.t0 - p.h0) * SR)), s1 = Math.min(len, Math.round((p.t0 + it.len + p.h1) * SR));
       var f0 = Math.max(1, 2 * p.h0 * SR), f1 = Math.max(1, 2 * p.h1 * SR);
       for (k = s0; k < s1; k++) {
-        var src = Math.round((it.start + k / SR - p.t0) * SR); if (src < 0 || src >= a.length) continue;
-        var fd = Math.min(1, (k - s0) / f0, (s1 - k) / f1); L[k] += aL[src] * fd; R[k] += aR[src] * fd;
+        var at = (it.start + k / SR - p.t0) * ar, src = Math.floor(at), fr = at - src; if (src < 0 || src + 1 >= a.length) continue;
+        var fd = Math.min(1, (k - s0) / f0, (s1 - k) / f1);
+        L[k] += (aL[src] + (aL[src + 1] - aL[src]) * fr) * fd; R[k] += (aR[src] + (aR[src + 1] - aR[src]) * fr) * fd;
       }
     });
     if (!any) return null;
@@ -757,16 +761,22 @@
     S.musicBlob = blob; S.music = null; S.musicLabel = label; S.beats = null; S.musicTrack = null;
     renderTracks();   // any other music clears the ✓ on the bundled list
     var mp = $("rgMusicPlayer");
-    if (!blob) { mp.hidden = true; mp.removeAttribute("src"); $("rgMusicSt").textContent = "بدون موسيقى"; return Promise.resolve(); }
+    if (!blob) {
+      mp.hidden = true; mp.removeAttribute("src"); $("rgMusicSt").textContent = noMusicText();
+      if (S.mode === "sum") relayout();   // the moments are heard now, at their own speed
+      return Promise.resolve();
+    }
     mp.src = URL.createObjectURL(blob); mp.hidden = false;
     return decode(blob)
       .then(function (buf) {
         S.music = buf; var bt = detectBeats(buf); S.beats = bt.beats; S.bpm = bt.bpm;
+        if (S.mode === "sum") { relayout(); return; }   // the style's speeds come back under music
         if ($("rgBeatSync").checked && snapToBeats()) drawAt(S.t);
         renderClips();
       })
-      .catch(function () { $("rgMusicSt").textContent = "تعذّرت قراءة ملف الموسيقى"; S.musicBlob = null; });
+      .catch(function () { $("rgMusicSt").textContent = "تعذّرت قراءة ملف الموسيقى"; S.musicBlob = null; if (S.mode === "sum") relayout(); });
   }
+  function noMusicText() { return S.mode === "sum" ? "بدون موسيقى — الريل بصوت الفيديو الأصلي" : "بدون موسيقى"; }
   /* Re-read on every timeline change, so "too short" never outlives the edit that fixed it. */
   function musicNote() {
     if (!S.music) return;
@@ -1198,11 +1208,12 @@
      Scenes are scored, the best window of each is a candidate, and the
      strongest candidates that are neither near each other nor look-alikes
      become the reel's shots: the very best opens the reel, the rest follow in
-     the video's order. The music is the only sound. Each shot keeps its moment
+     the video's order. With music, the music is the only sound; without
+     it, every moment keeps its own sound (and its own speed). Each shot keeps its moment
      (center) and its scene (lo…hi) whatever length the timeline gives it, and
      drawMedia slides the frame along the focus track
      (motion, else detail) so a wide picture keeps its action in the 9:16 crop. */
-  var SUM_W = 96, SUM_MAX = 1200, SUM_SEGS = 40, SUM_AUDIO_MAX = 400 * 1048576;
+  var SUM_W = 96, SUM_MAX = 1200, SUM_SEGS = 40, SUM_AUDIO_MAX = 400 * 1048576, SUM_SR = 24000;
   function sumSt(t, err) { var e = $("rgSumSt"); e.textContent = t || ""; e.style.color = err ? "var(--accent)" : ""; }
   function sumBar(p) { $("rgSumBar").hidden = p == null; $("rgSumFill").style.width = Math.round((p || 0) * 100) + "%"; }
   function median(a) { var s = a.filter(function (x) { return isFinite(x); }).sort(function (x, y) { return x - y; }); return s.length ? s[Math.floor(s.length / 2)] : 0; }
@@ -1248,18 +1259,28 @@
       .catch(function (e) { sumBar(null); sumSt("تعذّر تحليل الفيديو: " + (e && e.message || e), true); })
       .then(function () { btn.disabled = false; });
   }
-  /* Loudness and zero-crossing rate per sample, read at 8 kHz; null when the
-     file is too big to decode at once or has no readable sound. */
+  /* The long video's sound, decoded once (mono, SUM_SR) for the analysis and
+     for every moment that keeps it; rejects when the file is too big to
+     decode at once or has no readable sound. */
+  function sumAudio() {
+    var D = S.sumData; if (!D) return Promise.reject(new Error("no video"));
+    if (D.pcm) return Promise.resolve(D.pcm);
+    if (D.m.file.size > SUM_AUDIO_MAX) return Promise.reject(new Error("big"));
+    return D.pcmJob || (D.pcmJob = D.m.file.arrayBuffer()
+      .then(function (ab) { return new OfflineAudioContext(1, 1, SUM_SR).decodeAudioData(ab); })
+      .then(function (buf) { D.pcm = buf; return buf; }, function (e) { D.pcmJob = null; throw e; }));
+  }
+  /* Loudness and zero-crossing rate per sample (the rate as at 8 kHz); none without readable sound. */
   function sampleAudio(D) {
     var m = D.m; D.dt = Math.max(0.5, m.srcDur / SUM_MAX); D.n = Math.floor((m.srcDur - 0.1) / D.dt) + 1; D.aud = null;
     if (m.file.size > SUM_AUDIO_MAX) return Promise.resolve();
     sumSt("…جارٍ قراءة صوت الفيديو"); sumBar(0);
-    return m.file.arrayBuffer().then(function (ab) { return new OfflineAudioContext(1, 1, 8000).decodeAudioData(ab); }).then(function (buf) {
+    return sumAudio().then(function (buf) {
       var x = buf.getChannelData(0), sr = buf.sampleRate, db = new Float32Array(D.n), zc = new Float32Array(D.n);
       for (var i = 0; i < D.n; i++) {
         var a = Math.floor(i * D.dt * sr), b = Math.min(x.length, Math.floor((i + 1) * D.dt * sr)), e = 0, z = 0;
         for (var k = a + 1; k < b; k++) { e += x[k] * x[k]; if ((x[k] >= 0) !== (x[k - 1] >= 0)) z++; }
-        db[i] = 20 * Math.log10(Math.sqrt(e / Math.max(1, b - a)) + 1e-5); zc[i] = z / Math.max(1, b - a);
+        db[i] = 20 * Math.log10(Math.sqrt(e / Math.max(1, b - a)) + 1e-5); zc[i] = z / Math.max(1, b - a) * sr / 8000;
       }
       D.aud = { db: db, zc: zc };
     }).catch(function () { D.aud = null; });
@@ -1398,6 +1419,7 @@
     S.mode = mode === "sum" ? "sum" : "create"; $("rgMode").value = S.mode;
     var sum = S.mode === "sum";
     $("rgSumField").hidden = !sum; $("rgFilesField").hidden = sum; $("rgPick").hidden = sum;
+    if (!S.musicBlob) $("rgMusicSt").textContent = sum ? "لا موسيقى بعد — بدونها الريل بصوت الفيديو الأصلي" : "لا موسيقى بعد";
     $("rgEmpty").innerHTML = sum ? "ارفع فيديو طويل واضغط<br>«تحليل وتلخيص»" : "أضف صوراً أو مقاطع فيديو<br>لتظهر المعاينة هنا";
     try { localStorage.setItem("rg_mode", S.mode); } catch (e) {}
   }
@@ -1449,8 +1471,12 @@
                          : "التعليق الصوتي لسا ما تولّد، فالريل رح يطلع بلا صوت مازن وبلا كروت السكريبت. تصدير على كل حال؟")) return;
     if (Math.abs(T - reelLen()) > 0.1 && confirm("طول الريل " + T.toFixed(1) + " ث مش " + reelLen() + ". ضبطه على " + reelLen() + " ث قبل التصدير؟")) relayout();
     stop(); status("…تحضير الصوت");
-    Promise.all(ready().filter(function (it) { return it.sound; }).map(ensureAudio))
-      .then(runExport, function () { status("تعذّر قراءة الصوت الأصلي لأحد المقاطع — ألغِ «الصوت الأصلي» له", true); });
+    Promise.all(ready().filter(hears).map(ensureAudio))
+      .then(runExport, function () {
+        if (S.mode !== "sum") { status("تعذّر قراءة الصوت الأصلي لأحد المقاطع — ألغِ «الصوت الأصلي» له", true); return; }
+        if (confirm("تعذّر قراءة صوت الفيديو (الملف أكبر من " + Math.round(SUM_AUDIO_MAX / 1048576) + " MB أو صيغة الصوت غير مدعومة). تصدير بدون صوت؟")) runExport();
+        else status("أضف موسيقى، أو صدّر بدون صوت", true);
+      });
   }
   function runExport() {
     S.exporting = true;

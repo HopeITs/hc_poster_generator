@@ -172,7 +172,7 @@
             <div class="hint" id="rgStyleHint" style="margin-top:6px"></div>
           </div>
           <div class="field" id="rgSumField" hidden>
-            <div class="sec">الفيديو الطويل <span class="hint">فيديو واحد يتلخّص بريل بموسيقى</span></div>
+            <div class="sec">الفيديو الطويل <span class="hint">فيديو واحد يتلخّص بريل — بموسيقى، أو بصوته الأصلي بدونها</span></div>
             <label class="drop" id="rgLongDrop">
               <div class="t" id="rgLongName">اسحب الفيديو هنا أو اضغط للاختيار</div>
               <div class="h" id="rgLongInfo">MP4 · MOV · WEBM — المعالجة على جهازك، لا شيء يُرفع</div>
