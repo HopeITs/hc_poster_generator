@@ -25,6 +25,8 @@ store and survive deploys:
 - `REELS_GEMINI_KEY` (optional) — a Gemini key from a separate Google project
   for the Reels Gen routes, so their free daily quota is not shared with the
   other tools; they use `GEMINI_API_KEY` until it is set
+- `TRANSCRIBE_GEMINI_KEY` (optional) — the same for Text Transcription's
+  `/transcribe/images`, which otherwise shares the Reels Gen key
 
 ## Deploying
 
@@ -67,6 +69,7 @@ wrangler d1 export studyzone-db --remote --output backup.sql
 | POST | `/reels/voice` | `reels-gen` access |
 | POST | `/reels/moments` | `reels-gen` access |
 | POST | `/reels/critique` | `reels-gen` access |
+| POST | `/transcribe/images` | `text-transcription` access |
 
 The Reels Gen routes log each call in `ai_usage` and cap it per user per 24 h.
 `/reels/script` and `/reels/moments` use `GEMINI_API_KEY`; `/reels/music` and `/reels/voice` use
@@ -83,6 +86,8 @@ the runs of segments that make whole thoughts in that goal's structure.
 about the video (it is told only where each moment starts), says what it
 understood, scores it and lists the problems by moment; below 8/10 the editor
 revises the runs from the transcript with that critique in hand.
+`/transcribe/images` takes up to six images as raw JPEG bytes, passes them to
+Gemini's Files API as they are, returns each one's text, and deletes them.
 
 Photo endpoints take the email from the session, never from the request body,
 so a user cannot modify anyone else's photo. Deletion is a `POST` because

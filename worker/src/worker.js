@@ -35,6 +35,10 @@ const MOMENTS_DAILY_MAX = 30;                 // تحليلات لكل مستخ�
 const MOMENTS_MAX_BYTES = 40 * 1048576;       // صوت Opus ≈ 11 MB للساعة
 const MOMENTS_MAX_SEGS  = 3000;
 const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مستخدم خلال 24 ساعة (حتى 3 لكل ريل)
+// Text Transcription — تفريغ الصور بـ Gemini (تفريغ الجهاز لا يمرّ من هنا)
+const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
+const TRANSCRIBE_MAX_IMAGES = 6;
+const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
 // أهداف الريل وبنية كل هدف — Gemini يختار واحداً من المحتوى ويرتّب الأفكار حسبه
 const MOMENTS_GOALS = {
   "تعريف بمشروع":  "what the project is, then who it serves, then what they do there, then how to join or learn more",
@@ -190,6 +194,8 @@ async function findVoiceId(env) {
    free Google project, so its daily quota is not shared with the other tools),
    and on GEMINI_API_KEY until that secret is set. */
 function reelsKey(env) { return env.REELS_GEMINI_KEY || env.GEMINI_API_KEY; }
+// Text Transcription: a key of its own when TRANSCRIBE_GEMINI_KEY is set, else the Reels one.
+function transcribeKey(env) { return env.TRANSCRIBE_GEMINI_KEY || reelsKey(env); }
 /* Retries when Gemini is busy and falls back along the given models. A model
    that rejects the request outright (400) is asked again with less: first
    without the thinking and output-length settings, then without the strict
@@ -862,6 +868,54 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
           }, "revise");
           var crNew = crE.error ? [] : momentsRuns(crE.data.moments, crSegs, crText);
           return { ok: true, critique: critique, moments: crNew.length ? crNew : null, plan: crE.error ? "" : String(crE.data.plan || "").slice(0, 1200) };
+        });
+      }
+
+      /* ---- 7b7) Text Transcription: نص الصور عبر Gemini ----
+         لكل من يملك أداة text-transcription. الجسم: [4 بايت طول JSON][JSON {lang, sizes}][الصور JPEG متتالية].
+         تُرفع الصور كما هي إلى Files API، يقرؤها Gemini بطلب واحد ويعيد نص كل صورة، ثم تُحذف.
+         الرد يتدفّق (slowJSON): {texts:[نص كل صورة]} أو {error}. */
+      if (request.method === "POST" && path === "/transcribe/images") {
+        var txUser = await getSessionUser(env, request);
+        if (!txUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, txUser, "text-transcription"))) return json({ error: "لا صلاحية" }, 403);
+        var txKey = transcribeKey(env);
+        if (!txKey) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        if (Number(request.headers.get("Content-Length") || 0) > TRANSCRIBE_MAX_BYTES) return json({ error: "الصور أكبر من المسموح" }, 413);
+        if ((await usedToday(env, txUser.email, "transcribe")) >= TRANSCRIBE_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتفريغ الصور بـ Gemini. جرّب بكرا، أو استعمل «تفريغ على الجهاز»." }, 429);
+        var txIn = splitAudioBody(await request.arrayBuffer());
+        if (!txIn) return json({ error: "طلب غير صالح" }, 400);
+        var txSizes = (Array.isArray(txIn.meta.sizes) ? txIn.meta.sizes : []).map(function (n) { return Math.max(0, Math.floor(Number(n) || 0)); });
+        if (!txSizes.length || txSizes.length > TRANSCRIBE_MAX_IMAGES || txSizes.reduce(function (s, n) { return s + n; }, 0) !== txIn.audio.byteLength) return json({ error: "طلب غير صالح" }, 400);
+        var txLang = { "ara+eng": "Arabic and English", ara: "Arabic", eng: "English" }[txIn.meta.lang] || "Arabic and English";
+        return slowJSON(async function () {
+          var off = 0, parts = txSizes.map(function (n) { var b = txIn.audio.slice(off, off + n); off += n; return b; });
+          var ups = await Promise.all(parts.map(function (b, i) { return geminiUpload(txKey, b, "image/jpeg", "text-transcription-" + (i + 1)); }));
+          var txR;
+          try {
+            var bad = ups.filter(function (u) { return u.error; })[0];
+            if (bad) return { error: bad.error.replace("الصوت", "الصورة") };
+            var txParts = [];
+            ups.forEach(function (u, i) { txParts.push({ text: "Image " + (i + 1) + ":" }, { file_data: { mime_type: "image/jpeg", file_uri: u.file.uri } }); });
+            txR = await geminiJSON(txKey, ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"], {
+              system_instruction: { parts: [{ text:
+"You transcribe the text in images. For EACH image, in order, write all the text it contains exactly as written: the same language and spelling, no translation, no correction, no summary, nothing added. The text is mostly in " + txLang + ".\n" +
+"Keep the reading order (Arabic right to left, then top to bottom; columns one after another), the line breaks and the paragraphs. Headings and list items go on their own lines. A table is one line per row, its cells separated by ' | '.\n" +
+"Keep Arabic letters, diacritics and digits as they appear. Mark a word you cannot read as […]. If an image has no text, its text is \"\".\n" +
+"Return ONLY JSON: {\"images\":[{\"n\":1,\"text\":\"...\"}]}, one entry per image, covering all " + parts.length + " images." }] },
+              contents: [{ role: "user", parts: txParts }],
+              generationConfig: { temperature: 0, maxOutputTokens: 32768, responseMimeType: "application/json", responseSchema: {
+                type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: { type: "OBJECT", required: ["n", "text"],
+                  properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } } } } } }
+            }, "transcribe-images");
+          } finally { ups.forEach(function (u) { geminiDelete(txKey, ctx, u.file); }); }
+          if (txR.error) return { error: txR.error };
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'transcribe', datetime('now'))").bind(txUser.email).run();
+          var texts = parts.map(function () { return ""; });
+          ((txR.data && txR.data.images) || []).forEach(function (x) {
+            var n = Math.round(Number(x && x.n)); if (n >= 1 && n <= texts.length) texts[n - 1] = String(x.text || "").slice(0, 60000);
+          });
+          return { ok: true, texts: texts };
         });
       }
 

@@ -45,7 +45,9 @@ def main():
         return 1
 
     conf = io.open(HTACCESS, encoding="utf-8").read()
-    directive = "script-src 'self' " + " ".join(found) + ";"
+    # 'wasm-unsafe-eval' lets WebAssembly compile (Text Transcription's Tesseract
+    # OCR); it does not allow eval() or other string-to-code in JavaScript.
+    directive = "script-src 'self' 'wasm-unsafe-eval' " + " ".join(found) + ";"
     updated, n = re.subn(r"script-src [^;]*;", directive, conf)
     if n != 1:
         print("expected exactly one script-src in .htaccess, found %d" % n, file=sys.stderr)
