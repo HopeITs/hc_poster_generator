@@ -222,16 +222,31 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || d.error) throw new Error(d.error || "HTTP " + r.status); return d; }); });
   }
   /* Cards and documents carry personal data: say once per visit where the
-     images go before any of them leaves the device for Gemini. */
+     images go before any of them leaves the device for Gemini. A box in the
+     page, not confirm(): some browsers (and embedded ones) suppress native
+     dialogs and answer "no" without showing anything. Resolves true or false. */
   function docConsent(mode) {
-    if (mode === "text" || S.docOk) return true;
-    S.docOk = confirm("الصور رح تنقرأ عند Google (Gemini) وبتنحذف من عندهم مباشرة بعد القراءة. الأداة ما بتخزّن لا الصور ولا المعلومات — كل شي بيضل بهالصفحة لحد ما تسكّرها.\n\nإذا فيها بطاقات أو وثائق شخصية، تأكد إنه مسموح ترفعها لخدمة خارجية.\n\nمتابعة؟");
-    return S.docOk;
+    if (mode === "text" || S.docOk) return Promise.resolve(true);
+    return new Promise(function (done) {
+      var a = document.createElement("div"); a.className = "ask";
+      a.innerHTML = '<div class="box" role="dialog" aria-modal="true" aria-labelledby="ttAskT"><h2 id="ttAskT">قبل الإرسال لـ Gemini</h2>' +
+        "<p>الصور رح تنقرأ عند Google (Gemini) وبتنحذف من عندهم مباشرة بعد القراءة. الأداة ما بتخزّن لا الصور ولا المعلومات — كل شي بيضل بهالصفحة لحد ما تسكّرها.</p>" +
+        "<p>إذا فيها بطاقات أو وثائق شخصية، تأكد إنه مسموح ترفعها لخدمة خارجية.</p>" +
+        '<div class="row"><button type="button" class="btn" data-ok="1">متابعة</button><button type="button" class="btn-line" data-ok="0">إلغاء</button></div></div>';
+      function close(ok) { document.removeEventListener("keydown", key); a.remove(); if (ok) S.docOk = true; done(ok); }
+      function key(e) { if (e.key === "Escape") close(false); }
+      a.addEventListener("click", function (e) { var b = e.target.closest("[data-ok]"); if (b) close(b.dataset.ok === "1"); else if (e.target === a) close(false); });
+      document.addEventListener("keydown", key);
+      document.body.appendChild(a); a.querySelector('[data-ok="1"]').focus();
+    });
   }
   function runGemini(list) {
-    list = list || S.items.slice(); if (!list.length) return;
-    var lang = $("ttLang").value, mode = $("ttKind").value, batches = [];
-    if (!docConsent(mode)) { status("ما انبعت شي"); return; }
+    list = list || S.items.slice(); if (!list.length || S.busy) return;
+    var mode = $("ttKind").value;
+    docConsent(mode).then(function (ok) { if (ok) sendGemini(list, mode); else status("ما انبعت شي — اضغط «متابعة» بالنافذة لترسل الصور"); });
+  }
+  function sendGemini(list, mode) {
+    var lang = $("ttLang").value, batches = [];
     for (var k = 0; k < list.length; k += GEM_BATCH) batches.push(list.slice(k, k + GEM_BATCH));
     busy(true); bar(0);
     var done = 0, failed = 0, docs = 0;

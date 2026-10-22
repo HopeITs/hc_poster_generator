@@ -90,6 +90,12 @@
   .empty{padding:34px;text-align:center;color:var(--muted);font-size:14px;border:2px dashed var(--line);border-radius:14px;line-height:1.8;}
   .gate{max-width:520px;margin:60px auto;text-align:center;}
   .gate p{font-size:15px;font-weight:700;color:var(--ink);}
+  /* the consent box before images leave for Gemini (in the page: some browsers suppress confirm()) */
+  .ask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:30;padding:20px;}
+  .ask .box{background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.25);max-width:460px;width:100%;padding:22px 24px;}
+  .ask h2{margin:0 0 10px;font-size:16px;font-weight:900;color:var(--ink);}
+  .ask p{margin:0 0 8px;font-size:13px;line-height:1.8;color:var(--text);}
+  .ask .row{margin-top:16px;}
   .zoom{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:20;cursor:zoom-out;padding:24px;}
   .zoom img{max-width:100%;max-height:100%;border-radius:8px;}
   .foot{position:fixed;bottom:24px;left:0;right:0;z-index:-1;text-align:center;direction:ltr;font-size:11px;font-weight:500;color:#848484;padding:0 12px;pointer-events:none;}   /* z-index -1: fixed in place, behind anything that scrolls over it */
