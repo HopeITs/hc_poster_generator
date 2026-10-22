@@ -201,7 +201,7 @@
                 <option value="45">ريل 45 ثانية</option>
                 <option value="60">ريل 60 ثانية</option>
               </select>
-              <button type="button" class="btn-line" id="rgAnalyse" disabled>تحليل وتلخيص</button>
+              <button type="button" class="btn-line" id="rgAnalyse" disabled>توليد</button>
             </div>
             <div class="bar" id="rgSumBar" hidden><i id="rgSumFill"></i></div>
             <div class="music-st" id="rgSumSt"></div>

@@ -1253,10 +1253,10 @@
       if (miss.length) {   // re-link a reopened project: every moment gets its own element on the file
         return Promise.all(miss.map(function (it, i) {
           return sumEl(i).then(function (el) { Object.assign(it, { el: el, url: m.url, file: file, w: m.w, h: m.h, srcDur: m.srcDur, fps: m.fps, missing: false }); clampItem(it); });
-        })).then(function () { sumSt("✓ رجعت " + miss.length + " لحظة من الفيديو" + (S.talkGoal ? " · هدف الريل: " + S.talkGoal : "") + " — «تحليل وتلخيص» بيعيد الاختيار"); relayout(); });
+        })).then(function () { sumSt("✓ رجعت " + miss.length + " لحظة من الفيديو" + (S.talkGoal ? " · هدف الريل: " + S.talkGoal : "") + " — «توليد» بيعيد الاختيار"); relayout(); });
       }
       S.items = S.items.filter(function (it) { return it.kind === "card"; }); S.sum = null; relayout();
-      sumSt(m.srcDur < reelLen() * 1.5 ? "الفيديو قصير على التلخيص — الأفضل «إنشاء ريل»، أو اضغط «تحليل وتلخيص» على كل حال" : "اختار الطول والأسلوب واضغط «تحليل وتلخيص»", m.srcDur < reelLen() * 1.5);
+      sumSt(m.srcDur < reelLen() * 1.5 ? "الفيديو قصير على التلخيص — الأفضل «إنشاء ريل»، أو اضغط «توليد» على كل حال" : "اختار الطول والأسلوب واضغط «توليد»", m.srcDur < reelLen() * 1.5);
     }).catch(function () { sumSt("تعذّر فتح الفيديو — صيغة غير مدعومة بالمتصفح", true); });
   }
   function analyseLong() {
@@ -1703,7 +1703,7 @@
     kindHint();
     $("rgSumField").hidden = !sum; $("rgFilesField").hidden = sum; $("rgPick").hidden = sum;
     if (!S.musicBlob) $("rgMusicSt").textContent = sum ? "لا موسيقى بعد — بدونها الريل بصوت الفيديو الأصلي" : "لا موسيقى بعد";
-    $("rgEmpty").innerHTML = sum ? "ارفع فيديو طويل واضغط<br>«تحليل وتلخيص»" : "أضف صوراً أو مقاطع فيديو<br>لتظهر المعاينة هنا";
+    $("rgEmpty").innerHTML = sum ? "ارفع فيديو طويل واضغط<br>«توليد»" : "أضف صوراً أو مقاطع فيديو<br>لتظهر المعاينة هنا";
     try { localStorage.setItem("rg_mode", S.mode); } catch (e) {}
   }
 
@@ -1952,9 +1952,9 @@
     ["dragleave", "drop"].forEach(function (ev) { longDrop.addEventListener(ev, function (e) { e.preventDefault(); longDrop.classList.remove("over"); }); });
     longDrop.addEventListener("drop", function (e) { setLong(e.dataTransfer.files[0]); });
     $("rgAnalyse").onclick = analyseLong;
-    $("rgSumKind").addEventListener("change", function () { kindHint(); if (S.sumData) sumSt("اضغط «تحليل وتلخيص» للتلخيص بهالطريقة"); });
+    $("rgSumKind").addEventListener("change", function () { kindHint(); if (S.sumData) sumSt("اضغط «توليد» للتلخيص بهالطريقة"); });
     $("rgSumLen").addEventListener("change", function () {
-      if (talkReel()) sumSt("اضغط «تحليل وتلخيص» لتختار الأفكار على الطول الجديد");   // a new length needs a new choice of thoughts
+      if (talkReel()) sumSt("اضغط «توليد» لتختار الأفكار على الطول الجديد");   // a new length needs a new choice of thoughts
       else if (S.sumData && S.sumData.samples) buildSummary(); else { S.endLen = null; relayout(); }
     });
     $("rgExport").onclick = exportMp4;
