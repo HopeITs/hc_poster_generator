@@ -160,7 +160,9 @@
     var m = it.el.querySelector(".meta"), h = "";
     if (it.state === "busy") h = '<span class="tag">…جارٍ التفريغ</span>';
     else if (it.state === "error") h = '<span class="warn">' + esc(it.err) + '</span>';
-    else if (it.engine === "gemini") h = '<span class="tag gem">تم التفريغ</span>' + (isDoc(it) ? "<span>" + (it.docType === "فاتورة" ? "فاتورة" : "وثيقة") + " · " + it.fields.length + " خانة</span>" : "");
+    else if (it.engine === "gemini") h = '<span class="tag gem">تم التفريغ</span>' + (isDoc(it) ? "<span>" + (it.docType === "فاتورة" ? "فاتورة" : "وثيقة") + " · " + it.fields.length + " خانة</span>" : "") +
+      // read by the lighter model: the main one was busy or over today's quota — less exact, digits above all
+      (it.lite ? '<span class="warn" title="النموذج الأساسي كان مضغوط أو خلص حده اليومي">قراها نموذج أخف — راجع الأرقام أو أعد التفريغ لاحقاً</span>' : "");
     else h = "<span>بانتظار التفريغ</span>";
     m.innerHTML = h;
     if (it.shown !== it.ver) { out(it); it.shown = it.ver; }
@@ -236,7 +238,7 @@
       if (!it.pdf && last && !last[0].pdf && last.length < GEM_BATCH) last.push(it); else batches.push([it]);
     });
     busy(true); bar(0);
-    var done = 0, failed = 0, docs = 0;
+    var done = 0, failed = 0, docs = 0, lite = 0;
     function next(b) {
       if (b >= batches.length) return Promise.resolve();
       var group = batches[b];
@@ -250,8 +252,9 @@
         group.forEach(function (it, i) {
           var r = (d.images || [])[i] || { text: (d.texts || [])[i] || "", fields: [] };
           it.text = clean(r.text); it.fields = (r.fields || []).map(function (f) { return { label: f.label, value: f.value }; }); it.docType = r.docType || "";
-          it.engine = "gemini"; it.state = ""; it.ver++;
+          it.engine = "gemini"; it.state = ""; it.ver++; it.lite = !!d.lite;
           if (isDoc(it)) docs++;
+          if (it.lite) lite++;
         });
       }, function (e) {
         failed += group.length;
@@ -262,7 +265,8 @@
       status(failed ? "ما قدرت فرّغ " + failed + " صورة — شوف السبب جنبها"
                     : mode === "invoice" ? "✓ تم تفريغ " + list.length + " فاتورة — راجع الخانات، و«تنزيل Excel» بيعطيك جدولها"
                     : "✓ تم تفريغ " + list.length + (list.every(function (it) { return it.pdf; }) ? " ملف PDF" : list.some(function (it) { return it.pdf; }) ? " ملف" : " صورة") +
-                      (docs ? " · " + docs + " منها وثائق مقسومة لخانات" : ""), !!failed);
+                      (docs ? " · " + docs + " منها وثائق مقسومة لخانات" : "") +
+                      (lite ? " · " + lite + " منها قراها نموذج أخف لأن حد اليوم خلص — راجع أرقامها أو أعد تفريغها بكرا" : ""), !!failed);
       busy(false); buttons();
     });
   }

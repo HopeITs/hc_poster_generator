@@ -218,7 +218,7 @@ function geminiSoften(body, level) {
   return Object.assign({}, body, { generationConfig: gc, system_instruction: sys });
 }
 async function geminiJSON(key, models, body, label) {
-  var r = null, d = null, overQuota = false;
+  var r = null, d = null, overQuota = false, used = "";
   async function call(model) {
     var level = geminiLenient[model] || 0, t0 = Date.now();
     r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + key,
@@ -231,6 +231,7 @@ async function geminiJSON(key, models, body, label) {
   for (var i = 0; i < models.length; i++) {
     if (i) await new Promise(function (res) { setTimeout(res, 600 * i); });   // short: a busy model rarely clears in a second or two, and the next try may be another model
     try { await call(models[i]); } catch (e) { r = null; d = null; continue; }
+    if (r.ok) used = models[i];
     if (r.ok || r.status === 401 || r.status === 403 || r.status === 404) break;   // anything else (busy, over quota, rejected) tries the next model
   }
   if (!r) return { error: "تعذّر الاتصال بـ Gemini" };
@@ -239,7 +240,7 @@ async function geminiJSON(key, models, body, label) {
                            : ((d && d.error && d.error.message) || "فشل طلب Gemini") };
   var out = ""; try { out = d.candidates[0].content.parts[0].text || ""; } catch (e) {}
   out = out.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");   // a lenient answer may come fenced
-  try { return { data: JSON.parse(out) }; } catch (e) { return { error: "ردّ Gemini غير صالح" }; }
+  try { return { data: JSON.parse(out), model: used }; } catch (e) { return { error: "ردّ Gemini غير صالح" }; }   // model: which one answered (a fallback reads less well)
 }
 /* A long answer (a minute or two of Gemini) as a stream: the response starts
    at once and a space goes out every few seconds until the JSON follows, so
@@ -969,7 +970,8 @@ txDocRules +
             var doc = txMode !== "text" && x.kind === "document" && fields.length > 0;
             images[n - 1] = { text: String(x.text || "").slice(0, 200000), kind: doc ? "document" : "text", docType: doc ? String(x.doc_type || "").trim().slice(0, 80) : "", fields: doc ? fields : [] };
           });
-          return { ok: true, images: images, texts: images.map(function (im) { return im.text; }) };
+          // lite: the main model was busy or over its daily quota and the lighter one read these — less exact, digits above all
+          return { ok: true, images: images, texts: images.map(function (im) { return im.text; }), model: txR.model, lite: /lite/.test(txR.model || "") };
         });
       }
 
