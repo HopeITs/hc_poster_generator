@@ -39,6 +39,7 @@ const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مس�
 const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
 const TRANSCRIBE_MAX_IMAGES = 6;
 const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
+const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;   // up to this the images travel inside the request, not uploaded first
 // أهداف الريل وبنية كل هدف — Gemini يختار واحداً من المحتوى ويرتّب الأفكار حسبه
 const MOMENTS_GOALS = {
   "تعريف بمشروع":  "what the project is, then who it serves, then what they do there, then how to join or learn more",
@@ -226,7 +227,7 @@ async function geminiJSON(key, models, body, label) {
     if (r.status === 400 && level < 2 && body.generationConfig) { geminiLenient[model] = level + 1; return call(model); }
   }
   for (var i = 0; i < models.length; i++) {
-    if (i) await new Promise(function (res) { setTimeout(res, 1500 * i); });
+    if (i) await new Promise(function (res) { setTimeout(res, 600 * i); });   // short: a busy model rarely clears in a second or two, and the next try may be another model
     try { await call(models[i]); } catch (e) { r = null; d = null; continue; }
     if (r.ok || r.status === 401 || r.status === 403 || r.status === 404) break;   // anything else (busy, over quota, rejected) tries the next model
   }
@@ -274,6 +275,11 @@ async function geminiUpload(key, bytes, mime, name) {
   }
   if (file.state !== "ACTIVE") return { error: "Gemini ما قدر يقرأ الصوت", file: file };
   return { file: file };
+}
+function base64(buf) {   // in 32 KB slices: one String.fromCharCode call per slice stays within the argument limit
+  var b = new Uint8Array(buf), s = "";
+  for (var i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768));
+  return btoa(s);
 }
 function geminiDelete(key, ctx, file) {   // the audio does not stay with Google
   if (file && file.name) ctx.waitUntil(fetch("https://generativelanguage.googleapis.com/v1beta/" + file.name + "?key=" + key, { method: "DELETE" }).catch(function () {}));
@@ -898,13 +904,20 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
 "For kind \"text\": 'fields' is [] and 'doc_type' is \"\".\n";
         return slowJSON(async function () {
           var off = 0, parts = txSizes.map(function (n) { var b = txIn.audio.slice(off, off + n); off += n; return b; });
-          var ups = await Promise.all(parts.map(function (b, i) { return geminiUpload(txKey, b, "image/jpeg", "text-transcription-" + (i + 1)); }));
+          // Small batches go inline (no upload round trip, ~1 s saved); bigger ones through the
+          // Files API, so the Worker never base64-encodes megabytes.
+          var txInline = txIn.audio.byteLength <= TRANSCRIBE_INLINE_BYTES, txT0 = Date.now();
+          var ups = txInline ? [] : await Promise.all(parts.map(function (b, i) { return geminiUpload(txKey, b, "image/jpeg", "text-transcription-" + (i + 1)); }));
+          console.log("transcribe " + (txInline ? "inline" : "upload") + " " + parts.length + " image(s), " + Math.round(txIn.audio.byteLength / 1024) + " KB: " + (Date.now() - txT0) + "ms");
           var txR;
           try {
             var bad = ups.filter(function (u) { return u.error; })[0];
             if (bad) return { error: bad.error.replace("الصوت", "الصورة") };
             var txParts = [];
-            ups.forEach(function (u, i) { txParts.push({ text: "Image " + (i + 1) + ":" }, { file_data: { mime_type: "image/jpeg", file_uri: u.file.uri } }); });
+            parts.forEach(function (b, i) {
+              txParts.push({ text: "Image " + (i + 1) + ":" }, txInline ? { inline_data: { mime_type: "image/jpeg", data: base64(b) } }
+                                                                      : { file_data: { mime_type: "image/jpeg", file_uri: ups[i].file.uri } });
+            });
             txR = await geminiJSON(txKey, ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"], {
               system_instruction: { parts: [{ text:
 "You transcribe the text in images. For EACH image, in order, write all the text it contains exactly as written: the same language and spelling, no translation, no correction, no summary, nothing added. The text is mostly in " + txLang + ".\n" +
@@ -913,7 +926,8 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
 txDocRules +
 "Return ONLY JSON: one entry per image in 'images', covering all " + parts.length + " images." }] },
               contents: [{ role: "user", parts: txParts }],
-              generationConfig: { temperature: 0, maxOutputTokens: 32768, responseMimeType: "application/json", responseSchema: {
+              // no thinking: copying text needs none, and it was most of the wait (9.4 s of 12 for one card)
+              generationConfig: { temperature: 0, maxOutputTokens: 32768, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: {
                 type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: txMode === "text"
                   ? { type: "OBJECT", required: ["n", "text"], properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } }
                   : { type: "OBJECT", required: ["n", "kind", "doc_type", "fields", "text"], propertyOrdering: ["n", "kind", "doc_type", "fields", "text"], properties: {
