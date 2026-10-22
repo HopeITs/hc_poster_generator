@@ -1906,6 +1906,8 @@
   /* ---------- wiring ---------- */
   function wire() {
     cv = $("rgCanvas"); g = cv.getContext("2d");
+    var scr = cv.parentNode;   // the screen's height follows the card, so the play bar takes its width from it
+    new ResizeObserver(function () { scr.parentNode.style.setProperty("--sw", scr.offsetWidth + "px"); }).observe(scr);
     $("rgFiles").addEventListener("change", function (e) { addFiles(e.target.files); e.target.value = ""; });
     var drop = $("rgDrop");
     ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });

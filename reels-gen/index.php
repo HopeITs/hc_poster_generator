@@ -76,11 +76,16 @@
   audio{width:100%;height:34px;margin-top:6px;}
 
   /* preview */
-  .pv{display:flex;flex-direction:column;align-items:center;gap:12px;}
-  .screen{position:relative;height:min(640px,72vh);aspect-ratio:9/16;max-width:100%;background:#111;border-radius:14px;overflow:hidden;}
+  /* The screen is 899px tall in both kinds of work, 74px under the card's top:
+     the size that fills the card of "إنشاء ريل" down to 95px above its bottom
+     (a taller side column, as in a summary, only adds room below). Its width
+     follows 9:16; on one column (phones) the width decides instead. */
+  .pv{display:flex;flex-direction:column;align-items:center;gap:12px;padding-top:74px;padding-bottom:95px;}
+  .screen{position:relative;flex:none;height:899px;aspect-ratio:9/16;max-width:100%;background:#111;border-radius:14px;overflow:hidden;}
+  @media(max-width:900px){.pv{padding-top:22px;padding-bottom:22px;} .screen{flex:none;width:min(100%,360px,40.5vh);height:auto;min-height:0;}}   /* width first, so a narrow phone keeps 9:16 */
   .screen canvas{display:block;width:100%;height:100%;}
   .screen .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#aaa;font-size:14px;padding:30px;line-height:1.7;}
-  .transport{display:flex;flex-direction:row-reverse;align-items:center;gap:10px;width:min(100%,360px,40.5vh);}   /* as wide as .screen (9/16 of its height); reversed in RTL: play on its left edge, time on its right */
+  .transport{display:flex;flex-direction:row-reverse;align-items:center;gap:10px;width:var(--sw,360px);max-width:100%;}   /* as wide as .screen (--sw, kept by app.js); reversed in RTL: play on its left edge, time on its right */
   .transport button{width:27px;height:27px;padding:0;border-radius:50%;border:none;background:var(--navy);color:#fff;font-size:11px;line-height:27px;cursor:pointer;flex:0 0 auto;}
   #rgPlay:not(.playing){padding-left:2px;}   /* nudges ▶ 1px right so it looks centred; ❚❚ stays put */
   /* Seek bar: a thin K50 grey line (K50 = #939598) running left to right from the
