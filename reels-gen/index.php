@@ -140,7 +140,7 @@
 
   .gate{max-width:520px;margin:60px auto;text-align:center;}
   .gate p{font-size:15px;font-weight:700;color:var(--ink);}
-  .foot{position:fixed;bottom:24px;left:0;right:0;text-align:center;direction:ltr;font-size:11px;font-weight:500;color:#848484;padding:0 12px;pointer-events:none;}
+  .foot{position:fixed;bottom:24px;left:0;right:0;z-index:-1;text-align:center;direction:ltr;font-size:11px;font-weight:500;color:#848484;padding:0 12px;pointer-events:none;}   /* z-index -1: fixed in place, behind anything that scrolls over it */
 </style>
 </head>
 <body>

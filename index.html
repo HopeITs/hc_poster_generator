@@ -481,7 +481,7 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .proj-go{font-size:13px;color:#58595b;font-weight:700;white-space:nowrap;}
 .proj-badge{font-size:11px;font-weight:700;color:#5a7282;white-space:nowrap;}
 .pg-logout{margin-top:19.5px;background:none;border:none;color:#808285;font-family:'Somar Sans';font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;}
-.app-copyright{position:absolute;bottom:24px;left:0;right:0;text-align:center;padding:0 12px;direction:ltr;font-family:'Somar Sans';font-weight:500;font-size:11px;color:#5b5b5b;}
+.app-copyright{position:fixed;bottom:24px;left:0;right:0;z-index:-1;pointer-events:none;text-align:center;padding:0 12px;direction:ltr;font-family:'Somar Sans';font-weight:500;font-size:11px;color:#5b5b5b;}   /* fixed in place, behind the gate's own content */
 #projectGate .app-copyright{color:#848484;}
 .pg-stack{display:flex;flex-direction:column;align-items:center;gap:15px;}
 .pg-ga{width:min(92vw,440px);background:#fff;border-radius:18px;padding:21px 33px;box-shadow:0 10px 40px rgba(0,0,0,.12);}
