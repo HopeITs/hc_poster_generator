@@ -222,7 +222,7 @@ into Success</textarea>
   <script src="compositor.js" defer></script>
   <script src="app.js" defer></script>
 
-  <div class="foot">HC Generator, a project by Christian Hope Center. © 2026 All Rights Reserved.</div>
+  <div class="foot">HC Generator, a project by Christian Hope Center. © <?= date('Y') ?> All Rights Reserved.</div>
 
 </body>
 </html>
