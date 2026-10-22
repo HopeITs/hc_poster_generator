@@ -872,9 +872,11 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
       }
 
       /* ---- 7b7) Text Transcription: نص الصور عبر Gemini ----
-         لكل من يملك أداة text-transcription. الجسم: [4 بايت طول JSON][JSON {lang, sizes}][الصور JPEG متتالية].
+         لكل من يملك أداة text-transcription. الجسم: [4 بايت طول JSON][JSON {lang, sizes, mode}][الصور JPEG متتالية].
          تُرفع الصور كما هي إلى Files API، يقرؤها Gemini بطلب واحد ويعيد نص كل صورة، ثم تُحذف.
-         الرد يتدفّق (slowJSON): {texts:[نص كل صورة]} أو {error}. */
+         mode: text (نص فقط) | doc (كل صورة وثيقة: بطاقة، جواز…) | auto (Gemini يقرّر لكل صورة).
+         للوثيقة يعيد خاناتها {label, value} بترتيبها على الوثيقة. لا يُحفظ شيء من المحتوى هنا.
+         الرد يتدفّق (slowJSON): {images:[{text, kind, docType, fields}]} أو {error}. */
       if (request.method === "POST" && path === "/transcribe/images") {
         var txUser = await getSessionUser(env, request);
         if (!txUser) return json({ error: "غير مسجّل دخول" }, 401);
@@ -888,6 +890,12 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
         var txSizes = (Array.isArray(txIn.meta.sizes) ? txIn.meta.sizes : []).map(function (n) { return Math.max(0, Math.floor(Number(n) || 0)); });
         if (!txSizes.length || txSizes.length > TRANSCRIBE_MAX_IMAGES || txSizes.reduce(function (s, n) { return s + n; }, 0) !== txIn.audio.byteLength) return json({ error: "طلب غير صالح" }, 400);
         var txLang = { "ara+eng": "Arabic and English", ara: "Arabic", eng: "English" }[txIn.meta.lang] || "Arabic and English";
+        var txMode = ["text", "doc", "auto"].indexOf(txIn.meta.mode) >= 0 ? txIn.meta.mode : "text";
+        var txDocRules = txMode === "text" ? "" :
+          (txMode === "doc" ? "EVERY image is an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, form): its kind is \"document\".\n"
+                            : "Decide for each image: an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, filled form) is kind \"document\"; anything else is kind \"text\".\n") +
+"For a document: 'doc_type' names it in Arabic (like «بطاقة شخصية سورية — الوجه» or «جواز سفر»). 'fields' lists every labelled item on it, in the order it appears: 'label' is the field's name as printed (Arabic when the document has it, e.g. «الاسم», «اسم الأب», «اسم الأم», «تاريخ الولادة», «مكان الولادة», «الرقم الوطني»), or a short Arabic name when the value has no printed label; 'value' is exactly what is written there — names, dates and numbers digit for digit, never reformatted or guessed. Unreadable: […]. Leave out the document's title, emblems and printed headings. 'text' still holds the full transcription.\n" +
+"For kind \"text\": 'fields' is [] and 'doc_type' is \"\".\n";
         return slowJSON(async function () {
           var off = 0, parts = txSizes.map(function (n) { var b = txIn.audio.slice(off, off + n); off += n; return b; });
           var ups = await Promise.all(parts.map(function (b, i) { return geminiUpload(txKey, b, "image/jpeg", "text-transcription-" + (i + 1)); }));
@@ -902,20 +910,30 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
 "You transcribe the text in images. For EACH image, in order, write all the text it contains exactly as written: the same language and spelling, no translation, no correction, no summary, nothing added. The text is mostly in " + txLang + ".\n" +
 "Keep the reading order (Arabic right to left, then top to bottom; columns one after another), the line breaks and the paragraphs. Headings and list items go on their own lines. A table is one line per row, its cells separated by ' | '.\n" +
 "Keep Arabic letters, diacritics and digits as they appear. Mark a word you cannot read as […]. If an image has no text, its text is \"\".\n" +
-"Return ONLY JSON: {\"images\":[{\"n\":1,\"text\":\"...\"}]}, one entry per image, covering all " + parts.length + " images." }] },
+txDocRules +
+"Return ONLY JSON: one entry per image in 'images', covering all " + parts.length + " images." }] },
               contents: [{ role: "user", parts: txParts }],
               generationConfig: { temperature: 0, maxOutputTokens: 32768, responseMimeType: "application/json", responseSchema: {
-                type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: { type: "OBJECT", required: ["n", "text"],
-                  properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } } } } } }
-            }, "transcribe-images");
+                type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: txMode === "text"
+                  ? { type: "OBJECT", required: ["n", "text"], properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } }
+                  : { type: "OBJECT", required: ["n", "kind", "doc_type", "fields", "text"], propertyOrdering: ["n", "kind", "doc_type", "fields", "text"], properties: {
+                      n: { type: "INTEGER" }, kind: { type: "STRING", enum: ["text", "document"] }, doc_type: { type: "STRING" },
+                      fields: { type: "ARRAY", items: { type: "OBJECT", required: ["label", "value"], properties: { label: { type: "STRING" }, value: { type: "STRING" } } } },
+                      text: { type: "STRING" } } } } } } }
+            }, "transcribe-images-" + txMode);
           } finally { ups.forEach(function (u) { geminiDelete(txKey, ctx, u.file); }); }
           if (txR.error) return { error: txR.error };
           await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'transcribe', datetime('now'))").bind(txUser.email).run();
-          var texts = parts.map(function () { return ""; });
+          var images = parts.map(function () { return { text: "", kind: "text", docType: "", fields: [] }; });
           ((txR.data && txR.data.images) || []).forEach(function (x) {
-            var n = Math.round(Number(x && x.n)); if (n >= 1 && n <= texts.length) texts[n - 1] = String(x.text || "").slice(0, 60000);
+            var n = Math.round(Number(x && x.n)); if (!(n >= 1 && n <= images.length)) return;
+            var fields = (Array.isArray(x.fields) ? x.fields : []).slice(0, 60).map(function (f) {
+              return { label: String(f && f.label || "").trim().slice(0, 80), value: String(f && f.value || "").trim().slice(0, 400) };
+            }).filter(function (f) { return f.label || f.value; });
+            var doc = txMode !== "text" && x.kind === "document" && fields.length > 0;
+            images[n - 1] = { text: String(x.text || "").slice(0, 60000), kind: doc ? "document" : "text", docType: doc ? String(x.doc_type || "").trim().slice(0, 80) : "", fields: doc ? fields : [] };
           });
-          return { ok: true, texts: texts };
+          return { ok: true, images: images, texts: images.map(function (im) { return im.text; }) };
         });
       }
 

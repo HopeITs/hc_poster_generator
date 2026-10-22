@@ -72,6 +72,19 @@
   .tag.dev{background:#e7eef2;color:var(--navy);}
   .warn{color:var(--red);}
   .item textarea{width:100%;min-height:140px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:inherit;font-size:14px;line-height:1.75;color:var(--ink);background:#fff;unicode-bidi:plaintext;}
+  /* a document: its fields, each label and value editable, then the full text folded away */
+  .doc-type{font-size:13px;font-weight:800;color:var(--ink);}
+  .fields{width:100%;border-collapse:collapse;font-size:14px;}
+  .fields td{border-bottom:1px solid var(--fill);padding:3px 0;vertical-align:middle;}
+  .fields td.l{width:34%;padding-inline-end:8px;}
+  .fields td.c{width:1%;padding-inline-start:6px;}
+  .fields input{width:100%;border:1px solid transparent;border-radius:7px;padding:6px 8px;font-family:inherit;font-size:14px;color:var(--ink);background:transparent;unicode-bidi:plaintext;}
+  .fields td.l input{font-weight:700;color:var(--muted);font-size:13px;}
+  .fields input:hover{border-color:var(--line);}
+  .fields input:focus{outline:2px solid var(--red);outline-offset:0;background:#fff;}
+  .fields button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:4px 9px;font-family:inherit;font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;}
+  .fields button:hover{border-color:var(--red);color:var(--red);}
+  details.full summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);margin:2px 0 6px;}
   .item .tools{display:flex;gap:6px;flex-wrap:wrap;}
   .item .tools button{flex:0 0 auto;}
   .empty{padding:34px;text-align:center;color:var(--muted);font-size:14px;border:2px dashed var(--line);border-radius:14px;line-height:1.8;}
@@ -109,6 +122,15 @@
             <option value="eng">English</option>
           </select>
         </div>
+        <div class="field">
+          <div class="sec">نوع الصورة</div>
+          <select id="ttKind">
+            <option value="auto">تلقائي — الأداة بتعرف</option>
+            <option value="text">نص عادي</option>
+            <option value="doc">بطاقة أو وثيقة — خانات</option>
+          </select>
+          <div class="hint" id="ttKindHint" style="margin-top:6px"></div>
+        </div>
         <div class="engines">
           <button type="button" class="btn" id="ttLocal" disabled>تفريغ على الجهاز</button>
           <div class="hint" style="margin-top:6px">مجاني والصورة ما بتطلع من جهازك — مناسب للمستندات والنصوص المطبوعة الواضحة. أول مرة بيحمّل حوالي 9 MB.</div>
@@ -125,6 +147,7 @@
           <div class="row">
             <button type="button" class="btn-line" id="ttCopyAll" disabled>نسخ الكل</button>
             <button type="button" class="btn-line" id="ttSave" disabled>تنزيل TXT</button>
+            <button type="button" class="btn-line" id="ttCsv" disabled title="كل البطاقات بجدول واحد: سطر لكل بطاقة">تنزيل Excel</button>
             <button type="button" class="btn-line" id="ttClear" disabled>مسح الكل</button>
           </div>
         </div>
