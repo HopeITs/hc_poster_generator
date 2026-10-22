@@ -1,6 +1,6 @@
 <?php
 /**
- * Text Transcription — the text in images, as editable text.
+ * Text Transcription — the text in images and PDF files, as editable text.
  * «تفريغ النص» reads them with Gemini through the auth Worker
  * (/transcribe/images); the images are sent to Google for that and deleted
  * right after. Image types: plain text, card or document (as fields), invoice.
@@ -62,6 +62,11 @@
   @media(max-width:620px){.item{grid-template-columns:1fr;}}
   .item .pic{position:relative;border-radius:9px;overflow:hidden;background:var(--fill);align-self:start;}
   .item .pic img{display:block;width:100%;height:auto;max-height:220px;object-fit:contain;cursor:zoom-in;}
+  /* a PDF: a tile with its name, opening the file */
+  .item .pdf{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;aspect-ratio:3/4;max-height:220px;border:none;background:var(--fill);cursor:pointer;font-family:inherit;padding:10px;}
+  .item .pdf b{background:var(--red);color:#fff;font-size:13px;font-weight:900;border-radius:6px;padding:4px 10px;letter-spacing:.04em;}
+  .item .pdf span{font-size:11px;font-weight:700;color:var(--ink);direction:ltr;word-break:break-all;text-align:center;max-height:4.5em;overflow:hidden;}
+  .item .pdf:hover b{background:var(--navy);}
   .item .num{position:absolute;top:6px;inset-inline-start:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;}
   .item .body{display:flex;flex-direction:column;gap:8px;min-width:0;}
   .item .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;font-weight:700;color:var(--muted);}
@@ -113,11 +118,11 @@
     <div class="layout" id="ttApp" hidden>
       <div class="card">
         <div class="field">
-          <div class="sec">الصور <span class="hint">صورة أو أكتر — أو الصق بـ Ctrl+V</span></div>
+          <div class="sec">الملفات <span class="hint">صور أو PDF — أو الصق صورة بـ Ctrl+V</span></div>
           <label class="drop" id="ttDrop">
-            <div class="t">اسحب الصور هنا أو اضغط للاختيار</div>
-            <div class="h">JPG · PNG · WEBP</div>
-            <input type="file" id="ttFiles" accept="image/*" multiple>
+            <div class="t">اسحب الصور أو ملفات PDF هنا أو اضغط للاختيار</div>
+            <div class="h">JPG · PNG · WEBP · PDF</div>
+            <input type="file" id="ttFiles" accept="image/*,application/pdf,.pdf" multiple>
           </label>
         </div>
         <div class="field">

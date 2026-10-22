@@ -1,7 +1,8 @@
-/* Text Transcription — the text in images, as editable text.
-   «تفريغ النص» sends the images to Gemini through the auth Worker
-   (/transcribe/images): scaled down to GEM_SIDE, in batches of GEM_BATCH
-   (one request each), and deleted from Google once read.
+/* Text Transcription — the text in images and PDF files, as editable text.
+   «تفريغ النص» sends them to Gemini through the auth Worker
+   (/transcribe/images): images scaled down to GEM_SIDE in batches of
+   GEM_BATCH, each PDF as it is in a request of its own (Gemini reads its
+   pages, text or scan); all deleted from Google once read.
    Image type: plain text, a card or document (ID, passport, certificate…), or
    an invoice for the accounting team. A document or invoice comes back as its
    fields — label and value, both editable — with the full text folded below.
@@ -43,14 +44,18 @@
   }
 
   /* ---------- images ---------- */
+  function isPdfFile(f) { return f.type === "application/pdf" || /\.pdf$/i.test(f.name || ""); }
   function addFiles(files) {
-    var list = [].slice.call(files || []).filter(function (f) { return /^image\//.test(f.type); });
-    if (!list.length) { status("اختر صوراً (JPG أو PNG أو WEBP)", true); return; }
+    var all = [].slice.call(files || []), list = all.filter(function (f) { return /^image\//.test(f.type) || isPdfFile(f); });
+    if (!list.length) { status("اختر صوراً (JPG أو PNG أو WEBP) أو ملفات PDF", true); return; }
+    var big = list.filter(function (f) { return isPdfFile(f) && f.size > GEM_MAX_BYTES; });
+    list = list.filter(function (f) { return big.indexOf(f) < 0; });
     list.forEach(function (f) {
-      S.items.push({ id: nextId++, file: f, url: URL.createObjectURL(f), name: f.name || "image", text: "", engine: "", state: "", err: "",
+      S.items.push({ id: nextId++, file: f, url: URL.createObjectURL(f), name: f.name || "image", pdf: isPdfFile(f), text: "", engine: "", state: "", err: "",
                      docType: "", fields: [], ver: 0 });
     });
-    status(""); render();
+    status(big.length ? "ملف PDF أكبر من " + Math.round(GEM_MAX_BYTES / 1048576) + " MB ما انضاف: " + big.map(function (f) { return f.name; }).join("، ") : "", !!big.length);
+    render();
   }
   function loadImage(it) {
     if (it.img) return Promise.resolve(it.img);
@@ -75,7 +80,13 @@
       el.innerHTML = '<div class="pic"><img alt=""><span class="num">' + (i + 1) + '</span></div>' +
         '<div class="body"><div class="meta"></div><div class="out"></div>' +
         '<div class="tools"><button type="button" class="btn-line" data-a="copy">نسخ</button><button type="button" class="btn-line" data-a="gem">تفريغ هالصورة</button><button type="button" class="btn-line" data-a="del">حذف</button></div></div>';
-      var img = el.querySelector("img"); img.src = it.url; img.onclick = function () { zoom(it.url); };
+      if (it.pdf) {   // no preview of a PDF's pages here: a tile with its name, opening the file itself
+        var pic = el.querySelector(".pic"); pic.querySelector("img").remove();
+        var tile = document.createElement("button"); tile.type = "button"; tile.className = "pdf"; tile.title = "فتح الملف";
+        tile.innerHTML = '<b>PDF</b><span></span>'; tile.querySelector("span").textContent = it.name;
+        tile.onclick = function () { window.open(it.url, "_blank", "noopener"); };
+        pic.insertBefore(tile, pic.firstChild);
+      } else { var img = el.querySelector("img"); img.src = it.url; img.onclick = function () { zoom(it.url); }; }
       el.querySelector(".tools").addEventListener("click", function (e) {
         var a = e.target.dataset && e.target.dataset.a; if (!a) return;
         if (a === "copy") copy(itemText(it), "✓ نسخت " + (isDoc(it) ? "خانات" : "نص") + " الصورة " + (S.items.indexOf(it) + 1));
@@ -129,7 +140,7 @@
     $("ttCopyAll").disabled = $("ttSave").disabled = !any;
     $("ttCsv").disabled = !S.items.some(isDoc);
     $("ttClear").disabled = !n || S.busy;
-    $("ttCount").textContent = n ? "· " + n + " صورة" : "";
+    $("ttCount").textContent = n ? "· " + n + " ملف" : "";
     S.items.forEach(function (it) { if (it.el) it.el.querySelector('[data-a="gem"]').disabled = S.busy; });
   }
   function zoom(url) {
@@ -142,6 +153,7 @@
   /* At most GEM_SIDE on the long side, as JPEG on white: small enough to send,
      sharp enough for small print. */
   function shrink(it) {
+    if (it.pdf) return Promise.resolve(it.file);   // a PDF goes as it is: Gemini reads its pages
     return loadImage(it).then(function (im) {
       var w = im.naturalWidth, h = im.naturalHeight, k = Math.min(1, GEM_SIDE / Math.max(w, h));
       var c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
@@ -149,11 +161,12 @@
       return new Promise(function (res) { c.toBlob(res, "image/jpeg", 0.9); });
     });
   }
-  /* Body: [4-byte JSON length][JSON {lang, mode, sizes}][the JPEGs back to back] —
+  /* Body: [4-byte JSON length][JSON {lang, mode, sizes, mimes}][the JPEGs or PDF back to back] —
      the Worker hands the bytes on to Gemini as they are. The answer streams
      (spaces while Gemini reads, then the JSON). */
-  function askGemini(blobs, lang, mode) {
-    var meta = new TextEncoder().encode(JSON.stringify({ lang: lang, mode: mode, sizes: blobs.map(function (b) { return b.size; }) }));
+  function askGemini(blobs, lang, mode, group) {
+    var meta = new TextEncoder().encode(JSON.stringify({ lang: lang, mode: mode, sizes: blobs.map(function (b) { return b.size; }),
+      mimes: group.map(function (it) { return it.pdf ? "application/pdf" : "image/jpeg"; }) }));
     var hdr = new Uint8Array(4); new DataView(hdr.buffer).setUint32(0, meta.length);
     return fetch(WORKER + "/transcribe/images", { method: "POST", headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/octet-stream" },
       body: new Blob([hdr, meta].concat(blobs)) })
@@ -185,17 +198,22 @@
   }
   function sendGemini(list, mode) {
     var lang = $("ttLang").value, batches = [];
-    for (var k = 0; k < list.length; k += GEM_BATCH) batches.push(list.slice(k, k + GEM_BATCH));
+    // images in batches of GEM_BATCH; a PDF alone, so a long one has the whole answer to itself
+    list.forEach(function (it) {
+      var last = batches[batches.length - 1];
+      if (!it.pdf && last && !last[0].pdf && last.length < GEM_BATCH) last.push(it); else batches.push([it]);
+    });
     busy(true); bar(0);
     var done = 0, failed = 0, docs = 0;
     function next(b) {
       if (b >= batches.length) return Promise.resolve();
       var group = batches[b];
       group.forEach(function (it) { it.state = "busy"; paint(it); });
-      status("…جارٍ تفريغ " + (list.length > 1 ? "الصور " + (done + 1) + "–" + (done + group.length) + " من " + list.length : "الصورة"));
+      status("…جارٍ تفريغ " + (list.length > 1 ? "الملفات " + (done + 1) + (group.length > 1 ? "–" + (done + group.length) : "") + " من " + list.length : group[0].pdf ? "ملف PDF" : "الصورة") +
+             (group[0].pdf ? " — الملفات الطويلة بتاخد وقت أطول" : ""));
       return Promise.all(group.map(shrink)).then(function (blobs) {
         if (blobs.reduce(function (s, x) { return s + x.size; }, 0) > GEM_MAX_BYTES) throw new Error("الصور كبيرة كتير مع بعض");
-        return askGemini(blobs, lang, mode);
+        return askGemini(blobs, lang, mode, group);
       }).then(function (d) {
         group.forEach(function (it, i) {
           var r = (d.images || [])[i] || { text: (d.texts || [])[i] || "", fields: [] };
@@ -211,7 +229,8 @@
     next(0).then(function () {
       status(failed ? "ما قدرت فرّغ " + failed + " صورة — شوف السبب جنبها"
                     : mode === "invoice" ? "✓ تم تفريغ " + list.length + " فاتورة — راجع الخانات، و«تنزيل Excel» بيعطيك جدولها"
-                    : "✓ تم تفريغ " + list.length + " صورة" + (docs ? " · " + docs + " منها وثائق مقسومة لخانات" : ""), !!failed);
+                    : "✓ تم تفريغ " + list.length + (list.every(function (it) { return it.pdf; }) ? " ملف PDF" : list.some(function (it) { return it.pdf; }) ? " ملف" : " صورة") +
+                      (docs ? " · " + docs + " منها وثائق مقسومة لخانات" : ""), !!failed);
       busy(false); buttons();
     });
   }
