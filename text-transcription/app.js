@@ -51,8 +51,10 @@
     var big = list.filter(function (f) { return isPdfFile(f) && f.size > GEM_MAX_BYTES; });
     list = list.filter(function (f) { return big.indexOf(f) < 0; });
     list.forEach(function (f) {
-      S.items.push({ id: nextId++, file: f, url: URL.createObjectURL(f), name: f.name || "image", pdf: isPdfFile(f), text: "", engine: "", state: "", err: "",
-                     docType: "", fields: [], ver: 0 });
+      var it = { id: nextId++, file: f, url: URL.createObjectURL(f), name: f.name || "image", pdf: isPdfFile(f), text: "", engine: "", state: "", err: "",
+                 docType: "", fields: [], ver: 0, thumb: "", pages: 0 };
+      S.items.push(it);
+      if (it.pdf) pdfThumb(it);
     });
     status(big.length ? "ملف PDF أكبر من " + Math.round(GEM_MAX_BYTES / 1048576) + " MB ما انضاف: " + big.map(function (f) { return f.name; }).join("، ") : "", !!big.length);
     render();
@@ -80,13 +82,8 @@
       el.innerHTML = '<div class="pic"><img alt=""><span class="num">' + (i + 1) + '</span></div>' +
         '<div class="body"><div class="meta"></div><div class="out"></div>' +
         '<div class="tools"><button type="button" class="btn-line" data-a="copy">نسخ</button><button type="button" class="btn-line" data-a="gem">تفريغ هالصورة</button><button type="button" class="btn-line" data-a="del">حذف</button></div></div>';
-      if (it.pdf) {   // no preview of a PDF's pages here: a tile with its name, opening the file itself
-        var pic = el.querySelector(".pic"); pic.querySelector("img").remove();
-        var tile = document.createElement("button"); tile.type = "button"; tile.className = "pdf"; tile.title = "فتح الملف";
-        tile.innerHTML = '<b>PDF</b><span></span>'; tile.querySelector("span").textContent = it.name;
-        tile.onclick = function () { window.open(it.url, "_blank", "noopener"); };
-        pic.insertBefore(tile, pic.firstChild);
-      } else { var img = el.querySelector("img"); img.src = it.url; img.onclick = function () { zoom(it.url); }; }
+      if (it.pdf) pdfPic(it);
+      else { var img = el.querySelector("img"); img.src = it.url; img.onclick = function () { zoom(it.url); }; }
       el.querySelector(".tools").addEventListener("click", function (e) {
         var a = e.target.dataset && e.target.dataset.a; if (!a) return;
         if (a === "copy") copy(itemText(it), "✓ نسخت " + (isDoc(it) ? "خانات" : "نص") + " الصورة " + (S.items.indexOf(it) + 1));
@@ -96,6 +93,41 @@
       paint(it); box.appendChild(el);
     });
     buttons();
+  }
+  /* A PDF's picture: its first page once drawn (pdfThumb), with the page count;
+     until then — or if the page cannot be drawn — a tile with its name.
+     Either way a click opens the file itself. */
+  function pdfPic(it) {
+    if (!it.el) return;
+    var pic = it.el.querySelector(".pic"), old = pic.querySelector("img, .pdf"); if (old) old.remove();
+    var tile = document.createElement("button"); tile.type = "button"; tile.className = "pdf" + (it.thumb ? " page" : ""); tile.title = "فتح الملف";
+    if (it.thumb) {
+      tile.innerHTML = '<img alt=""><b></b>'; tile.querySelector("img").src = it.thumb;
+      tile.querySelector("b").textContent = "PDF" + (it.pages ? " · " + it.pages + (it.pages === 1 ? " صفحة" : it.pages <= 10 ? " صفحات" : " صفحة") : "");
+    } else { tile.innerHTML = '<b>PDF</b><span></span>'; tile.querySelector("span").textContent = it.name; }
+    tile.onclick = function () { window.open(it.url, "_blank", "noopener"); };
+    pic.insertBefore(tile, pic.firstChild);
+  }
+  /* PDF.js (vendor/pdfjs, Apache-2.0), loaded only once a PDF is added; eval
+     stays off for the CSP. Draws page 1 about 300 px wide. */
+  var pdfjs = null;
+  function pdfLib() {
+    return pdfjs || (pdfjs = import(new URL("vendor/pdfjs/pdf.min.js", location.href).href).then(function (m) {
+      m.GlobalWorkerOptions.workerSrc = new URL("vendor/pdfjs/pdf.worker.min.js", location.href).href; return m;
+    }));
+  }
+  function pdfThumb(it) {
+    pdfLib().then(function (m) { return it.file.arrayBuffer().then(function (buf) { return m.getDocument({ data: buf, isEvalSupported: false }).promise; }); })
+      .then(function (doc) {
+        it.pages = doc.numPages;
+        return doc.getPage(1).then(function (p) {
+          var vp = p.getViewport({ scale: 300 / p.getViewport({ scale: 1 }).width }), c = document.createElement("canvas");
+          c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+          var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+          return p.render({ canvasContext: g, viewport: vp }).promise.then(function () { it.thumb = c.toDataURL("image/jpeg", 0.85); });
+        }).then(function () { doc.destroy(); }, function (e) { doc.destroy(); throw e; });
+      })
+      .then(function () { pdfPic(it); }, function () {});   // no picture: the tile stays
   }
   /* The text, or for a document its fields — rebuilt only when a new reading
      arrives (it.ver), so typing in them is never interrupted. */

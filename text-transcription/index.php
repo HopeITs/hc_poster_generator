@@ -67,6 +67,10 @@
   .item .pdf b{background:var(--red);color:#fff;font-size:13px;font-weight:900;border-radius:6px;padding:4px 10px;letter-spacing:.04em;}
   .item .pdf span{font-size:11px;font-weight:700;color:var(--ink);direction:ltr;word-break:break-all;text-align:center;max-height:4.5em;overflow:hidden;}
   .item .pdf:hover b{background:var(--navy);}
+  /* …and once its first page is drawn: the page itself, a badge with the page count */
+  .item .pdf.page{position:relative;aspect-ratio:auto;max-height:none;padding:0;background:#fff;border:1px solid var(--line);border-radius:9px;overflow:hidden;}
+  .item .pdf.page img{display:block;width:100%;height:auto;max-height:220px;object-fit:contain;object-position:top;cursor:pointer;}
+  .item .pdf.page b{position:absolute;bottom:6px;inset-inline-end:6px;font-size:11px;padding:2px 8px;box-shadow:0 2px 6px rgba(0,0,0,.2);}
   .item .num{position:absolute;top:6px;inset-inline-start:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;}
   .item .body{display:flex;flex-direction:column;gap:8px;min-width:0;}
   .item .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;font-weight:700;color:var(--muted);}
