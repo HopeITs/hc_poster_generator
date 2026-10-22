@@ -78,6 +78,9 @@
   .fields td{border-bottom:1px solid var(--fill);padding:3px 0;vertical-align:middle;}
   .fields td.l{width:34%;padding-inline-end:8px;}
   .fields td.c{width:1%;padding-inline-start:6px;}
+  .fields textarea{width:100%;min-height:0;resize:vertical;border:1px solid transparent;border-radius:7px;padding:6px 8px;font-family:inherit;font-size:14px;line-height:1.6;color:var(--ink);background:transparent;unicode-bidi:plaintext;}
+  .fields textarea:hover{border-color:var(--line);}
+  .fields textarea:focus{outline:2px solid var(--red);outline-offset:0;background:#fff;}
   .fields input{width:100%;border:1px solid transparent;border-radius:7px;padding:6px 8px;font-family:inherit;font-size:14px;color:var(--ink);background:transparent;unicode-bidi:plaintext;}
   .fields td.l input{font-weight:700;color:var(--muted);font-size:13px;}
   .fields input:hover{border-color:var(--line);}
@@ -134,6 +137,7 @@
             <option value="auto">تلقائي — الأداة بتعرف</option>
             <option value="text">نص عادي</option>
             <option value="doc">بطاقة أو وثيقة — خانات</option>
+            <option value="invoice">فاتورة — للمحاسبة</option>
           </select>
           <div class="hint" id="ttKindHint" style="margin-top:6px"></div>
         </div>

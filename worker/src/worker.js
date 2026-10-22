@@ -39,7 +39,9 @@ const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مس�
 const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
 const TRANSCRIBE_MAX_IMAGES = 6;
 const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
-const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;   // up to this the images travel inside the request, not uploaded first
+const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;
+// نوع «فاتورة» (قسم المحاسبة): خاناته الثابتة — [العنوان بالواجهة، اسمها بردّ Gemini]
+const INVOICE_FIELDS = [["تاريخ الفاتورة", "invoice_date"], ["رقم الفاتورة", "invoice_number"], ["تفاصيل الفاتورة (انكليزي)", "details_en"], ["المبلغ الإجمالي", "total"]];   // up to this the images travel inside the request, not uploaded first
 // أهداف الريل وبنية كل هدف — Gemini يختار واحداً من المحتوى ويرتّب الأفكار حسبه
 const MOMENTS_GOALS = {
   "تعريف بمشروع":  "what the project is, then who it serves, then what they do there, then how to join or learn more",
@@ -880,7 +882,8 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
       /* ---- 7b7) Text Transcription: نص الصور عبر Gemini ----
          لكل من يملك أداة text-transcription. الجسم: [4 بايت طول JSON][JSON {lang, sizes, mode}][الصور JPEG متتالية].
          تُرفع الصور كما هي إلى Files API، يقرؤها Gemini بطلب واحد ويعيد نص كل صورة، ثم تُحذف.
-         mode: text (نص فقط) | doc (كل صورة وثيقة: بطاقة، جواز…) | auto (Gemini يقرّر لكل صورة).
+         mode: text (نص فقط) | doc (كل صورة وثيقة: بطاقة، جواز…) | auto (Gemini يقرّر لكل صورة)
+         | invoice (فاتورة للمحاسبة: تاريخ، رقم، تفاصيل بالإنكليزي، المبلغ الإجمالي — INVOICE_FIELDS).
          للوثيقة يعيد خاناتها {label, value} بترتيبها على الوثيقة. لا يُحفظ شيء من المحتوى هنا.
          الرد يتدفّق (slowJSON): {images:[{text, kind, docType, fields}]} أو {error}. */
       if (request.method === "POST" && path === "/transcribe/images") {
@@ -896,8 +899,14 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
         var txSizes = (Array.isArray(txIn.meta.sizes) ? txIn.meta.sizes : []).map(function (n) { return Math.max(0, Math.floor(Number(n) || 0)); });
         if (!txSizes.length || txSizes.length > TRANSCRIBE_MAX_IMAGES || txSizes.reduce(function (s, n) { return s + n; }, 0) !== txIn.audio.byteLength) return json({ error: "طلب غير صالح" }, 400);
         var txLang = { "ara+eng": "Arabic and English", ara: "Arabic", eng: "English" }[txIn.meta.lang] || "Arabic and English";
-        var txMode = ["text", "doc", "auto"].indexOf(txIn.meta.mode) >= 0 ? txIn.meta.mode : "text";
-        var txDocRules = txMode === "text" ? "" :
+        var txMode = ["text", "doc", "auto", "invoice"].indexOf(txIn.meta.mode) >= 0 ? txIn.meta.mode : "text";
+        var txDocRules = txMode === "text" ? "" : txMode === "invoice" ?
+"EVERY image is an invoice or receipt (for the accounting team). Besides 'text', fill:\n" +
+"- 'invoice_date': the invoice's date exactly as printed (not reformatted); \"\" if there is none.\n" +
+"- 'invoice_number': the invoice or receipt number exactly as printed, digits and letters as they are; \"\" if there is none.\n" +
+"- 'details_en': IN ENGLISH, what the invoice is for — each item or service on its own line with its quantity when shown, like \"2 x A4 printer paper (box)\" or \"Generator maintenance — October\". Translate Arabic item names into plain English; keep brand and model names as they are. Only what the invoice lists; nothing invented.\n" +
+"- 'total': the final amount to pay exactly as printed, with its currency (like \"1,250,000 SYP\" or \"450.00 USD\"); when several totals appear (before and after tax or discount), the final payable one.\n" +
+"Unreadable: […].\n" :
           (txMode === "doc" ? "EVERY image is an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, form): its kind is \"document\".\n"
                             : "Decide for each image: an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, filled form) is kind \"document\"; anything else is kind \"text\".\n") +
 "For a document: 'doc_type' names it in Arabic (like «بطاقة شخصية سورية — الوجه» or «جواز سفر»). 'fields' lists every labelled item on it, in the order it appears: 'label' is the field's name as printed (Arabic when the document has it, e.g. «الاسم», «اسم الأب», «اسم الأم», «تاريخ الولادة», «مكان الولادة», «الرقم الوطني»), or a short Arabic name when the value has no printed label; 'value' is exactly what is written there — names, dates and numbers digit for digit, never reformatted or guessed. Unreadable: […]. Leave out the document's title, emblems and printed headings. 'text' still holds the full transcription.\n" +
@@ -930,6 +939,9 @@ txDocRules +
               generationConfig: { temperature: 0, maxOutputTokens: 32768, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: {
                 type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: txMode === "text"
                   ? { type: "OBJECT", required: ["n", "text"], properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } }
+                  : txMode === "invoice"
+                  ? { type: "OBJECT", required: ["n", "invoice_date", "invoice_number", "details_en", "total", "text"], propertyOrdering: ["n", "invoice_date", "invoice_number", "details_en", "total", "text"], properties: {
+                      n: { type: "INTEGER" }, invoice_date: { type: "STRING" }, invoice_number: { type: "STRING" }, details_en: { type: "STRING" }, total: { type: "STRING" }, text: { type: "STRING" } } }
                   : { type: "OBJECT", required: ["n", "kind", "doc_type", "fields", "text"], propertyOrdering: ["n", "kind", "doc_type", "fields", "text"], properties: {
                       n: { type: "INTEGER" }, kind: { type: "STRING", enum: ["text", "document"] }, doc_type: { type: "STRING" },
                       fields: { type: "ARRAY", items: { type: "OBJECT", required: ["label", "value"], properties: { label: { type: "STRING" }, value: { type: "STRING" } } } },
@@ -941,6 +953,11 @@ txDocRules +
           var images = parts.map(function () { return { text: "", kind: "text", docType: "", fields: [] }; });
           ((txR.data && txR.data.images) || []).forEach(function (x) {
             var n = Math.round(Number(x && x.n)); if (!(n >= 1 && n <= images.length)) return;
+            if (txMode === "invoice") {   // the four fields accounting asked for, always present and in this order
+              images[n - 1] = { text: String(x.text || "").slice(0, 60000), kind: "document", docType: "فاتورة",
+                fields: INVOICE_FIELDS.map(function (f) { return { label: f[0], value: String(x[f[1]] || "").trim().slice(0, 2000) }; }) };
+              return;
+            }
             var fields = (Array.isArray(x.fields) ? x.fields : []).slice(0, 60).map(function (f) {
               return { label: String(f && f.label || "").trim().slice(0, 80), value: String(f && f.value || "").trim().slice(0, 400) };
             }).filter(function (f) { return f.label || f.value; });

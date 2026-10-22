@@ -26,7 +26,8 @@
   var KIND_HINTS = {
     auto: "Gemini بيعرف إذا الصورة بطاقة أو وثيقة ويطلّع خاناتها، وإلا بيطلّع النص",
     text: "النص كما هو، بفقراته وأسطره",
-    doc: "كل صورة وثيقة: الاسم، تاريخ الولادة، الرقم… كل معلومة بخانة — بتحتاج «دقة أعلى»"
+    doc: "كل صورة وثيقة: الاسم، تاريخ الولادة، الرقم… كل معلومة بخانة — بتحتاج «دقة أعلى»",
+    invoice: "تاريخ الفاتورة، رقمها، تفاصيلها بالإنكليزي والمبلغ الإجمالي، مع النص الكامل — بتحتاج «دقة أعلى»، و«تنزيل Excel» بيعطي جدول الفواتير"
   };
 
   var S = { items: [], busy: false, ocr: null, ocrLang: "", docOk: false }, nextId = 1;
@@ -113,8 +114,11 @@
     var tb = document.createElement("table"); tb.className = "fields";
     it.fields.forEach(function (f) {
       var tr = document.createElement("tr");
-      tr.innerHTML = '<td class="l"><input dir="auto" aria-label="الخانة"></td><td><input dir="auto" aria-label="القيمة"></td><td class="c"><button type="button">نسخ</button></td>';
-      var ins = tr.querySelectorAll("input"); ins[0].value = f.label; ins[1].value = f.value;
+      var multi = /\n/.test(f.value) || f.value.length > 70;   // an invoice's item list, one per line
+      tr.innerHTML = '<td class="l"><input dir="auto" aria-label="الخانة"></td><td>' + (multi ? '<textarea dir="auto" aria-label="القيمة"></textarea>' : '<input dir="auto" aria-label="القيمة">') +
+        '</td><td class="c"><button type="button">نسخ</button></td>';
+      var ins = tr.querySelectorAll("input, textarea"); ins[0].value = f.label; ins[1].value = f.value;
+      if (multi) ins[1].rows = Math.min(8, f.value.split("\n").length + 1);
       ins[0].addEventListener("input", function () { f.label = ins[0].value; });
       ins[1].addEventListener("input", function () { f.value = ins[1].value; buttons(); });
       tr.querySelector("button").onclick = function () { copy(f.value, "✓ نسخت «" + (f.label || "القيمة") + "»"); };
@@ -176,7 +180,7 @@
   }
   function runLocal() {
     if (typeof Tesseract === "undefined") { status("تعذّر تحميل محرّك القراءة", true); return; }
-    if ($("ttKind").value === "doc") { status("تقسيم البطاقات لخانات بيحتاج «دقة أعلى» — القراءة على الجهاز بتطلّع النص بس. غيّر نوع الصورة لـ «نص عادي» لتقراها هون.", true); return; }
+    if ($("ttKind").value === "doc" || $("ttKind").value === "invoice") { status("تقسيم " + ($("ttKind").value === "invoice" ? "الفواتير" : "البطاقات") + " لخانات بيحتاج «دقة أعلى» — القراءة على الجهاز بتطلّع النص بس. غيّر نوع الصورة لـ «نص عادي» لتقراها هون.", true); return; }
     var list = S.items.slice(), lang = $("ttLang").value;
     if (!list.length) return;
     busy(true); status("…جارٍ تجهيز محرّك القراءة"); bar(0);
@@ -272,6 +276,7 @@
     }
     next(0).then(function () {
       status(failed ? "Gemini ما قدر يقرأ " + failed + " صورة — شوف السبب جنبها"
+                    : mode === "invoice" ? "✓ قرأ Gemini " + list.length + " فاتورة — راجع الخانات، و«تنزيل Excel» بيعطيك جدولها"
                     : "✓ قرأ Gemini " + list.length + " صورة" + (docs ? " · " + docs + " منها وثائق مقسومة لخانات" : ""), !!failed);
       busy(false); buttons();
     });
@@ -311,8 +316,9 @@
       cols.forEach(function (c) { var f = it.fields.filter(function (x) { return x.label === c; })[0]; row.push(f ? f.value : ""); });
       rows.push(row.map(function (v, i) { return i === 0 ? q(v) : cell(v); }).join(","));
     });
-    download("Documents_" + stamp() + ".csv", rows.join("\r\n"), "text/csv");
-    status("✓ نزّلت " + docs.length + " وثيقة بجدول واحد");
+    var bills = docs.every(function (it) { return it.docType === "فاتورة"; });
+    download((bills ? "Invoices_" : "Documents_") + stamp() + ".csv", rows.join("\r\n"), "text/csv");
+    status("✓ نزّلت " + docs.length + (bills ? " فاتورة" : " وثيقة") + " بجدول واحد");
   }
 
   /* ---------- wiring ---------- */
