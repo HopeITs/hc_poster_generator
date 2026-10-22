@@ -158,7 +158,7 @@
 
   <div class="topbar">
     <a class="back" href="../">→ المشاريع</a>
-    <div class="brand"><h1>Reels Gen</h1><span class="beta">BETA</span></div>
+    <div class="brand"><h1>Reels Gen</h1><span class="beta">NEW</span></div>
   </div>
 
   <div class="wrap">
