@@ -1,13 +1,11 @@
 <?php
 /**
  * Text Transcription — the text in images, as editable text.
- * Two engines: Tesseract (OCR in the browser, vendor/tesseract: free, and the
- * image never leaves the device) and Gemini through the auth Worker
- * (/transcribe/images: designs, handwriting and hard photos; the images are
- * uploaded to Google for that and deleted right after).
- * Strict CSP applies (no inline script; 'wasm-unsafe-eval' lets the OCR
- * compile); access is checked by app.js against the user's projects
- * ("text-transcription"), like Thumbnail Gen and Reels Gen.
+ * «تفريغ النص» reads them with Gemini through the auth Worker
+ * (/transcribe/images); the images are sent to Google for that and deleted
+ * right after. Image types: plain text, card or document (as fields), invoice.
+ * Strict CSP applies (no inline script); access is checked by app.js against
+ * the user's projects ("text-transcription"), like Thumbnail Gen and Reels Gen.
  */
 ?>
 <!doctype html>
@@ -69,7 +67,6 @@
   .item .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;font-weight:700;color:var(--muted);}
   .tag{border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;background:var(--fill);color:var(--ink);}
   .tag.gem{background:#fdecec;color:var(--red);}
-  .tag.dev{background:#e7eef2;color:var(--navy);}
   .warn{color:var(--red);}
   .item textarea{width:100%;min-height:140px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:inherit;font-size:14px;line-height:1.75;color:var(--ink);background:#fff;unicode-bidi:plaintext;}
   /* a document: its fields, each label and value editable, then the full text folded away */
@@ -134,7 +131,6 @@
         <div class="field">
           <div class="sec">نوع الصورة</div>
           <select id="ttKind">
-            <option value="auto">تلقائي — الأداة بتعرف</option>
             <option value="text">نص عادي</option>
             <option value="doc">بطاقة أو وثيقة — خانات</option>
             <option value="invoice">فاتورة — للمحاسبة</option>
@@ -142,10 +138,8 @@
           <div class="hint" id="ttKindHint" style="margin-top:6px"></div>
         </div>
         <div class="engines">
-          <button type="button" class="btn" id="ttLocal" disabled>تفريغ على الجهاز</button>
-          <div class="hint" style="margin-top:6px">مجاني والصورة ما بتطلع من جهازك — مناسب للمستندات والنصوص المطبوعة الواضحة. أول مرة بيحمّل حوالي 9 MB.</div>
-          <button type="button" class="btn-line wide" id="ttGemini" disabled>دقة أعلى — Gemini</button>
-          <div class="hint" style="margin-top:6px">للتصاميم، الخطوط المزخرفة، خط الإيد والصور الصعبة — الصور بتترفع لـ Google لهالغرض وبتنحذف بعدها.</div>
+          <button type="button" class="btn" id="ttGemini" disabled>تفريغ النص</button>
+          <div class="hint" style="margin-top:6px">الصور بتنقرأ عند Google (Gemini) وبتنحذف من عندهم بعدها مباشرة، والأداة ما بتخزّن شي.</div>
         </div>
         <div class="bar" id="ttBar" hidden><i id="ttBarFill"></i></div>
         <div class="status" id="ttStatus"></div>
@@ -161,12 +155,11 @@
             <button type="button" class="btn-line" id="ttClear" disabled>مسح الكل</button>
           </div>
         </div>
-        <div class="items" id="ttItems"><div class="empty">لا صور بعد — أضف صوراً من اليمين،<br>ثم اختر «تفريغ على الجهاز» أو «دقة أعلى»</div></div>
+        <div class="items" id="ttItems"><div class="empty">لا صور بعد — أضف صوراً من اليمين،<br>ثم اضغط «تفريغ النص»</div></div>
       </div>
     </div>
   </div>
 
-  <script src="vendor/tesseract/tesseract.min.js" defer></script>
   <script src="app.js" defer></script>
 
   <div class="foot">HC Generator, a project by Christian Hope Center. © 2026 All Rights Reserved.</div>

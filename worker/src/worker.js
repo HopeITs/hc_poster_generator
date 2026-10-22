@@ -893,7 +893,7 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
         var txKey = transcribeKey(env);
         if (!txKey) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
         if (Number(request.headers.get("Content-Length") || 0) > TRANSCRIBE_MAX_BYTES) return json({ error: "الصور أكبر من المسموح" }, 413);
-        if ((await usedToday(env, txUser.email, "transcribe")) >= TRANSCRIBE_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتفريغ الصور بـ Gemini. جرّب بكرا، أو استعمل «تفريغ على الجهاز»." }, 429);
+        if ((await usedToday(env, txUser.email, "transcribe")) >= TRANSCRIBE_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتفريغ الصور. جرّب بكرا." }, 429);
         var txIn = splitAudioBody(await request.arrayBuffer());
         if (!txIn) return json({ error: "طلب غير صالح" }, 400);
         var txSizes = (Array.isArray(txIn.meta.sizes) ? txIn.meta.sizes : []).map(function (n) { return Math.max(0, Math.floor(Number(n) || 0)); });
