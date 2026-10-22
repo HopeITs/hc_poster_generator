@@ -69,6 +69,12 @@
   .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s;}
   .music-st{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px;}
   /* critic report: one block per hearing; the kept one is marked */
+  .rtabs{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;}
+  .rtab{background:var(--fill);color:var(--ink);border:1.5px solid var(--line);border-radius:8px;padding:5px 9px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .rtab.on{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .rtab.add{background:#fff;border-style:dashed;color:var(--muted);}
+  .rtab.add:hover,.rtab:not(.on):hover{border-color:var(--accent);color:var(--accent);}
+  .rtab .x{font-size:14px;line-height:1;opacity:.7;} .rtab .x:hover{opacity:1;}
   .critic{margin-top:8px;max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
   .crit{border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:12px;line-height:1.6;color:var(--ink);background:var(--fill);}
   .crit.kept{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:#fff;}
@@ -196,6 +202,7 @@
             <div class="hint" id="rgSumKindHint" style="margin-top:4px"></div>
             <label class="chk" id="rgCriticRow" style="margin-top:6px"><input type="checkbox" id="rgCriticOn" checked> ناقد بيسمع الريل كمشاهد ويحسّنه (دقيقة زيادة تقريباً)</label>
             <label class="chk" id="rgBrollRow" style="margin-top:6px"><input type="checkbox" id="rgBrollOn" checked> لقطات تغطية: الكلام بيكمّل والصورة بتنتقل لمشهد تاني وبترجع</label>
+            <div class="rtabs" id="rgReelTabs" hidden></div>
             <div class="row" style="margin-top:8px">
               <select id="rgSumLen">
                 <option value="30">ريل 30 ثانية</option>

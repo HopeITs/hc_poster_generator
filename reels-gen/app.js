@@ -98,7 +98,8 @@
   var S = { items: [], recipe: "question", project: "disc", logo: null, logoNavy: null, mode: "create", sum: null, sumData: null,
             music: null, musicBlob: null, musicLabel: "", musicTrack: null, beats: null,
             lines: [], voice: null, endLen: null, regs: [], plan: [],
-            t: 0, playing: false, clock: 0, seq: 0, exporting: false };
+            t: 0, playing: false, clock: 0, seq: 0, exporting: false,
+            reels: [{}], reel: 0 };   // summary tabs: several reels from one long video
 
   function status(t, err) { var e = $("rgStatus"); e.textContent = t || ""; e.className = "status" + (err ? " err" : ""); }
   function fmt(s) { s = Math.max(0, s); var m = Math.floor(s / 60), r = Math.floor(s % 60); return m + ":" + (r < 10 ? "0" : "") + r; }
@@ -600,6 +601,7 @@
     $("rgExport").disabled = !ready().length || S.items.some(function (x) { return x.missing; });
     $("rgCover").disabled = !ready().length;
     $("rgEmpty").hidden = !!ready().length;
+    renderReels();
   }
   /* Reorder by dragging a card onto another: it lands before or after that
      card depending on which half the pointer is over (the grid runs right to
@@ -1279,15 +1281,16 @@
     loadMedia(file).then(function (m) {
       if (m.kind !== "video") throw new Error(file.name);
       $("rgLongName").textContent = file.name; $("rgLongInfo").textContent = "المدة " + fmt(m.srcDur) + " · ⁦" + m.w + "×" + m.h + "⁩";   // isolated so RTL does not flip it to h×w
-      var miss = S.items.filter(function (it) { return it.missing && it.sum && it.name === file.name; });
+      saveReel();
+      var lists = S.reels.map(function (r) { return (r.items || []).filter(function (it) { return it.missing && it.sum && it.name === file.name; }); }), miss = [].concat.apply([], lists);
       S.sumData = { m: m, els: [m.el], samples: null }; $("rgCritic").hidden = true;
       $("rgAnalyse").disabled = false;
       if (miss.length) {   // re-link a reopened project: every moment gets its own element on the file
-        return Promise.all(miss.map(function (it, i) {
-          return sumEl(i).then(function (el) { Object.assign(it, { el: el, url: m.url, file: file, w: m.w, h: m.h, srcDur: m.srcDur, fps: m.fps, missing: false }); clampItem(it); });
-        })).then(function () { sumSt("✓ رجعت " + miss.length + " لحظة من الفيديو" + (S.talkGoal ? " · هدف الريل: " + S.talkGoal : "") + " — «توليد» بيعيد الاختيار"); relayout(); });
+        return Promise.all([].concat.apply([], lists.map(function (l) {   // the reels share the elements: only one shows at a time
+          return l.map(function (it, i) { return sumEl(i).then(function (el) { Object.assign(it, { el: el, url: m.url, file: file, w: m.w, h: m.h, srcDur: m.srcDur, fps: m.fps, missing: false }); clampItem(it); }); });
+        }))).then(function () { loadReel(); sumSt("✓ رجعت " + miss.length + " لحظة من الفيديو" + (S.reels.length > 1 ? " (" + S.reels.length + " ريلات)" : "") + (S.talkGoal ? " · هدف الريل: " + S.talkGoal : "") + " — «توليد» بيعيد الاختيار"); });
       }
-      S.items = S.items.filter(function (it) { return it.kind === "card"; }); S.sum = null; relayout();
+      resetReels(); S.items = S.items.filter(function (it) { return it.kind === "card"; }); S.sum = null; relayout();
       sumSt(m.srcDur < reelLen() * 1.5 ? "الفيديو قصير على التلخيص — الأفضل «إنشاء ريل»، أو اضغط «توليد» على كل حال" : "اختار الطول والأسلوب واضغط «توليد»", m.srcDur < reelLen() * 1.5);
     }).catch(function () { sumSt("تعذّر فتح الفيديو — صيغة غير مدعومة بالمتصفح", true); });
   }
@@ -1416,15 +1419,16 @@
     var win = Math.max(1, Math.round(st.len * 1.3 / D.dt)), pre = [0], still = [0];
     sm.forEach(function (s, i) { pre[i + 1] = pre[i] + s.score; still[i + 1] = still[i] + (s.still ? 1 : 0); });
     function mean(a, b) { return (pre[b] - pre[a]) / (b - a) - ((still[b] - still[a]) / (b - a) > 0.5 ? 1 : 0); }   // mostly still: never a moment
-    var cands = [];
+    var cands = [], taken = usedSpans();
+    function takenAt(c) { var t = c * D.dt; return taken.some(function (u) { return t > u[0] - 1 && t < u[1] + 1; }); }   // another reel's shot
     D.scenes.forEach(function (sc) {
       var a = sc[0], b = sc[1];
       if (sc.hi - sc.lo < 0.5) return;   // a flash between two cuts, or all intro / outro
-      if (b - a <= win) { cands.push({ c: (a + b - 1) / 2, sc: sc, score: mean(a, b) }); return; }
+      if (b - a <= win) { if (!takenAt((a + b - 1) / 2)) cands.push({ c: (a + b - 1) / 2, sc: sc, score: mean(a, b) }); return; }
       for (var c0 = a; c0 < b - win + 1; c0 += 3 * win) {   // a long scene gives one candidate per three shot-lengths
         var best = c0, bs = -Infinity;
-        for (var p = c0; p <= Math.min(b - win, c0 + 3 * win - 1); p++) { var v = mean(p, p + win); if (v > bs) { bs = v; best = p; } }
-        cands.push({ c: best + (win - 1) / 2, sc: sc, score: bs });
+        for (var p = c0; p <= Math.min(b - win, c0 + 3 * win - 1); p++) { if (takenAt(p + (win - 1) / 2)) continue; var v = mean(p, p + win); if (v > bs) { bs = v; best = p; } }
+        if (bs > -Infinity) cands.push({ c: best + (win - 1) / 2, sc: sc, score: bs });
       }
     });
     cands.forEach(function (x) { x.t = x.c * D.dt; x.hash = sm[Math.round(x.c)].hash; });
@@ -1440,10 +1444,11 @@
         picked.push(x); cover += Math.min(st.len, (x.sc.hi - x.sc.lo) / rate);
       });
     });
-    if (!picked.length) { sumSt("ما لقيت لحظات واضحة بهالفيديو — جرّب فيديو تاني", true); return Promise.resolve(); }
+    if (!picked.length) { sumSt(taken.length ? "ما ضل لقطات واضحة غير اللي بالريلات التانية" : "ما لقيت لحظات واضحة بهالفيديو — جرّب فيديو تاني", true); return Promise.resolve(); }
     picked.forEach(function (x) {   // moments sharing a scene split it halfway between them
       var mates = picked.filter(function (y) { return y.sc === x.sc; }).sort(function (a, b) { return a.t - b.t; }), k = mates.indexOf(x);
       x.lo = k ? (mates[k - 1].t + x.t) / 2 : x.sc.lo; x.hi = k < mates.length - 1 ? (x.t + mates[k + 1].t) / 2 : x.sc.hi;
+      taken.forEach(function (u) { if (u[1] <= x.t) x.lo = Math.max(x.lo, u[1]); else if (u[0] >= x.t) x.hi = Math.min(x.hi, u[0]); });   // nor into another reel's shot
       x.t = Math.max(x.lo, Math.min(x.hi, x.t));
     });
     var hook = picked[0];
@@ -1457,7 +1462,7 @@
                  rot: 0, tint: false, sound: false, missing: false, sum: true, center: x.t, lo: x.lo, hi: x.hi, start: 0, len: st.len };
       });
       cards.forEach(function (x) { shots.splice(Math.min(x.i, shots.length), 0, x.it); });   // the user's own text cards keep their place
-      S.items = shots; S.endLen = null; S.t = 0;
+      S.items = shots; S.endLen = null; S.t = 0; D.talkList = null; D.goal = D.topic = "";   // a reel of shots: no thoughts of its own for the other reels to avoid
       relayout();
       var T = total();
       sumSt("✓ اخترت " + picked.length + " لحظة من فيديو مدته " + fmt(m.srcDur) + " · أقوى لحظة بالبداية" +
@@ -1558,19 +1563,23 @@
   /* Once a video is transcribed, a new length or a second try sends the text, not the sound: one Gemini request instead of two. */
   function haveTranscript(D) { return !!(D.transcript && D.transcript.length === D.speech.segs.length); }
   function askMoments(D, room) {
-    return haveTranscript(D) ? postAudio("/reels/moments", { seconds: Math.round(room), segments: segList(D), transcript: D.transcript }, null)
-                             : postAudio("/reels/moments", { seconds: Math.round(room), segments: segList(D) }, D.ogg);
+    var u = usedSegs(), avoid = [], meta = { seconds: Math.round(room), segments: segList(D) };
+    Object.keys(u).map(Number).sort(function (a, b) { return a - b; }).forEach(function (k) { var l = avoid[avoid.length - 1]; if (l && l[1] === k - 1) l[1] = k; else avoid.push([k, k]); });
+    if (avoid.length) { meta.avoid = avoid; meta.goals = otherReels().map(function (r) { return r.goal; }).filter(Boolean); }
+    return haveTranscript(D) ? postAudio("/reels/moments", Object.assign(meta, { transcript: D.transcript }), null)
+                             : postAudio("/reels/moments", meta, D.ogg);
   }
   /* Whole sentences on the device: runs that start and end on a real pause,
      4–15 s, with no long silence inside; scored on how full of speech they
      are, how good the picture is, and how clearly they end. */
   function localThoughts(D, room) {
-    var segs = D.speech.segs, sm = D.samples, cands = [];
+    var segs = D.speech.segs, sm = D.samples, cands = [], u = usedSegs();
     function vis(a, b) { var s = 0, n = 0; for (var i = Math.floor(a / D.dt); i <= Math.min(sm.length - 1, Math.floor(b / D.dt)); i++) { s += Math.max(-0.5, sm[i].score); n++; } return n ? s / n : 0; }
     for (var i = 0; i < segs.length; i++) {
-      if (i && segs[i][0] - segs[i - 1][1] < 0.7) continue;
+      if (u[i + 1] || (i && segs[i][0] - segs[i - 1][1] < 0.7)) continue;
       var said = 0;
       for (var j = i; j < segs.length; j++) {
+        if (u[j + 1]) break;   // another reel's thought
         if (j > i && segs[j][0] - segs[j - 1][1] > 1.2) break;
         said += segs[j][1] - segs[j][0];
         var len = segs[j][1] - segs[i][0]; if (len > 15) break;
@@ -1602,7 +1611,7 @@
   /* Whole runs only, never the same words twice, each with its transcribed
      words; too long: drop from the middle, keeping the opening and the close. */
   function tidyRuns(D, runs, room) {
-    var segs = D.speech.segs, tr = D.transcript || [], used = {}, list = [], said = 0;
+    var segs = D.speech.segs, tr = D.transcript || [], used = usedSegs(), list = [], said = 0;
     runs.forEach(function (x) {
       if (!(x.from >= 1 && x.to >= x.from && x.to <= segs.length)) return;
       if (haveTranscript(D)) x = wholeSentences(D, x);
@@ -1766,7 +1775,7 @@
         var tr = Array.isArray(d.transcript) ? d.transcript : [];
         D.transcript = tr; D.goal = d.goal || ""; D.topic = d.topic || "";
         var res = { list: tidyRuns(D, d.moments || [], room), topic: d.topic || "", goal: d.goal || "", ai: true };
-        if (!res.list.length || !$("rgCriticOn").checked) return res;
+        if (!res.list.length || !$("rgCriticOn").checked || S.reel > 0) return res;   // the critic hears the first reel only: the others follow its lesson at a fraction of the quota
         return criticLoop(D, res.list, room).then(function (c) { res.list = c.list; res.critic = c; return res; });
       },
             function (e) {
@@ -1776,6 +1785,7 @@
       .then(function (res) {
         var segs = D.speech.segs, list = res.list;
         if (res.critic) showCritic(res.critic);
+        if (!list.length && otherReels().length) { sumSt("ما ضل بالفيديو أفكار كاملة غير اللي بالريلات التانية — جرّب طول أقصر", true); return; }
         if (!list.length) { sumSt(res.ai ? "Gemini ما لقى كلام واضح بالفيديو — جرّب «لقطات على الإيقاع»" : "ما لقيت جمل واضحة بالفيديو", true); return; }
         sumSt("…جارٍ تجهيز اللحظات");
         D.talkList = list;
@@ -1789,8 +1799,59 @@
         });
       });
   }
+  /* ---------- several reels from one long video ----------
+     Each tab is a reel of its own: its moments, length, goal and status. The
+     analysis, the transcript and the video elements are shared, so another
+     reel costs one text request; it leaves out the thoughts (or shots) the
+     other reels use, and only the first reel gets the critic. */
+  var REELS_MAX = 5;
+  function otherReels() { return S.reels.filter(function (r, i) { return i !== S.reel; }); }
+  function usedSegs() { var u = {}; otherReels().forEach(function (r) { (r.talkList || []).forEach(function (x) { for (var k = x.from; k <= x.to; k++) u[k] = true; }); }); return u; }
+  function usedSpans() { var out = []; otherReels().forEach(function (r) { (r.items || []).forEach(function (it) { if (it.sum && it.hi != null) out.push([it.start, it.start + span(it, it.len)]); }); }); return out; }   // the seconds a shot plays, not its whole scene
+  function saveReel() {
+    var r = S.reels[S.reel], D = S.sumData, st = $("rgSumSt"), cr = $("rgCritic");
+    r.items = S.items; r.len = $("rgSumLen").value; r.endLen = S.endLen; r.t = S.t;
+    r.goal = D ? D.goal || "" : S.talkGoal || ""; r.topic = D ? D.topic || "" : S.talkTopic || "";
+    if (D) { r.talkList = D.talkList || null; r.brollPool = D.brollPool || []; }
+    r.st = st.textContent; r.stErr = !!st.style.color; r.critic = cr.hidden ? "" : cr.innerHTML;
+  }
+  function loadReel() {
+    var r = S.reels[S.reel], D = S.sumData, cr = $("rgCritic");
+    S.items = r.items || []; S.endLen = r.endLen || null; S.t = r.t || 0;
+    if (r.len) $("rgSumLen").value = r.len;
+    S.talkGoal = r.goal || ""; S.talkTopic = r.topic || "";
+    if (D) { D.goal = r.goal || ""; D.topic = r.topic || ""; D.talkList = r.talkList || null; D.brollPool = r.brollPool || []; }
+    sumSt(r.st || "", r.stErr); cr.innerHTML = r.critic || ""; cr.hidden = !r.critic;
+    kindHint(); stop(); relayout();
+  }
+  function resetReels() { S.reels = [{}]; S.reel = 0; }
+  function switchReel(i) { if (i === S.reel || !S.reels[i] || S.exporting) return; stop(); saveReel(); S.reel = i; loadReel(); }
+  function addReel() {
+    if (S.reels.length >= REELS_MAX || S.exporting || !S.sumData) return;
+    stop(); saveReel();
+    S.reels.push({ len: $("rgSumLen").value, items: [],
+                   st: "ريل " + (S.reels.length + 1) + " من نفس الفيديو — اختار طوله واضغط «توليد»: بياخد " + ($("rgSumKind").value === "talk" ? "أفكار" : "لقطات") + " غير اللي بالريلات التانية" });
+    S.reel = S.reels.length - 1; loadReel();
+  }
+  function dropReel(i) {
+    if (S.reels.length < 2 || S.exporting) return;
+    stop(); saveReel(); S.reels.splice(i, 1);
+    S.reel = i < S.reel ? S.reel - 1 : Math.min(S.reel, S.reels.length - 1);   // removing the open one shows its neighbour
+    loadReel();
+  }
+  function renderReels() {
+    var box = $("rgReelTabs");
+    box.hidden = S.mode !== "sum" || (S.reels.length < 2 && !S.items.some(function (it) { return it.sum; }));
+    if (box.hidden) return;
+    box.innerHTML = S.reels.map(function (r, i) {
+      var on = i === S.reel, len = on ? $("rgSumLen").value : r.len, goal = on ? (S.sumData ? S.sumData.goal : S.talkGoal) : r.goal;
+      return '<button type="button" class="rtab' + (on ? " on" : "") + '" data-i="' + i + '">ريل ' + (i + 1) + " · " + len + " ث" + (goal ? " · " + esc(goal) : "") +
+             (on && S.reels.length > 1 ? '<span class="x" data-x="' + i + '" title="احذف هالريل">×</span>' : "") + "</button>";
+    }).join("") + (S.reels.length < REELS_MAX && S.sumData ? '<button type="button" class="rtab add" data-add="1" title="ريل تاني من نفس الفيديو، بأفكار ولقطات غير هيك">+ ريل تاني</button>' : "");
+  }
   function kindHint() {
-    $("rgCriticRow").hidden = $("rgBrollRow").hidden = $("rgSumKind").value !== "talk";
+    $("rgBrollRow").hidden = $("rgSumKind").value !== "talk";
+    $("rgCriticRow").hidden = $("rgSumKind").value !== "talk" || S.reel > 0;
     $("rgSumKindHint").textContent = $("rgSumKind").value === "talk"
       ? "Gemini بيسمع الكلام وبيختار أفكار كاملة بدون ما يقطع جملة — صوت الفيديو بيترفع لـ Google لهالغرض وبينحذف بعدها؛ والموسيقى، إذا اخترتها، بتنخفض تحت الكلام"
       : "لقطات قصيرة على إيقاع الموسيقى؛ بدون موسيقى بيضل صوت الفيديو الأصلي";
@@ -1919,7 +1980,7 @@
     var first = (ready().filter(function (it) { return it.kind === "card" && it.text.trim(); })[0] || {}).text || "";
     var title = (project().name + " " + first.replace(/\s+/g, " ")).trim().replace(/[\\/:*?"<>|؟?]/g, "").slice(0, 60);
     var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
-    return "Reel_" + title + "_" + p(d.getMonth() + 1) + p(d.getDate()) + d.getFullYear() + ".mp4";
+    return "Reel_" + title + (S.mode === "sum" && S.reels.length > 1 ? "_" + (S.reel + 1) : "") + "_" + p(d.getMonth() + 1) + p(d.getDate()) + d.getFullYear() + ".mp4";
   }
 
   /* ---------- device speed test (5 s synthetic reel) ---------- */
@@ -1940,19 +2001,38 @@
   }
 
   /* ---------- projects (settings only; media is re-linked by file name) ---------- */
+  function itemOut(it) {
+    return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
+                              : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, mute: !!it.mute, off: !!it.off, skip: !!it.skip, why: it.why || "",
+                                  sum: !!it.sum, center: it.center != null ? it.center : null, lo: it.hi != null ? it.lo : null, hi: it.hi != null ? it.hi : null,
+                                  talk: !!it.talk, say: it.say || "", role: it.role || "",
+                                  mom: it.mom != null ? it.mom : null, aStart: it.aStart != null ? it.aStart : null, broll: it.broll != null ? it.broll : null, cont: !!it.cont };
+  }
+  function itemsIn(list, v) {
+    var out = [];
+    list.forEach(function (x) {
+      if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; out.push(c); return; }
+      if (v === 1 && x.text && String(x.text).trim()) out.push(newCard(String(x.text)));   // v1 captions sat on the shot; they become a card before it
+      out.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, mute: !!x.mute, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true,
+                 sum: !!x.sum, center: x.center != null ? +x.center : undefined, lo: x.hi != null ? +x.lo : undefined, hi: x.hi != null ? +x.hi : undefined,
+                 talk: !!x.talk, say: String(x.say || ""), role: String(x.role || ""),
+                 mom: x.mom != null ? +x.mom : undefined, aStart: x.aStart != null ? +x.aStart : undefined, broll: x.broll != null ? +x.broll : undefined, cont: !!x.cont });
+      if (x.mom != null) momSeq = Math.max(momSeq, +x.mom);
+    });
+    return out;
+  }
   function saveProject() {
+    saveReel();
     var d = { app: "reels-gen", v: 3, recipe: S.recipe, project: S.project, mode: S.mode, sumLen: +$("rgSumLen").value, sumKind: $("rgSumKind").value,
               talkGoal: S.sumData && S.sumData.goal || S.talkGoal || "", talkTopic: S.sumData && S.sumData.topic || S.talkTopic || "",
               sum: S.sum ? { name: S.sum.name, dt: S.sum.dt, fx: Array.from(S.sum.fx, function (x) { return Math.round(x * 1000) / 1000; }) } : null,   // the crop follows this track once the video is back
               beatSync: $("rgBeatSync").checked, endLen: S.endLen, musicTrack: S.musicTrack, script: $("rgScript").value, lines: S.lines,
               voice: S.voice ? { data: S.voice.data, times: S.voice.times, dur: S.voice.dur } : null,   // the paid-for voiceover travels with the project
-              items: S.items.map(function (it) {
-                return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
-                                          : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, mute: !!it.mute, off: !!it.off, skip: !!it.skip, why: it.why || "",
-                                              sum: !!it.sum, center: it.center != null ? it.center : null, lo: it.hi != null ? it.lo : null, hi: it.hi != null ? it.hi : null,
-                                              talk: !!it.talk, say: it.say || "", role: it.role || "",
-                                              mom: it.mom != null ? it.mom : null, aStart: it.aStart != null ? it.aStart : null, broll: it.broll != null ? it.broll : null, cont: !!it.cont };
-              }) };
+              items: S.items.map(itemOut), reel: S.reel,
+              reels: S.mode === "sum" ? S.reels.map(function (r) {   // every tab; "items" above stays the open one for older versions
+                return { len: +r.len || 30, goal: r.goal || "", topic: r.topic || "", items: (r.items || []).map(itemOut),
+                         talkList: (r.talkList || []).map(function (x) { return { from: x.from, to: x.to, why: x.why || "", text: x.text || "" }; }) };
+              }) : null };
     var a = document.createElement("a"); a.download = "Reel_project_" + project().name + ".json";
     a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: "application/json" })); a.click();
     status("✓ تم حفظ المشروع (الإعدادات والنصوص — الملفات تُضاف من جهازك عند الفتح)");
@@ -1966,16 +2046,13 @@
     S.sumData = null; $("rgAnalyse").disabled = true; sumSt(""); $("rgLongName").textContent = "اسحب الفيديو هنا أو اضغط للاختيار";
     S.sum = d.sum && Array.isArray(d.sum.fx) ? { name: String(d.sum.name || ""), dt: +d.sum.dt || 1, fx: Float32Array.from(d.sum.fx) } : null;
     setStyle(RECIPES[d.recipe] ? d.recipe : OLD_RECIPES[d.recipe] || project().style);
-    S.items = [];
-    d.items.forEach(function (x) {
-      if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; S.items.push(c); return; }
-      if (d.v === 1 && x.text && String(x.text).trim()) S.items.push(newCard(String(x.text)));   // v1 captions sat on the shot; they become a card before it
-      S.items.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, mute: !!x.mute, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true,
-                     sum: !!x.sum, center: x.center != null ? +x.center : undefined, lo: x.hi != null ? +x.lo : undefined, hi: x.hi != null ? +x.hi : undefined,
-                     talk: !!x.talk, say: String(x.say || ""), role: String(x.role || ""),
-                     mom: x.mom != null ? +x.mom : undefined, aStart: x.aStart != null ? +x.aStart : undefined, broll: x.broll != null ? +x.broll : undefined, cont: !!x.cont });
-      if (x.mom != null) momSeq = Math.max(momSeq, +x.mom);
+    var reels = Array.isArray(d.reels) && d.reels.length ? d.reels.slice(0, REELS_MAX) : [{ items: d.items, len: d.sumLen, goal: d.talkGoal, topic: d.talkTopic }];
+    S.reels = reels.map(function (r) {
+      return { items: itemsIn(Array.isArray(r.items) ? r.items : [], d.v), len: String(+r.len || +d.sumLen || 30), goal: String(r.goal || ""), topic: String(r.topic || ""), st: "",
+               talkList: Array.isArray(r.talkList) ? r.talkList.map(function (x) { return { from: +x.from, to: +x.to, why: String(x.why || ""), text: String(x.text || "") }; }).filter(function (x) { return x.from >= 1 && x.to >= x.from; }) : null };
     });
+    S.reel = Math.max(0, Math.min(S.reels.length - 1, +d.reel || 0));
+    var open = S.reels[S.reel]; S.items = open.items; $("rgSumLen").value = open.len; S.talkGoal = open.goal; S.talkTopic = open.topic;
     $("rgBeatSync").checked = d.beatSync !== false; S.endLen = +d.endLen || null;
     $("rgScript").value = d.script || ""; S.lines = Array.isArray(d.lines) ? d.lines.map(function (l) { return { voice: String(l.voice || ""), card: String(l.card || "") }; }) : [];
     renderLines(); S.voice = null; $("rgVoicePlayer").hidden = true; $("rgArrange").hidden = true; voiceSt("");
@@ -2044,7 +2121,7 @@
     $("rgProject").addEventListener("change", function () { setProject(this.value); applyStyle(project().style); });
     $("rgMode").addEventListener("change", function () {
       if (S.items.length && !confirm("تبديل نوع العمل بيمسح اللقطات الحالية. متابعة؟")) { this.value = S.mode; return; }
-      stop(); S.items = []; S.sum = null; S.sumData = null; S.endLen = null; S.t = 0;
+      stop(); resetReels(); S.items = []; S.sum = null; S.sumData = null; S.endLen = null; S.t = 0;
       $("rgAnalyse").disabled = true; sumSt(""); $("rgLongName").textContent = "اسحب الفيديو هنا أو اضغط للاختيار"; $("rgLongInfo").textContent = "MP4 · MOV · WEBM — المعالجة على جهازك، لا شيء يُرفع";
       setMode(this.value); relayout();
     });
@@ -2055,15 +2132,20 @@
     longDrop.addEventListener("drop", function (e) { setLong(e.dataTransfer.files[0]); });
     $("rgAnalyse").onclick = analyseLong;
     $("rgBrollOn").addEventListener("change", function () {   // the same thoughts, laid out again: no new Gemini request
-      if (!talkReel() || !S.sumData || !S.sumData.talkList) return;
+      if (!talkReel() || !S.sumData || !S.sumData.talkList || !S.sumData.speech) return;
       stop();
       var cards = S.items.map(function (it, i) { return { it: it, i: i }; }).filter(function (x) { return x.it.kind === "card"; });
       layTalk(S.sumData, S.sumData.talkList, cards).then(function (nB) { sumSt("✓ " + (nB ? brollText(nB) : "بلا لقطات تغطية") + " · " + fmt(total())); });
     });
     $("rgSumKind").addEventListener("change", function () { kindHint(); if (S.sumData) sumSt("اضغط «توليد» للتلخيص بهالطريقة"); });
     $("rgSumLen").addEventListener("change", function () {
+      renderReels();
       if (talkReel()) sumSt("اضغط «توليد» لتختار الأفكار على الطول الجديد");   // a new length needs a new choice of thoughts
       else if (S.sumData && S.sumData.samples) buildSummary(); else { S.endLen = null; relayout(); }
+    });
+    $("rgReelTabs").addEventListener("click", function (e) {
+      var x = e.target.closest("[data-x]"), b = e.target.closest(".rtab"); if (!b) return;
+      if (x) dropReel(+x.dataset.x); else if (b.dataset.add) addReel(); else switchReel(+b.dataset.i);
     });
     $("rgExport").onclick = exportMp4;
     $("rgCover").onclick = exportCover;

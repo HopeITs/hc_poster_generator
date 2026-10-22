@@ -304,7 +304,11 @@ function momentsLines(segs, text) {
 function momentsRuns(list, segs, text) {
   return (list || []).map(function (m) {
     return { from: Math.round(Number(m && m.from)), to: Math.round(Number(m && m.to)), why: String(m && m.why || "").trim().slice(0, 60) };
-  }).filter(function (m) { return m.from >= 1 && m.to >= m.from && m.to <= segs.length && text[m.from - 1] && text[m.to - 1]; }).slice(0, 20);
+  }).filter(function (m) {
+    if (!(m.from >= 1 && m.to >= m.from && m.to <= segs.length && text[m.from - 1] && text[m.to - 1])) return false;
+    for (var k = m.from; k <= m.to; k++) if (text[k - 1] == null) return false;   // never across a segment left out (another reel's) — "" is a silence, null is taken
+    return true;
+  }).slice(0, 20);
 }
 function momentsSecs(runs, segs) { return runs.reduce(function (s, m) { return s + segs[m.to - 1][1] - segs[m.from - 1][0]; }, 0); }
 function momentsRules(lo, room) {
@@ -712,7 +716,9 @@ export default {
       }
 
       /* ---- 7b5) Reels Gen: تلخيص فيديو بالكلام — أفكار كاملة (Gemini، خطوتان) ----
-         الجسم: [4 بايت طول JSON][JSON {seconds, segments:[[start,end]], transcript?}][صوت Ogg Opus].
+         الجسم: [4 بايت طول JSON][JSON {seconds, segments:[[start,end]], transcript?, avoid?, goals?}][صوت Ogg Opus].
+         avoid: سلاسل [from,to] استعملتها ريلات تانية من نفس الفيديو — ما بتنعرض على Gemini
+         وما بترجع؛ goals: أهداف تلك الريلات، ليختار هدفاً غيرها إن سمح المحتوى.
          المقاطع حدودها سكتات اكتشفها المتصفح. الخطوة 1: Gemini يسمع الصوت ويفرّغ كل مقطع
          برقمه فقط (يُرفع عبر Files API ويُحذف بعدها مباشرة) — وتُتخطّى إن أرسل المتصفح
          التفريغ من مرة سابقة (بلا صوت). الخطوة 2: نص فقط — يحدّد هدف الريل من قائمة ثابتة
@@ -760,7 +766,12 @@ export default {
             });
           }
           await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'moments', datetime('now'))").bind(moUser.email).run();
-          var moSaid = momentsLines(moSegs, moText);
+          var moAvoid = {}, moFree = moText.slice();
+          (Array.isArray(moIn.meta.avoid) ? moIn.meta.avoid : []).slice(0, 300).forEach(function (r) {
+            for (var k = Math.max(1, Math.round(Number(r && r[0]))); k <= Math.min(moSegs.length, Math.round(Number(r && r[1]))); k++) { moAvoid[k] = true; moFree[k - 1] = null; }
+          });
+          var moUsedGoals = (Array.isArray(moIn.meta.goals) ? moIn.meta.goals : []).map(String).filter(function (g) { return MOMENTS_GOALS[g]; }).slice(0, 6);
+          var moSaid = momentsLines(moSegs, moFree);
           if (!moSaid.length) return { ok: true, goal: "", topic: "", transcript: moText, moments: [] };
 
           // 2) from the text alone: the reel's goal, a plan, then whole thoughts in that goal's shape
@@ -774,7 +785,10 @@ export default {
 "2) 'topic': one short Arabic sentence, the video's main idea.\n" +
 "3) 'plan': a few short lines. Walk through the goal's structure step by step and, for each step, name the segment numbers that say it best, with their seconds. Add up the seconds.\n" +
 "4) 'moments': the RUNS of consecutive segments (from..to) from your plan, in the order the reel plays them, so that someone who sees only the reel understands the idea clearly, in the speakers' own voices.\n" +
-momentsRules(moLo, moRoom) + "Return ONLY JSON." }] },
+momentsRules(moLo, moRoom) +
+(Object.keys(moAvoid).length ? "- Other reels were already made from this video; their segments are left out of the transcript. Make this reel tell a DIFFERENT idea or angle" +
+  (moUsedGoals.length ? ", with a goal other than " + moUsedGoals.map(function (g) { return "«" + g + "»"; }).join(" and ") + " unless the content fits no other" : "") + ".\n" : "") +
+"Return ONLY JSON." }] },
             contents: moAsk,
             generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: {
               type: "OBJECT", required: ["goal", "topic", "plan", "moments"], propertyOrdering: ["goal", "topic", "plan", "moments"], properties: {
@@ -782,12 +796,12 @@ momentsRules(moLo, moRoom) + "Return ONLY JSON." }] },
           };
           var moS = await geminiJSON(moKey, moModels, moSel, "select");
           if (moS.error) return { error: moS.error, transcript: moText };
-          var moMoments = momentsRuns(moS.data.moments, moSegs, moText), moSpoken = moText.reduce(function (s, t, i) { return s + (t ? moSegs[i][1] - moSegs[i][0] : 0); }, 0);
+          var moMoments = momentsRuns(moS.data.moments, moSegs, moFree), moSpoken = moFree.reduce(function (s, t, i) { return s + (t ? moSegs[i][1] - moSegs[i][0] : 0); }, 0);
           if (momentsSecs(moMoments, moSegs) < moLo - 4 && moSpoken > moRoom * 1.3) {   // far too short while there is enough to say: ask once more
             moAsk.push({ role: "model", parts: [{ text: JSON.stringify(moS.data) }] },
                        { role: "user", parts: [{ text: "Your runs last " + Math.round(momentsSecs(moMoments, moSegs)) + " seconds; the reel needs " + moLo + " to " + moRoom + ". Keep what works and add more complete, self-contained thoughts that fit the goal's structure." }] });
             var moS2 = await geminiJSON(moKey, moModels, moSel, "select-again");
-            var moM2 = moS2.error ? [] : momentsRuns(moS2.data.moments, moSegs, moText);
+            var moM2 = moS2.error ? [] : momentsRuns(moS2.data.moments, moSegs, moFree);
             if (momentsSecs(moM2, moSegs) > momentsSecs(moMoments, moSegs)) { moS = moS2; moMoments = moM2; }
           }
           var moGoal = String(moS.data.goal || ""); if (!MOMENTS_GOALS[moGoal]) moGoal = "";
