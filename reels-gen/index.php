@@ -195,6 +195,7 @@
             </select>
             <div class="hint" id="rgSumKindHint" style="margin-top:4px"></div>
             <label class="chk" id="rgCriticRow" style="margin-top:6px"><input type="checkbox" id="rgCriticOn" checked> ناقد بيسمع الريل كمشاهد ويحسّنه (دقيقة زيادة تقريباً)</label>
+            <label class="chk" id="rgBrollRow" style="margin-top:6px"><input type="checkbox" id="rgBrollOn" checked> لقطات تغطية: الكلام بيكمّل والصورة بتنتقل لمشهد تاني وبترجع</label>
             <div class="row" style="margin-top:8px">
               <select id="rgSumLen">
                 <option value="30">ريل 30 ثانية</option>
