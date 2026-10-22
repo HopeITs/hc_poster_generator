@@ -484,7 +484,7 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .app-copyright{position:fixed;bottom:24px;left:0;right:0;z-index:-1;pointer-events:none;text-align:center;padding:0 12px;direction:ltr;font-family:'Somar Sans';font-weight:500;font-size:11px;color:#5b5b5b;}   /* fixed in place, behind the gate's own content */
 #projectGate .app-copyright{color:#848484;}
 .pg-stack{display:flex;flex-direction:column;align-items:center;gap:15px;}
-.pg-ga{width:min(92vw,440px);background:#fff;border-radius:18px;padding:21px 33px;box-shadow:0 10px 40px rgba(0,0,0,.12);}
+.pg-ga{width:min(92vw,440px);background:#fff;border-radius:18px;padding:39px 33px 33px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.12);}
 .pg-ga .proj-card{text-decoration:none;}
 .pg-ga .proj-card + .proj-card{margin-top:15px;}
 .pg-ga .proj-name{direction:ltr;}
@@ -494,10 +494,11 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 <div class="project-gate" id="projectGate" style="display:none">
   <div class="pg-stack">
     <div class="pg-wrap">
-      <div class="pg-title">اختر المشروع</div>
+      <div class="pg-title">Poster Maker</div>
       <div class="proj-grid" id="projGrid"></div>
     </div>
     <div class="pg-ga">
+      <div class="pg-title">Creative Tools</div>
       <a class="proj-card" href="guideline-assistant/" style="--pc-hover:#be1f24">
         <span class="proj-name">Guidelines Assistant <span class="proj-badge new">NEW</span></span>
       </a>
