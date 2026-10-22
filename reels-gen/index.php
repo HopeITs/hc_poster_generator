@@ -254,7 +254,7 @@
             </div>
             <audio id="rgMusicPlayer" controls hidden></audio>
             <label class="chk" style="margin-top:8px"><input type="checkbox" id="rgBeatSync" checked> قصّ اللقطات على إيقاع الموسيقى</label>
-            <div class="music-st" id="rgMusicSt">لا موسيقى بعد</div>
+            <div class="music-st" id="rgMusicSt">لا موسيقى بعد — بدونها المقاطع بصوتها الأصلي</div>
           </div>
           <div class="actions">
             <div class="proj-row">

@@ -405,7 +405,7 @@
     var mode = recipe().speed, vi = 0;
     shots.forEach(function (it) {
       it.speed = 1; it.ramp = false;
-      if (it.kind !== "video" || it.talk || (it.sum && !S.musicBlob)) return;   // a summary without music is heard, so it runs at its own speed
+      if (it.kind !== "video" || hears(it)) return;   // a clip that is heard runs at its own speed (sped-up or slowed sound is muted)
       var hi = (it.fps || 30) >= 48;   // 50/60 fps footage slows down cleanly at our 25 fps
       if (mode === "fast") it.speed = vi % 2 ? 1.6 : 1;
       else if (mode === "light") it.speed = 1.25;
@@ -416,9 +416,16 @@
     });
   }
   function vTime(it, local) { return Math.max(0, Math.min(it.srcDur - 0.04, it.start + span(it, local))); }
-  /* A clip is heard when the user keeps its sound, every moment of a summary
-     that has no music, and every spoken thought (music steps back under it). */
-  function hears(it) { return it.kind === "video" && (it.sound || it.talk || (it.sum && !S.musicBlob)); }
+  /* A video clip is heard when it is a spoken thought (music steps back under
+     it), when the user ticked «الصوت الأصلي», and — by default — whenever the
+     reel has no music, unless the user unticked it (mute). */
+  function hears(it) { return it.kind === "video" && !it.mute && (it.sound || it.talk || !S.musicBlob); }
+  /* Re-time the clips after what is heard changed (music added or removed, a
+     clip's sound ticked): heard clips go back to their own speed. Lengths stay. */
+  function reSpeed() {
+    assignSpeeds(S.items.filter(function (it) { return !it.missing && it.kind !== "card"; }));
+    S.items.forEach(function (it) { if (!it.missing && it.kind !== "card") clampItem(it); });
+  }
   function talkReel() { return S.items.some(function (it) { return it.talk; }); }
   function seekEl(it, local) {   // resolves once a video shows start+local (images and cards: at once)
     if (it.kind !== "video") return Promise.resolve();
@@ -550,7 +557,7 @@
           '<div class="row">' + lenField +
           (it.kind === "video" ? '<div style="flex:1"><label class="l">البداية (ث)</label><input type="number" data-f="start" min="0" step="0.5" value="' + it.start.toFixed(1) + '"></div>' : "") + '</div>' +
           '<div class="row"><label class="chk"><input type="checkbox" data-f="tint"' + (it.tint ? " checked" : "") + '> طبقة كحلية</label>' +
-          (it.kind === "video" && !it.sum ? '<label class="chk"><input type="checkbox" data-f="sound"' + (it.sound ? " checked" : "") + '> الصوت الأصلي</label>' : "") + '</div>' +
+          (it.kind === "video" && !it.sum ? '<label class="chk"><input type="checkbox" data-f="sound"' + (hears(it) ? " checked" : "") + '> الصوت الأصلي</label>' : "") + '</div>' +
           (it.talk && (it.say || it.role) ? '<div class="hint" title="' + esc(it.say) + '">' + (it.role ? '<b>' + esc(it.role) + '</b>' + (it.say ? " · " : "") : "") +
                                               esc(it.say.length > 110 ? it.say.slice(0, 110) + "…" : it.say) + '</div>' : "") +
           (it.skip ? '<div class="hint" style="color:var(--accent)">مستبعدة' + (it.why ? " — " + esc(it.why) : "") + '</div>'
@@ -713,11 +720,12 @@
     return (it.sum ? sumAudio() : decode(it.file)).then(function (b) { it.audio = b; return b; });   // the moments of a summary share one decode
   }
   function setSound(it, inp) {
-    it.sound = inp.checked; it.el.muted = !it.sound;
-    if (!it.sound) return;
+    it.sound = inp.checked; it.mute = !inp.checked; it.el.muted = !hears(it);
+    reSpeed(); renderClips(); drawAt(S.t);
+    if (!hears(it)) return;
     status("…جارٍ قراءة صوت المقطع");
     ensureAudio(it).then(function () { status(""); }, function () {
-      it.sound = false; inp.checked = false; it.el.muted = true;
+      it.sound = false; it.mute = true; it.el.muted = true; reSpeed(); renderClips();
       status("تعذّر قراءة صوت هذا المقطع — صيغة الصوت غير مدعومة بالمتصفح", true);
     });
   }
@@ -766,22 +774,25 @@
     S.musicBlob = blob; S.music = null; S.musicLabel = label; S.beats = null; S.musicTrack = null;
     renderTracks();   // any other music clears the ✓ on the bundled list
     var mp = $("rgMusicPlayer");
+    // without music the clips are heard, at their own speed; with it the style's speeds come back
+    function heardChanged() { if (S.mode === "sum") relayout(); else { reSpeed(); renderClips(); drawAt(S.t); } }
     if (!blob) {
       mp.hidden = true; mp.removeAttribute("src"); $("rgMusicSt").textContent = noMusicText();
-      if (S.mode === "sum") relayout();   // the moments are heard now, at their own speed
+      heardChanged();
       return Promise.resolve();
     }
     mp.src = URL.createObjectURL(blob); mp.hidden = false;
     return decode(blob)
       .then(function (buf) {
         S.music = buf; var bt = detectBeats(buf); S.beats = bt.beats; S.bpm = bt.bpm;
-        if (S.mode === "sum") { relayout(); return; }   // the style's speeds come back under music
+        if (S.mode === "sum") { relayout(); return; }
+        reSpeed();
         if ($("rgBeatSync").checked && snapToBeats()) drawAt(S.t);
         renderClips();
       })
-      .catch(function () { $("rgMusicSt").textContent = "تعذّرت قراءة ملف الموسيقى"; S.musicBlob = null; if (S.mode === "sum") relayout(); });
+      .catch(function () { $("rgMusicSt").textContent = "تعذّرت قراءة ملف الموسيقى"; S.musicBlob = null; heardChanged(); });
   }
-  function noMusicText() { return S.mode === "sum" ? "بدون موسيقى — الريل بصوت الفيديو الأصلي" : "بدون موسيقى"; }
+  function noMusicText() { return S.mode === "sum" ? "بدون موسيقى — الريل بصوت الفيديو الأصلي" : "بدون موسيقى — المقاطع بصوتها الأصلي"; }
   /* Re-read on every timeline change, so "too short" never outlives the edit that fixed it. */
   function musicNote() {
     if (!S.music) return;
@@ -1702,7 +1713,7 @@
     var sum = S.mode === "sum";
     kindHint();
     $("rgSumField").hidden = !sum; $("rgFilesField").hidden = sum; $("rgPick").hidden = sum;
-    if (!S.musicBlob) $("rgMusicSt").textContent = sum ? "لا موسيقى بعد — بدونها الريل بصوت الفيديو الأصلي" : "لا موسيقى بعد";
+    if (!S.musicBlob) $("rgMusicSt").textContent = sum ? "لا موسيقى بعد — بدونها الريل بصوت الفيديو الأصلي" : "لا موسيقى بعد — بدونها المقاطع بصوتها الأصلي";
     $("rgEmpty").innerHTML = sum ? "ارفع فيديو طويل واضغط<br>«توليد»" : "أضف صوراً أو مقاطع فيديو<br>لتظهر المعاينة هنا";
     try { localStorage.setItem("rg_mode", S.mode); } catch (e) {}
   }
@@ -1849,7 +1860,7 @@
               voice: S.voice ? { data: S.voice.data, times: S.voice.times, dur: S.voice.dur } : null,   // the paid-for voiceover travels with the project
               items: S.items.map(function (it) {
                 return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
-                                          : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, off: !!it.off, skip: !!it.skip, why: it.why || "",
+                                          : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, mute: !!it.mute, off: !!it.off, skip: !!it.skip, why: it.why || "",
                                               sum: !!it.sum, center: it.center != null ? it.center : null, lo: it.hi != null ? it.lo : null, hi: it.hi != null ? it.hi : null,
                                               talk: !!it.talk, say: it.say || "", role: it.role || "" };
               }) };
@@ -1870,7 +1881,7 @@
     d.items.forEach(function (x) {
       if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; S.items.push(c); return; }
       if (d.v === 1 && x.text && String(x.text).trim()) S.items.push(newCard(String(x.text)));   // v1 captions sat on the shot; they become a card before it
-      S.items.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true,
+      S.items.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, mute: !!x.mute, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true,
                      sum: !!x.sum, center: x.center != null ? +x.center : undefined, lo: x.hi != null ? +x.lo : undefined, hi: x.hi != null ? +x.hi : undefined,
                      talk: !!x.talk, say: String(x.say || ""), role: String(x.role || "") });
     });
