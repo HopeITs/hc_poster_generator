@@ -315,7 +315,7 @@ function momentsRules(lo, room) {
   return "RULES for moments:\n" +
 "- Each run is ONE COMPLETE, CLEAR THOUGHT that makes sense on its own. It starts where a sentence starts and ends where a sentence ends: never cut a sentence, never leave a thought unfinished. If a sentence spans several segments, include all of them.\n" +
 "- A run must not lean on words outside it: if it opens with a word that points back (them, this, that, so, and, also, هم، هاد، هيك، لأنو، و…), start the run earlier so the listener knows what it refers to — or choose another run.\n" +
-"- Usually 3 to 6 runs, each 3 to 20 seconds (start of 'from' to end of 'to'). Together they last between " + lo + " and " + room + " seconds: fill that time, never go over " + room + ".\n" +
+"- Usually 2 to 5 runs, each 7 to 20 seconds (start of 'from' to end of 'to'). NEVER shorter than 7 seconds: one short sentence alone does not get an idea across, so take in the sentences right before or after it that complete its idea, or choose another run. Together they last between " + lo + " and " + room + " seconds: fill that time, never go over " + room + ".\n" +
 "- Follow the goal's structure; the order may differ from the video's. The first run is a strong, self-contained opening that makes people keep watching. If the video ends with a call to action (how to join or register), the reel ends with it.\n" +
 "- Leave out greetings, thanks, self-introductions (unless they are the point), filler (um, so, okay), checks of the microphone, repeated ideas and false starts — do not keep them inside a run either: end the run before them or start it after them.\n" +
 "- 'why' is 2 to 6 Arabic words on the run's role in the structure (like «افتتاحية قوية» or «النتيجة»).\n" +

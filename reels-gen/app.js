@@ -1584,7 +1584,7 @@
         said += segs[j][1] - segs[j][0];
         var len = segs[j][1] - segs[i][0]; if (len > 15) break;
         var after = j + 1 < segs.length ? segs[j + 1][0] - segs[j][1] : 3;
-        if (len >= 4 && after >= 0.7) cands.push({ from: i + 1, to: j + 1, a: segs[i][0], b: segs[j][1], score: said / len + 0.5 * vis(segs[i][0], segs[j][1]) + 0.15 * Math.min(after, 2) });
+        if (len >= THOUGHT_MIN && after >= 0.7) cands.push({ from: i + 1, to: j + 1, a: segs[i][0], b: segs[j][1], score: said / len + 0.5 * vis(segs[i][0], segs[j][1]) + 0.15 * Math.min(after, 2) });
       }
     }
     cands.sort(function (x, y) { return y.score - x.score; });
@@ -1611,17 +1611,38 @@
   /* Whole runs only, never the same words twice, each with its transcribed
      words; too long: drop from the middle, keeping the opening and the close. */
   function tidyRuns(D, runs, room) {
-    var segs = D.speech.segs, tr = D.transcript || [], used = usedSegs(), list = [], said = 0;
+    var segs = D.speech.segs, tr = D.transcript || [], used = usedSegs(), list = [], said = 0, short = [];
+    function keep(x) {
+      for (var k = x.from; k <= x.to; k++) used[k] = true;
+      list.push({ from: x.from, to: x.to, why: x.why || "", text: tr.slice(x.from - 1, x.to).filter(Boolean).join(" ") });
+      said += segs[x.to - 1][1] - segs[x.from - 1][0];
+    }
     runs.forEach(function (x) {
       if (!(x.from >= 1 && x.to >= x.from && x.to <= segs.length)) return;
       if (haveTranscript(D)) x = wholeSentences(D, x);
       for (var k = x.from; k <= x.to; k++) if (used[k]) return;
-      for (k = x.from; k <= x.to; k++) used[k] = true;
-      list.push({ from: x.from, to: x.to, why: x.why || "", text: tr.slice(x.from - 1, x.to).filter(Boolean).join(" ") });
-      said += segs[x.to - 1][1] - segs[x.from - 1][0];
+      var g = growRun(D, x, used); if (g) keep(g); else short.push(x);
     });
+    if (!list.length) short.forEach(function (x) { for (var k = x.from; k <= x.to; k++) if (used[k]) return; keep(x); });   // nothing reaches THOUGHT_MIN: short thoughts beat an empty reel
     while (said > room + 2 && list.length > 2) { var cut = list.splice(list.length - 2, 1)[0]; said -= segs[cut.to - 1][1] - segs[cut.from - 1][0]; }
     return list;
+  }
+  /* A thought under THOUGHT_MIN takes in the speech right after it, then
+     right before it, while that is the same flow (no pause over 1.2 s) and
+     no other thought's; with a transcript it then runs on to a sentence's
+     end. Still too short: null. */
+  var THOUGHT_MIN = 7;   // seconds: shorter, a spoken idea rarely lands on its own
+  function growRun(D, x, used) {
+    var segs = D.speech.segs, tr = D.transcript || [], f = x.from - 1, t = x.to - 1;
+    function free(k) { return k >= 0 && k < segs.length && !used[k + 1]; }
+    if (segs[t][1] - segs[f][0] >= THOUGHT_MIN) return x;
+    while (segs[t][1] - segs[f][0] < THOUGHT_MIN) {
+      if (free(t + 1) && segs[t + 1][0] - segs[t][1] <= 1.2 && segs[t + 1][1] - segs[f][0] <= 20) t++;
+      else if (free(f - 1) && segs[f][0] - segs[f - 1][1] <= 1.2 && segs[t][1] - segs[f - 1][0] <= 20) f--;
+      else return null;
+    }
+    if (haveTranscript(D)) while (!endsSentence(tr[t]) && free(t + 1) && segs[t + 1][0] - segs[t][1] < 0.7 && segs[t + 1][1] - segs[f][0] <= 20) t++;
+    return { from: f + 1, to: t + 1, why: x.why };
   }
   /* A breath before the first word and after the last, short of the next voice. */
   function runSpan(segs, x, dur) {
@@ -1697,7 +1718,7 @@
      on-device analysis: scenes with movement and a clear picture, away from
      the chosen thoughts, that look unlike the speaker's own shots, never
      the same scene twice. */
-  var BROLL_LEN = 2.5, BROLL_MIN = 6, BROLL_LEAD = 2, BROLL_TAIL = 1, momSeq = 0;
+  var BROLL_LEN = 2.5, BROLL_MIN = 9, BROLL_LEAD = 2, BROLL_TAIL = 1, momSeq = 0;
   function brollPool(D, spans) {
     var sm = D.samples; if (!sm || !D.scenes) return [];
     var win = Math.max(1, Math.round(BROLL_LEN / D.dt)), pre = [0];
