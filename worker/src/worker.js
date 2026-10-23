@@ -210,7 +210,7 @@ var geminiLenient = {};   // model → 1 (no thinking / output settings) or 2 (n
 function geminiSoften(body, level) {
   if (!level || !body.generationConfig) return body;
   var gc = Object.assign({}, body.generationConfig), sys = body.system_instruction;
-  delete gc.thinkingConfig; delete gc.maxOutputTokens;
+  delete gc.thinkingConfig; delete gc.maxOutputTokens; delete gc.mediaResolution;
   if (level >= 2 && gc.responseSchema) {
     var schema = gc.responseSchema; delete gc.responseSchema;
     sys = { parts: [{ text: (sys ? sys.parts[0].text : "") + "\nThe JSON must follow this schema exactly: " + JSON.stringify(schema) }] };
@@ -224,7 +224,7 @@ async function geminiJSON(key, models, body, label) {
     r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + key,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geminiSoften(body, level)) });
     d = await r.json();
-    console.log("gemini " + (label || "") + " " + model + (level ? " (lenient " + level + ")" : "") + " " + r.status + " " + (Date.now() - t0) + "ms" + (r.ok ? "" : ": " + JSON.stringify(d && d.error || d).slice(0, 300)));
+    console.log("gemini " + (label || "") + " " + model + (level ? " (lenient " + level + ")" : "") + " " + r.status + " " + (Date.now() - t0) + "ms" + (r.ok ? "" : ": " + JSON.stringify(d && d.error || d).slice(0, 1500)));
     if (r.status === 429) overQuota = true;
     if (r.status === 400 && level < 2 && body.generationConfig) { geminiLenient[model] = level + 1; return call(model); }
   }
@@ -919,7 +919,7 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
         if (!txSizes.length || txSizes.length > TRANSCRIBE_MAX_IMAGES || txSizes.reduce(function (s, n) { return s + n; }, 0) !== txIn.audio.byteLength) return json({ error: "طلب غير صالح" }, 400);
         var txLang = { "ara+eng": "Arabic and English", ara: "Arabic", eng: "English" }[txIn.meta.lang] || "Arabic and English";
         var txMode = ["text", "doc", "auto", "invoice"].indexOf(txIn.meta.mode) >= 0 ? txIn.meta.mode : "text";
-        var txDocRules = txMode === "text" ? "" : txMode === "invoice" ?
+        var txDocRules =txMode === "text" ? "" : txMode === "invoice" ?
 "EVERY file is an invoice or receipt (for the accounting team). Besides 'text', fill:\n" +
 "- 'invoice_date': the invoice's date exactly as printed (not reformatted); \"\" if there is none.\n" +
 "- 'invoice_number': the invoice or receipt number exactly as printed, digits and letters as they are; \"\" if there is none.\n" +
@@ -951,12 +951,16 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
 "You transcribe the text in images and PDF files. Each numbered file is one entry in 'images', its 'n' the file's number; a PDF is one entry however many pages it has. For EACH file, in order, write all the text it contains exactly as written: the same language and spelling, no translation, no correction, no summary, nothing added. The text is mostly in " + txLang + ".\n" +
 "Keep the reading order (Arabic right to left, then top to bottom; columns one after another), the line breaks and the paragraphs. Headings and list items go on their own lines. A table is one line per row, its cells separated by ' | '.\n" +
 "Keep Arabic letters, diacritics and digits as they appear. Mark a word you cannot read as […]. If an image has no text, its text is \"\".\n" +
+"Numbers: copy every number digit by digit in the digits the image uses, keeping every zero (also leading and trailing ones) and the digits' order; count the digits of each number before writing it.\n" +
 txDocRules +
 (txPdf ? "For a PDF, transcribe every page in order; before each page after the first, put a line of its own reading exactly: — صفحة N — (with the page number for N, no quotation marks). For a document or invoice that runs over several pages, read its fields from all of them.\n" : "") +
 "Return ONLY JSON: one entry per file in 'images', covering all " + parts.length + " files." }] },
               contents: [{ role: "user", parts: txParts }],
               // no thinking: copying text needs none, and it was most of the wait (9.4 s of 12 for one card)
-              generationConfig: { temperature: 0, maxOutputTokens: txPdf ? 65536 : 32768, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: {
+              generationConfig: { temperature: 0, maxOutputTokens: txPdf ? 65536 : 32768, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json",
+                // the full picture, not a downsampled one: the Arabic-Indic zero is a dot that a lower resolution loses
+                mediaResolution: "MEDIA_RESOLUTION_HIGH",
+                responseSchema: {
                 type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: txMode === "text"
                   ? { type: "OBJECT", required: ["n", "text"], properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } }
                   : txMode === "invoice"
