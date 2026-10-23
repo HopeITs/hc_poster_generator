@@ -124,7 +124,7 @@
   /* Pinned to the bottom like the copyright on the other pages (.app-copyright:
      bottom 24px); body leaves room for it so content never runs underneath. */
   body{padding-bottom:70px;}
-  .foot{position:fixed;bottom:24px;left:0;right:0;text-align:center;direction:ltr;font-size:11px;font-weight:500;color:#848484;padding:0 12px;pointer-events:none;}
+  .foot{position:fixed;bottom:24px;left:0;right:0;z-index:-1;text-align:center;direction:ltr;font-size:11px;font-weight:500;color:#848484;padding:0 12px;pointer-events:none;}   /* z-index -1: fixed in place, behind anything that scrolls over it */
 </style>
 </head>
 <body>
@@ -222,7 +222,7 @@ into Success</textarea>
   <script src="compositor.js" defer></script>
   <script src="app.js" defer></script>
 
-  <div class="foot">HC Generator, a project by Christian Hope Center. © 2026 All Rights Reserved.</div>
+  <div class="foot">HC Generator, a project by Christian Hope Center. © <?= date('Y') ?> All Rights Reserved.</div>
 
 </body>
 </html>

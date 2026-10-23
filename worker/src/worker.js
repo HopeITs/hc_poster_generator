@@ -22,6 +22,36 @@ const MUSIC_DAILY_MAX  = 20;   // مقطوعات لكل مستخدم خلال 24
 const MUSIC_MIN_SEC    = 10;
 const MUSIC_MAX_SEC    = 90;
 const MUSIC_PROMPT_MAX = 500;  // أحرف وصف الموسيقى
+// Reels Gen — صياغة السكريبت (Gemini) والتعليق الصوتي (ElevenLabs) لكل من يملك الأداة
+const SCRIPT_DAILY_MAX = 60;   // صياغات لكل مستخدم خلال 24 ساعة
+const SCRIPT_MAX_CHARS = 4000; // سكريبت المستخدم
+const VOICE_DAILY_MAX  = 40;   // تعليقات صوتية لكل مستخدم خلال 24 ساعة
+const VOICE_MAX_CHARS  = 1200; // نص التعليق كاملاً (ريل 45 ث ≈ 500–700 حرف)
+const VOICE_NAME       = "mazen";            // يُبحث عنه في أصوات الحساب ثم في مكتبة ElevenLabs
+const VOICE_NAME_FULL  = "mazen lawand";
+const VOICE_MODEL      = "eleven_multilingual_v2";
+// Reels Gen — تلخيص الكلام: Gemini يسمع صوت الفيديو ويختار أفكاراً كاملة
+const MOMENTS_DAILY_MAX = 30;                 // تحليلات لكل مستخدم خلال 24 ساعة
+const MOMENTS_MAX_BYTES = 40 * 1048576;       // صوت Opus ≈ 11 MB للساعة
+const MOMENTS_MAX_SEGS  = 3000;
+const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مستخدم خلال 24 ساعة (حتى 3 لكل ريل)
+// Text Transcription — تفريغ الصور بـ Gemini (تفريغ الجهاز لا يمرّ من هنا)
+const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
+const TRANSCRIBE_MAX_IMAGES = 6;
+const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
+const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;
+// نوع «فاتورة» (قسم المحاسبة): خاناته الثابتة — [العنوان بالواجهة، اسمها بردّ Gemini]
+const INVOICE_FIELDS = [["تاريخ الفاتورة", "invoice_date"], ["رقم الفاتورة", "invoice_number"], ["تفاصيل الفاتورة (انكليزي)", "details_en"], ["المبلغ الإجمالي", "total"]];   // up to this the images travel inside the request, not uploaded first
+// أهداف الريل وبنية كل هدف — Gemini يختار واحداً من المحتوى ويرتّب الأفكار حسبه
+const MOMENTS_GOALS = {
+  "تعريف بمشروع":  "what the project is, then who it serves, then what they do there, then how to join or learn more",
+  "قصة نجاح":      "the person and the challenge before, then the turning point, then the change and the result now",
+  "دعوة للتسجيل":  "the need or the chance, then what is offered, then who it is for, then how and when to register",
+  "أثر ونتائج":    "the need, then what was done, then the results and numbers, then what comes next",
+  "تغطية فعالية":  "what the event is, then its key moments and statements, then the takeaway",
+  "توعية ونصائح":  "the issue, then the key advice, then a closing message"
+};
+var voiceIdCache = null;       // يبقى طوال عمر نسخة الـWorker
 
 function cors() {
   return {
@@ -121,7 +151,180 @@ async function getUserProjectsBrief(env, email, role) {
   return (rows.results || []).map(function (p) { return { id: p.id, name: p.name }; });
 }
 
+// هل يملك المستخدم مشروعاً بهذا الـslug (جاهزاً)؟ — نفس قاعدة ظهور الأدوات بالواجهة
+async function hasProjectSlug(env, user, slug) {
+  var list = await getAccessibleProjects(env, user.email, user.role);
+  return list.some(function (p) { return p.slug === slug && p.status === "ready"; });
+}
+async function usedToday(env, email, kind) {
+  var since = new Date(Date.now() - 86400000).toISOString().replace("T", " ").slice(0, 19);
+  var row = await env.DB.prepare("SELECT COUNT(*) AS c FROM ai_usage WHERE email=?1 AND kind=?2 AND at>?3").bind(email, kind, since).first();
+  return (row && row.c) || 0;
+}
+
+/* ---------- ElevenLabs: صوت مازن لاوند ----------
+   ELEVENLABS_VOICE_ID (اختياري) يتجاوز البحث. وإلا: أصوات الحساب أولاً، ثم مكتبة
+   الأصوات المشتركة — وإن وُجد هناك يُضاف إلى أصوات الحساب مرة واحدة (شرط ElevenLabs
+   لاستعماله عبر الـAPI). */
+function pickVoice(list, nameOf) {
+  var hits = (list || []).filter(function (v) { return String(nameOf(v) || "").toLowerCase().indexOf(VOICE_NAME) >= 0; });
+  return hits.filter(function (v) { return String(nameOf(v)).toLowerCase().indexOf(VOICE_NAME_FULL) >= 0; })[0] || hits[0] || null;
+}
+async function findVoiceId(env) {
+  if (env.ELEVENLABS_VOICE_ID) return env.ELEVENLABS_VOICE_ID;
+  if (voiceIdCache) return voiceIdCache;
+  var h = { "xi-api-key": env.ELEVENLABS_API_KEY };
+  var mine = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100&search=" + encodeURIComponent(VOICE_NAME), { headers: h });
+  if (mine.ok) {
+    var md = await mine.json(), mv = pickVoice(md.voices, function (v) { return v.name; });
+    if (mv) return (voiceIdCache = mv.voice_id);
+  }
+  var shared = await fetch("https://api.elevenlabs.io/v1/shared-voices?page_size=50&search=" + encodeURIComponent(VOICE_NAME_FULL), { headers: h });
+  if (!shared.ok) return null;
+  var sd = await shared.json(), sv = pickVoice(sd.voices, function (v) { return v.name; });
+  if (!sv) return null;
+  var add = await fetch("https://api.elevenlabs.io/v1/voices/add/" + encodeURIComponent(sv.public_owner_id) + "/" + encodeURIComponent(sv.voice_id), {
+    method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ new_name: sv.name })
+  });
+  if (!add.ok) return null;
+  var ad = await add.json();
+  return (voiceIdCache = ad.voice_id || sv.voice_id);
+}
+
 /* ---------- قواعد الصلاحيات ---------- */
+/* ---------- Gemini: one JSON answer ----------
+   Reels Gen calls Gemini on a key of its own (REELS_GEMINI_KEY, a separate
+   free Google project, so its daily quota is not shared with the other tools),
+   and on GEMINI_API_KEY until that secret is set. */
+function reelsKey(env) { return env.REELS_GEMINI_KEY || env.GEMINI_API_KEY; }
+// Text Transcription: a key of its own when TRANSCRIBE_GEMINI_KEY is set, else the Reels one.
+function transcribeKey(env) { return env.TRANSCRIBE_GEMINI_KEY || reelsKey(env); }
+/* Retries when Gemini is busy and falls back along the given models. A model
+   that rejects the request outright (400) is asked again with less: first
+   without the thinking and output-length settings, then without the strict
+   schema (written into the instructions instead) — the lighter models refuse
+   some of these. What a model needed is remembered for the Worker's lifetime,
+   so later calls do not spend a request finding out again. Returns {data}
+   (the parsed JSON) or {error} (a message for the user). */
+var geminiLenient = {};   // model → 1 (no thinking / output settings) or 2 (no schema either)
+function geminiSoften(body, level) {
+  if (!level || !body.generationConfig) return body;
+  var gc = Object.assign({}, body.generationConfig), sys = body.system_instruction;
+  delete gc.thinkingConfig; delete gc.maxOutputTokens;
+  if (level >= 2 && gc.responseSchema) {
+    var schema = gc.responseSchema; delete gc.responseSchema;
+    sys = { parts: [{ text: (sys ? sys.parts[0].text : "") + "\nThe JSON must follow this schema exactly: " + JSON.stringify(schema) }] };
+  }
+  return Object.assign({}, body, { generationConfig: gc, system_instruction: sys });
+}
+async function geminiJSON(key, models, body, label) {
+  var r = null, d = null, overQuota = false, used = "";
+  async function call(model) {
+    var level = geminiLenient[model] || 0, t0 = Date.now();
+    r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + key,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geminiSoften(body, level)) });
+    d = await r.json();
+    console.log("gemini " + (label || "") + " " + model + (level ? " (lenient " + level + ")" : "") + " " + r.status + " " + (Date.now() - t0) + "ms" + (r.ok ? "" : ": " + JSON.stringify(d && d.error || d).slice(0, 300)));
+    if (r.status === 429) overQuota = true;
+    if (r.status === 400 && level < 2 && body.generationConfig) { geminiLenient[model] = level + 1; return call(model); }
+  }
+  for (var i = 0; i < models.length; i++) {
+    if (i) await new Promise(function (res) { setTimeout(res, 600 * i); });   // short: a busy model rarely clears in a second or two, and the next try may be another model
+    try { await call(models[i]); } catch (e) { r = null; d = null; continue; }
+    if (r.ok) used = models[i];
+    if (r.ok || r.status === 401 || r.status === 403 || r.status === 404) break;   // anything else (busy, over quota, rejected) tries the next model
+  }
+  if (!r) return { error: "تعذّر الاتصال بـ Gemini" };
+  if (!r.ok) return { error: overQuota && r.status !== 400 ? "خلص الحد اليومي المجاني لـ Gemini، والنموذج البديل مضغوط — جرّب بعد شوي أو بكرا"
+                           : r.status === 503 ? "Gemini مضغوط حالياً — جرّب بعد دقيقة"
+                           : ((d && d.error && d.error.message) || "فشل طلب Gemini") };
+  var out = ""; try { out = d.candidates[0].content.parts[0].text || ""; } catch (e) {}
+  out = out.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");   // a lenient answer may come fenced
+  try { return { data: JSON.parse(out), model: used }; } catch (e) { return { error: "ردّ Gemini غير صالح" }; }   // model: which one answered (a fallback reads less well)
+}
+/* A long answer (a minute or two of Gemini) as a stream: the response starts
+   at once and a space goes out every few seconds until the JSON follows, so
+   nothing on the way gives up on the request and sends it again (which would
+   run it — and spend the quota — twice). Errors travel in the JSON, with 200. */
+function slowJSON(work) {
+  var ts = new TransformStream(), w = ts.writable.getWriter(), enc = new TextEncoder();
+  w.write(enc.encode(" ")).catch(function () {});
+  var tick = setInterval(function () { w.write(enc.encode(" ")).catch(function () {}); }, 4000);
+  (async function () {
+    var out; try { out = await work(); } catch (e) { out = { error: "خطأ بالخادم: " + (e && e.message || e) }; }
+    clearInterval(tick);
+    try { await w.write(enc.encode(JSON.stringify(out))); await w.close(); } catch (e) {}
+  })();
+  return new Response(ts.readable, { status: 200, headers: { ...cors(), "Content-Type": "application/json", "Cache-Control": "no-store" } });
+}
+
+/* ---------- Reels Gen: speech summaries (shared by /reels/moments and /reels/critique) ---------- */
+// Upload audio to Gemini's Files API and wait until it can be read. Returns {file} or {error};
+// the caller deletes the file (geminiDelete) as soon as it is done with it.
+async function geminiUpload(key, bytes, mime, name) {
+  var gk = "?key=" + key, gBase = "https://generativelanguage.googleapis.com";
+  var st = await fetch(gBase + "/upload/v1beta/files" + gk, { method: "POST",
+    headers: { "X-Goog-Upload-Protocol": "resumable", "X-Goog-Upload-Command": "start", "X-Goog-Upload-Header-Content-Length": String(bytes.byteLength),
+               "X-Goog-Upload-Header-Content-Type": mime, "Content-Type": "application/json" },
+    body: JSON.stringify({ file: { display_name: name } }) });
+  var url = st.ok && st.headers.get("x-goog-upload-url");
+  if (!url) return { error: "تعذّر رفع الصوت لـ Gemini" };
+  var fr = await fetch(url, { method: "POST", headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" }, body: bytes });
+  var file = fr.ok ? ((await fr.json()).file || null) : null;
+  if (!file || !file.name) return { error: "تعذّر رفع الصوت لـ Gemini" };
+  for (var i = 0; i < 40 && file.state === "PROCESSING"; i++) {   // audio is usually ready at once
+    await new Promise(function (r) { setTimeout(r, 1500); });
+    file = await (await fetch(gBase + "/v1beta/" + file.name + gk)).json();
+  }
+  if (file.state !== "ACTIVE") return { error: "Gemini ما قدر يقرأ الصوت", file: file };
+  return { file: file };
+}
+function base64(buf) {   // in 32 KB slices: one String.fromCharCode call per slice stays within the argument limit
+  var b = new Uint8Array(buf), s = "";
+  for (var i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768));
+  return btoa(s);
+}
+function geminiDelete(key, ctx, file) {   // the audio does not stay with Google
+  if (file && file.name) ctx.waitUntil(fetch("https://generativelanguage.googleapis.com/v1beta/" + file.name + "?key=" + key, { method: "DELETE" }).catch(function () {}));
+}
+// Body: [4-byte JSON length][JSON][Ogg Opus audio]
+function splitAudioBody(buf) {
+  if (buf.byteLength < 8 || buf.byteLength > MOMENTS_MAX_BYTES) return null;
+  var len = new DataView(buf).getUint32(0), meta;
+  try { meta = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, len))); } catch (e) { return null; }
+  return { meta: meta, audio: buf.slice(4 + len) };
+}
+function momentsSegs(meta) {
+  return (Array.isArray(meta.segments) ? meta.segments : []).slice(0, MOMENTS_MAX_SEGS).map(function (s) { return [Number(s[0]) || 0, Number(s[1]) || 0]; });
+}
+// The transcript as the editor reads it: number [start-end, length] words
+function momentsLines(segs, text) {
+  return text.map(function (t, i) { return t ? (i + 1) + " [" + segs[i][0].toFixed(1) + "-" + segs[i][1].toFixed(1) + ", " + (segs[i][1] - segs[i][0]).toFixed(1) + "s] " + t : ""; }).filter(Boolean);
+}
+function momentsRuns(list, segs, text) {
+  return (list || []).map(function (m) {
+    return { from: Math.round(Number(m && m.from)), to: Math.round(Number(m && m.to)), why: String(m && m.why || "").trim().slice(0, 60) };
+  }).filter(function (m) {
+    if (!(m.from >= 1 && m.to >= m.from && m.to <= segs.length && text[m.from - 1] && text[m.to - 1])) return false;
+    for (var k = m.from; k <= m.to; k++) if (text[k - 1] == null) return false;   // never across a segment left out (another reel's) — "" is a silence, null is taken
+    return true;
+  }).slice(0, 20);
+}
+function momentsSecs(runs, segs) { return runs.reduce(function (s, m) { return s + segs[m.to - 1][1] - segs[m.from - 1][0]; }, 0); }
+function momentsRules(lo, room) {
+  return "RULES for moments:\n" +
+"- Each run is ONE COMPLETE, CLEAR THOUGHT that makes sense on its own. It starts where a sentence starts and ends where a sentence ends: never cut a sentence, never leave a thought unfinished. If a sentence spans several segments, include all of them.\n" +
+"- A run must not lean on words outside it: if it opens with a word that points back (them, this, that, so, and, also, هم، هاد، هيك، لأنو، و…), start the run earlier so the listener knows what it refers to — or choose another run.\n" +
+"- Usually 2 to 5 runs, each 7 to 20 seconds (start of 'from' to end of 'to'). NEVER shorter than 7 seconds: one short sentence alone does not get an idea across, so take in the sentences right before or after it that complete its idea, or choose another run. Together they last between " + lo + " and " + room + " seconds: fill that time, never go over " + room + ".\n" +
+"- Follow the goal's structure; the order may differ from the video's. The first run is a strong, self-contained opening that makes people keep watching. If the video ends with a call to action (how to join or register), the reel ends with it.\n" +
+"- Leave out greetings, thanks, self-introductions (unless they are the point), filler (um, so, okay), checks of the microphone, repeated ideas and false starts — do not keep them inside a run either: end the run before them or start it after them.\n" +
+"- 'why' is 2 to 6 Arabic words on the run's role in the structure (like «افتتاحية قوية» or «النتيجة»).\n" +
+"- Use only numbers from the transcript, and choose from what is written there.\n";
+}
+var MOMENTS_RUNS_SCHEMA = { type: "ARRAY", items: { type: "OBJECT", required: ["from", "to", "why"], propertyOrdering: ["from", "to", "why"],
+  properties: { from: { type: "INTEGER" }, to: { type: "INTEGER" }, why: { type: "STRING" } } } };
+var CRITIC_KINDS = ["cut_start", "cut_end", "missing_context", "unclear", "weak", "filler", "order", "off_topic"];
+
 function canManage(role) { return role === "owner" || role === "admin" || role === "comms"; }
 function isGlobalRole(role) { return role === "owner" || role === "comms"; } // وصول شامل لكل المشاريع
 function rolesVisibleTo(role) {
@@ -146,7 +349,7 @@ function canAssign(actorRole, targetRole) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") return new Response(null, { headers: cors() });
     var url = new URL(request.url);
     var path = url.pathname.replace(/\/+$/, "");
@@ -413,6 +616,377 @@ export default {
         }
         await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'music', datetime('now'))").bind(muUser.email).run();
         return new Response(muRes.body, { status: 200, headers: { ...cors(), "Content-Type": "audio/mpeg", "Cache-Control": "no-store" } });
+      }
+
+      /* ---- 7b3) Reels Gen: سكريبت المستخدم ← جمل التعليق الصوتي + نصوص الكروت (Gemini) ----
+         لكل من يملك أداة reels-gen. يعيد {lines:[{voice, card}]}: كل جملة تُقرأ بالتعليق،
+         و card نص قصير لكرت يظهر معها (فارغ لمعظم الجمل). */
+      if (request.method === "POST" && path === "/reels/script") {
+        var scUser = await getSessionUser(env, request);
+        if (!scUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, scUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
+        if (!reelsKey(env)) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        var scb = await request.json();
+        var scText = String(scb.script || "").trim().slice(0, SCRIPT_MAX_CHARS);
+        var scSecs = Math.max(15, Math.min(80, Math.round(Number(scb.seconds) || 40)));
+        if (!scText) return json({ error: "اكتب السكريبت أولاً" }, 400);
+        if ((await usedToday(env, scUser.email, "script")) >= SCRIPT_DAILY_MAX) return json({ error: "وصلت للحد اليومي للصياغة. جرّب بكرا." }, 429);
+        var scWords = Math.round(scSecs * 2.1);
+        var scSys =
+"You write the voiceover and on-screen text cards for a short vertical social-media reel (Instagram/Facebook) for an NGO's education and community projects in Syria.\n" +
+"The user gives a rough script or notes. Rewrite it into a voiceover read by a male narrator, plus a few short text cards.\n" +
+"LANGUAGE: simple, warm Syrian colloquial Arabic — a neutral 'white' Syrian dialect that any Syrian understands. NOT heavy Modern Standard Arabic, and NOT the marked accent of any one city or region (avoid strongly Aleppine, Damascene, coastal or rural markers). Natural spoken phrasing, e.g. «شو»، «هيك»، «كتير»، «لأنو»، «عم».\n" +
+"LENGTH: the whole voiceover must be read in about " + scSecs + " seconds — about " + Math.round(scWords * 0.9) + " to " + scWords + " words in total. Never exceed " + scWords + " words.\n" +
+"LINES: split the voiceover into 7 to 12 short sentences (one breath each, 4–14 words). The last line is a short closing/call-to-action.\n" +
+"CARDS: a card is on-screen text shown ALONE, in silence, just BEFORE its line is spoken — the narrator NEVER reads it. Give a card on the FIRST line (the hook: a question or striking statement that makes people stop scrolling) and on each line where the reel moves to a NEW idea — 3 cards in total (4 at most); every other line has card \"\". A card is at most 7 words, in the same dialect, punchy, and may be split over two lines with \\n at a natural break (like «شو نفع الشهادة\\nاذا ما عم تعرف تستخدمها؟»).\n" +
+"NO REPETITION: the voice line after a card must NOT repeat, paraphrase or re-ask the card — the viewer has just read it. The line picks up from the card and moves the thought forward (answers the question, gives the example, adds the next fact).\n" +
+"Keep names of people, places, projects and organisations exactly as given. Use Western digits 0-9. No emojis, no hashtags, no stage directions.\n" +
+"Return ONLY JSON: {\"lines\":[{\"voice\":\"...\",\"card\":\"...\"}]}";
+        // Gemini answers 503/429 ("high demand") at busy times: retry, then fall back to the lighter model
+        var scBody = JSON.stringify({
+          system_instruction: { parts: [{ text: scSys }] },
+          contents: [{ role: "user", parts: [{ text: scText }] }],
+          generationConfig: { temperature: 0.7, responseMimeType: "application/json" }
+        });
+        var scTries = ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"];
+        var scR = null, scD = null;
+        for (var sci = 0; sci < scTries.length; sci++) {
+          if (sci) await new Promise(function (r) { setTimeout(r, 800 * sci); });
+          try {
+            scR = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + scTries[sci] + ":generateContent?key=" + reelsKey(env),
+              { method: "POST", headers: { "Content-Type": "application/json" }, body: scBody });
+            scD = await scR.json();
+          } catch (e) { scR = null; scD = null; continue; }
+          if (scR.ok || (scR.status !== 503 && scR.status !== 429 && scR.status !== 500)) break;
+        }
+        if (!scR) return json({ error: "تعذّر الاتصال بخدمة الصياغة" }, 502);
+        if (!scR.ok) {
+          var scBusy = scR.status === 503 || scR.status === 429;
+          return json({ error: scBusy ? "خدمة الصياغة (Gemini) مضغوطة حالياً — جرّب بعد دقيقة" : ((scD && scD.error && scD.error.message) || "فشلت الصياغة") }, 502);
+        }
+        var scOut = ""; try { scOut = scD.candidates[0].content.parts[0].text || ""; } catch (e) {}
+        var scParsed; try { scParsed = JSON.parse(scOut); } catch (e) { return json({ error: "ردّ الصياغة غير صالح" }, 502); }
+        var scLines = (Array.isArray(scParsed && scParsed.lines) ? scParsed.lines : [])
+          .map(function (l) { return { voice: String(l && l.voice || "").trim(), card: String(l && l.card || "").trim() }; })
+          .filter(function (l) { return l.voice; }).slice(0, 14);
+        if (!scLines.length) return json({ error: "لم تُرجع الصياغة أي جملة" }, 502);
+        await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'script', datetime('now'))").bind(scUser.email).run();
+        return json({ ok: true, lines: scLines });
+      }
+
+      /* ---- 7b4) Reels Gen: تعليق صوتي بصوت مازن لاوند (ElevenLabs، مع توقيت كل جملة) ----
+         يستقبل {lines:[نص]} ويقرؤها دفعة واحدة (أداء متصل)، ثم يحسب من محاذاة الأحرف
+         بداية ونهاية كل جملة. يعيد {audio: mp3 base64, lines:[{start,end}], duration}. */
+      if (request.method === "POST" && path === "/reels/voice") {
+        var vcUser = await getSessionUser(env, request);
+        if (!vcUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, vcUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
+        if (!env.ELEVENLABS_API_KEY) return json({ error: "مفتاح ElevenLabs غير مضبوط" }, 500);
+        var vcb = await request.json();
+        var vcLines = (Array.isArray(vcb.lines) ? vcb.lines : []).map(function (l) { return String(l || "").replace(/\s+/g, " ").trim(); }).filter(Boolean);
+        if (!vcLines.length) return json({ error: "لا يوجد نص للتعليق" }, 400);
+        var vcText = vcLines.join("\n");
+        if (vcText.length > VOICE_MAX_CHARS) return json({ error: "نص التعليق طويل (" + vcText.length + " حرف، الحد " + VOICE_MAX_CHARS + ")" }, 400);
+        if ((await usedToday(env, vcUser.email, "voice")) >= VOICE_DAILY_MAX) return json({ error: "وصلت للحد اليومي (" + VOICE_DAILY_MAX + " تعليق). جرّب بكرا." }, 429);
+        var vcId = await findVoiceId(env);
+        if (!vcId) return json({ error: "لم أجد صوت «Mazen Lawand» في حساب ElevenLabs ولا في مكتبة الأصوات" }, 502);
+        var vcR = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + encodeURIComponent(vcId) + "/with-timestamps?output_format=mp3_44100_128", {
+          method: "POST",
+          headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ text: vcText, model_id: VOICE_MODEL,
+                                 voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true } })
+        });
+        if (!vcR.ok) {
+          var vcErr = ""; try { var vce = await vcR.json(); vcErr = (vce.detail && (vce.detail.message || vce.detail)) || ""; } catch (e) {}
+          if (vcR.status === 404 || vcR.status === 400) voiceIdCache = null;   // صوت محذوف/مُستبدل: ابحث من جديد بالمرة الجاية
+          return json({ error: "تعذّر توليد التعليق" + (vcErr ? ": " + (typeof vcErr === "string" ? vcErr : JSON.stringify(vcErr)) : "") }, 502);
+        }
+        var vcD = await vcR.json(), al = vcD.alignment || vcD.normalized_alignment || {};
+        var chars = al.characters || [], cs = al.character_start_times_seconds || [], ce = al.character_end_times_seconds || [];
+        // حدود كل جملة بمواقع أحرفها داخل النص المجمّع (الجمل مفصولة بسطر جديد)
+        var vcTimes = [], off = 0;
+        vcLines.forEach(function (l) {
+          var a = off, b = off + l.length - 1, s = null, e = null;
+          for (var i = a; i <= b && i < chars.length; i++) { if (!/\s/.test(chars[i])) { if (s === null) s = cs[i]; e = ce[i]; } }
+          vcTimes.push({ start: s === null ? 0 : s, end: e === null ? 0 : e });
+          off += l.length + 1;
+        });
+        await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'voice', datetime('now'))").bind(vcUser.email).run();
+        return json({ ok: true, audio: vcD.audio_base64, lines: vcTimes, duration: ce.length ? ce[ce.length - 1] : 0 });
+      }
+
+      /* ---- 7b5) Reels Gen: تلخيص فيديو بالكلام — أفكار كاملة (Gemini، خطوتان) ----
+         الجسم: [4 بايت طول JSON][JSON {seconds, segments:[[start,end]], transcript?, avoid?, goals?}][صوت Ogg Opus].
+         avoid: سلاسل [from,to] استعملتها ريلات تانية من نفس الفيديو — ما بتنعرض على Gemini
+         وما بترجع؛ goals: أهداف تلك الريلات، ليختار هدفاً غيرها إن سمح المحتوى.
+         المقاطع حدودها سكتات اكتشفها المتصفح. الخطوة 1: Gemini يسمع الصوت ويفرّغ كل مقطع
+         برقمه فقط (يُرفع عبر Files API ويُحذف بعدها مباشرة) — وتُتخطّى إن أرسل المتصفح
+         التفريغ من مرة سابقة (بلا صوت). الخطوة 2: نص فقط — يحدّد هدف الريل من قائمة ثابتة
+         ويختار سلاسل متتالية (from..to) كل منها فكرة كاملة، مرتّبة حسب بنية الهدف.
+         الرد يتدفّق (slowJSON): {goal, topic, transcript, moments:[{from,to,why}]} أو {error}. */
+      if (request.method === "POST" && path === "/reels/moments") {
+        var moUser = await getSessionUser(env, request);
+        if (!moUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, moUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
+        var moKey = reelsKey(env);
+        if (!moKey) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        if (Number(request.headers.get("Content-Length") || 0) > MOMENTS_MAX_BYTES) return json({ error: "صوت الفيديو أكبر من المسموح" }, 413);
+        if ((await usedToday(env, moUser.email, "moments")) >= MOMENTS_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتحليل الكلام. جرّب بكرا." }, 429);
+        var moIn = splitAudioBody(await request.arrayBuffer());
+        if (!moIn) return json({ error: "طلب غير صالح" }, 400);
+        var moSegs = momentsSegs(moIn.meta), moRoom = Math.max(8, Math.min(90, Number(moIn.meta.seconds) || 40));
+        var moKnown = Array.isArray(moIn.meta.transcript) && moIn.meta.transcript.length === moSegs.length;
+        if (!moSegs.length || (!moKnown && moIn.audio.byteLength < 100)) return json({ error: "ما في كلام بالفيديو" }, 400);
+        var moModels = ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"];
+        return slowJSON(async function () {
+          var moText = moSegs.map(function (s, i) { return moKnown ? String(moIn.meta.transcript[i] || "").slice(0, 400) : ""; });
+          if (!moKnown) {
+            // 1) transcribe each numbered segment from the audio — nothing else
+            var moUp = await geminiUpload(moKey, moIn.audio, "audio/ogg", "reels-gen-moments");
+            if (moUp.error) { geminiDelete(moKey, ctx, moUp.file); return { error: moUp.error }; }
+            var moT;
+            try {
+              var moList = moSegs.map(function (s, i) { return (i + 1) + ": " + s[0].toFixed(1) + "-" + s[1].toFixed(1); }).join("\n");
+              moT = await geminiJSON(moKey, moModels, {
+                system_instruction: { parts: [{ text:
+"You transcribe speech. You get a soundtrack and a numbered list of segments, each with its start and end in seconds from the start of the audio.\n" +
+"For EVERY number in the list, in order, write exactly the words spoken inside that time span, as spoken: the speaker's own dialect (mostly Syrian Arabic, in Arabic script), and English or other words as they are said. No translation, no correction, no summary.\n" +
+"The list marks where there is SOUND, not where there are words. If a segment has no clear words (music, applause, laughter, noise, tones, unclear voices), its text is \"\".\n" +
+"NEVER invent or guess words. Write only what you actually hear.\n" +
+"Return ONLY JSON: {\"segments\":[{\"n\":1,\"text\":\"...\"}, ...]}, one entry per number, covering all " + moSegs.length + " numbers." }] },
+                contents: [{ role: "user", parts: [{ file_data: { mime_type: "audio/ogg", file_uri: moUp.file.uri } }, { text: "Segments (number: start-end seconds):\n" + moList }] }],
+                generationConfig: { temperature: 0, maxOutputTokens: 65536, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: {
+                  type: "OBJECT", required: ["segments"], properties: { segments: { type: "ARRAY", items: { type: "OBJECT", required: ["n", "text"],
+                    properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } } } } } }
+              }, "transcribe");
+            } finally { geminiDelete(moKey, ctx, moUp.file); }
+            if (moT.error) return { error: moT.error };
+            ((moT.data && moT.data.segments) || []).forEach(function (x) {
+              var n = Math.round(Number(x && x.n)); if (n >= 1 && n <= moSegs.length) moText[n - 1] = String(x.text || "").replace(/\s+/g, " ").trim().slice(0, 400);
+            });
+          }
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'moments', datetime('now'))").bind(moUser.email).run();
+          var moAvoid = {}, moFree = moText.slice();
+          (Array.isArray(moIn.meta.avoid) ? moIn.meta.avoid : []).slice(0, 300).forEach(function (r) {
+            for (var k = Math.max(1, Math.round(Number(r && r[0]))); k <= Math.min(moSegs.length, Math.round(Number(r && r[1]))); k++) { moAvoid[k] = true; moFree[k - 1] = null; }
+          });
+          var moUsedGoals = (Array.isArray(moIn.meta.goals) ? moIn.meta.goals : []).map(String).filter(function (g) { return MOMENTS_GOALS[g]; }).slice(0, 6);
+          var moSaid = momentsLines(moSegs, moFree);
+          if (!moSaid.length) return { ok: true, goal: "", topic: "", transcript: moText, moments: [] };
+
+          // 2) from the text alone: the reel's goal, a plan, then whole thoughts in that goal's shape
+          var moGoals = Object.keys(MOMENTS_GOALS), moLo = Math.max(5, moRoom - 6);
+          var moAsk = [{ role: "user", parts: [{ text: "Transcript:\n" + moSaid.join("\n") }] }];
+          var moSel = {
+            system_instruction: { parts: [{ text:
+"You are a video editor making a short vertical summary reel from a long video about an NGO's education and community projects in Syria.\n" +
+"You get the video's transcript as numbered segments: number [start-end seconds, length] words. Segments are split at pauses, so one sentence often runs over several segments. Missing numbers had no words.\n" +
+"1) 'goal': decide from the content what this reel is for, exactly one of: " + moGoals.map(function (g) { return "«" + g + "» (" + MOMENTS_GOALS[g] + ")"; }).join("; ") + ".\n" +
+"2) 'topic': one short Arabic sentence, the video's main idea.\n" +
+"3) 'plan': a few short lines. Walk through the goal's structure step by step and, for each step, name the segment numbers that say it best, with their seconds. Add up the seconds.\n" +
+"4) 'moments': the RUNS of consecutive segments (from..to) from your plan, in the order the reel plays them, so that someone who sees only the reel understands the idea clearly, in the speakers' own voices.\n" +
+momentsRules(moLo, moRoom) +
+(Object.keys(moAvoid).length ? "- Other reels were already made from this video; their segments are left out of the transcript. Make this reel tell a DIFFERENT idea or angle" +
+  (moUsedGoals.length ? ", with a goal other than " + moUsedGoals.map(function (g) { return "«" + g + "»"; }).join(" and ") + " unless the content fits no other" : "") + ".\n" : "") +
+"Return ONLY JSON." }] },
+            contents: moAsk,
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: {
+              type: "OBJECT", required: ["goal", "topic", "plan", "moments"], propertyOrdering: ["goal", "topic", "plan", "moments"], properties: {
+                goal: { type: "STRING", enum: moGoals }, topic: { type: "STRING" }, plan: { type: "STRING" }, moments: MOMENTS_RUNS_SCHEMA } } }
+          };
+          var moS = await geminiJSON(moKey, moModels, moSel, "select");
+          if (moS.error) return { error: moS.error, transcript: moText };
+          var moMoments = momentsRuns(moS.data.moments, moSegs, moFree), moSpoken = moFree.reduce(function (s, t, i) { return s + (t ? moSegs[i][1] - moSegs[i][0] : 0); }, 0);
+          if (momentsSecs(moMoments, moSegs) < moLo - 4 && moSpoken > moRoom * 1.3) {   // far too short while there is enough to say: ask once more
+            moAsk.push({ role: "model", parts: [{ text: JSON.stringify(moS.data) }] },
+                       { role: "user", parts: [{ text: "Your runs last " + Math.round(momentsSecs(moMoments, moSegs)) + " seconds; the reel needs " + moLo + " to " + moRoom + ". Keep what works and add more complete, self-contained thoughts that fit the goal's structure." }] });
+            var moS2 = await geminiJSON(moKey, moModels, moSel, "select-again");
+            var moM2 = moS2.error ? [] : momentsRuns(moS2.data.moments, moSegs, moFree);
+            if (momentsSecs(moM2, moSegs) > momentsSecs(moMoments, moSegs)) { moS = moS2; moMoments = moM2; }
+          }
+          var moGoal = String(moS.data.goal || ""); if (!MOMENTS_GOALS[moGoal]) moGoal = "";
+          return { ok: true, goal: moGoal, topic: String(moS.data.topic || "").trim().slice(0, 200), transcript: moText, moments: moMoments };
+        });
+      }
+
+      /* ---- 7b6) Reels Gen: ناقد يسمع الريل كمشاهد عادي، ومحرّر يعدّل حسب نقده ----
+         الجسم كـ /reels/moments، والصوت هنا صوت الريل نفسه (اللحظات المختارة بالتتابع).
+         JSON: {seconds, goal, topic, segments, transcript, moments:[{from,to,why}], starts:[ث],
+         revise}. الناقد «أعمى»: يسمع الصوت فقط ويعرف أين يبدأ كل مقطع، لا أكثر — لا
+         التفريغ ولا الهدف. يقول ما فهمه، ويقيّم ويحدّد المشاكل بأرقام اللحظات. إن كانت
+         العلامة دون 8 وطُلب التعديل، يعدّل المحرّر (نص فقط) الاختيار على ضوء النقد.
+         الرد يتدفّق: {critique:{understood, scores, issues, overall}, moments|null, plan} أو {error}. */
+      if (request.method === "POST" && path === "/reels/critique") {
+        var crUser = await getSessionUser(env, request);
+        if (!crUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, crUser, "reels-gen"))) return json({ error: "لا صلاحية" }, 403);
+        var crKey = reelsKey(env);
+        if (!crKey) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        if ((await usedToday(env, crUser.email, "critique")) >= CRITIQUE_DAILY_MAX) return json({ error: "وصلت للحد اليومي للنقد. جرّب بكرا." }, 429);
+        var crIn = splitAudioBody(await request.arrayBuffer());
+        if (!crIn) return json({ error: "طلب غير صالح" }, 400);
+        var crM = crIn.meta, crSegs = momentsSegs(crM), crRoom = Math.max(8, Math.min(90, Number(crM.seconds) || 40)), crLo = Math.max(5, crRoom - 6);
+        var crText = crSegs.map(function (s, i) { return String((crM.transcript || [])[i] || "").slice(0, 400); });
+        var crRuns = momentsRuns(crM.moments, crSegs, crText), crStarts = (Array.isArray(crM.starts) ? crM.starts : []).map(Number);
+        if (!crRuns.length || crStarts.length !== crRuns.length || crIn.audio.byteLength < 100) return json({ error: "طلب غير صالح" }, 400);
+        var crModels = ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"];
+        return slowJSON(async function () {
+          // the critic: a viewer who only hears the reel
+          var crUp = await geminiUpload(crKey, crIn.audio, "audio/ogg", "reels-gen-critique");
+          if (crUp.error) { geminiDelete(crKey, ctx, crUp.file); return { error: crUp.error }; }
+          var crC;
+          try {
+            crC = await geminiJSON(crKey, crModels, {
+              system_instruction: { parts: [{ text:
+"You are an ordinary viewer in Syria scrolling Instagram and Facebook reels. You hear this short reel once, with no picture, and you know nothing about it beforehand.\n" +
+"The reel is made of separate moments cut from a longer video and played one after another. You are told only when each moment starts.\n" +
+"Listen as a real viewer would, and judge honestly whether the reel gets a clear idea across to you. Do not guess what the makers meant: judge only what you hear.\n" +
+"- 'understood': in Arabic, one or two sentences: what this reel told you. If you did not get a clear idea, say so.\n" +
+"- 'scores' from 1 to 10: clarity (one clear idea comes across), completeness (no word or sentence cut at the start or end of a moment, no thought left hanging), context (nothing refers to someone or something you never heard about), opening (the first seconds make you want to keep listening), ending (it ends on a complete closing note), flow (the moments connect naturally).\n" +
+"- 'issues': each concrete problem, with the moment's number, a kind (" + CRITIC_KINDS.join(", ") + ") and in Arabic what exactly is wrong — quote the words you heard where it helps.\n" +
+"- 'overall' from 1 to 10: would this reel get its idea across to people like you. 8 or more only when it truly works.\n" +
+"Return ONLY JSON." }] },
+              contents: [{ role: "user", parts: [{ file_data: { mime_type: "audio/ogg", file_uri: crUp.file.uri } },
+                { text: "Moments start at (seconds): " + crStarts.map(function (t, i) { return (i + 1) + ": " + t.toFixed(1); }).join(", ") }] }],
+              generationConfig: { temperature: 0.3, responseMimeType: "application/json", responseSchema: {
+                type: "OBJECT", required: ["understood", "scores", "issues", "overall"], propertyOrdering: ["understood", "scores", "issues", "overall"], properties: {
+                  understood: { type: "STRING" },
+                  scores: { type: "OBJECT", required: ["clarity", "completeness", "context", "opening", "ending", "flow"], properties: {
+                    clarity: { type: "INTEGER" }, completeness: { type: "INTEGER" }, context: { type: "INTEGER" }, opening: { type: "INTEGER" }, ending: { type: "INTEGER" }, flow: { type: "INTEGER" } } },
+                  issues: { type: "ARRAY", items: { type: "OBJECT", required: ["moment", "kind", "problem"], properties: {
+                    moment: { type: "INTEGER" }, kind: { type: "STRING", enum: CRITIC_KINDS }, problem: { type: "STRING" } } } },
+                  overall: { type: "INTEGER" } } } }
+            }, "critic");
+          } finally { geminiDelete(crKey, ctx, crUp.file); }
+          if (crC.error) return { error: crC.error };
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'critique', datetime('now'))").bind(crUser.email).run();
+          var crSc = crC.data.scores || {}, clamp10 = function (x) { return Math.max(1, Math.min(10, Math.round(Number(x) || 1))); };
+          var critique = {
+            understood: String(crC.data.understood || "").trim().slice(0, 400),
+            scores: { clarity: clamp10(crSc.clarity), completeness: clamp10(crSc.completeness), context: clamp10(crSc.context), opening: clamp10(crSc.opening), ending: clamp10(crSc.ending), flow: clamp10(crSc.flow) },
+            issues: (Array.isArray(crC.data.issues) ? crC.data.issues : []).slice(0, 12).map(function (x) {
+              return { moment: Math.round(Number(x && x.moment)) || 0, kind: CRITIC_KINDS.indexOf(x && x.kind) >= 0 ? x.kind : "unclear", problem: String(x && x.problem || "").trim().slice(0, 300) };
+            }),
+            overall: clamp10(crC.data.overall)
+          };
+          if (critique.overall >= 8 || !crM.revise) return { ok: true, critique: critique, moments: null };
+
+          // the editor revises from the text, with the critique in hand
+          var crNow = crRuns.map(function (m, i) {
+            return "moment " + (i + 1) + " = segments " + m.from + "-" + m.to + " (" + m.why + "): " + crText.slice(m.from - 1, m.to).filter(Boolean).join(" ");
+          }).join("\n");
+          var crE = await geminiJSON(crKey, crModels, {
+            system_instruction: { parts: [{ text:
+"You are the video editor of a short vertical summary reel from a long video about an NGO's education and community projects in Syria. The reel's goal is «" + String(crM.goal || "") + "» (" + (MOMENTS_GOALS[crM.goal] || "a clear structure") + "); the idea it must get across: " + String(crM.topic || "").slice(0, 200) + "\n" +
+"A viewer who knew nothing about the video heard your current cut and told you what they understood and what went wrong. Revise the cut so that the idea comes across clearly to such a viewer.\n" +
+"Compare what the viewer understood with the idea: whatever did not come across needs a clearer or added moment. Fix every issue: a cut word or sentence means widening the run to the sentence's real start or end; missing context means adding the sentence that introduces it, or dropping the moment; weak or unclear moments are replaced by stronger ones from the transcript; fix the order when the flow breaks. Keep the moments that work.\n" +
+"You get the full transcript as numbered segments: number [start-end seconds, length] words.\n" +
+"'plan': a few short lines on what you change and why, with segment numbers and seconds; add up the seconds. 'moments': the revised runs, in the order the reel plays them.\n" +
+momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
+            contents: [{ role: "user", parts: [{ text: "Transcript:\n" + momentsLines(crSegs, crText).join("\n") + "\n\nCurrent cut:\n" + crNow +
+              "\n\nThe viewer understood: " + critique.understood + "\nScores: " + JSON.stringify(critique.scores) + ", overall " + critique.overall + "/10\nIssues:\n" +
+              critique.issues.map(function (x) { return "- moment " + x.moment + " [" + x.kind + "]: " + x.problem; }).join("\n") }] }],
+            generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: {
+              type: "OBJECT", required: ["plan", "moments"], propertyOrdering: ["plan", "moments"], properties: { plan: { type: "STRING" }, moments: MOMENTS_RUNS_SCHEMA } } }
+          }, "revise");
+          var crNew = crE.error ? [] : momentsRuns(crE.data.moments, crSegs, crText);
+          return { ok: true, critique: critique, moments: crNew.length ? crNew : null, plan: crE.error ? "" : String(crE.data.plan || "").slice(0, 1200) };
+        });
+      }
+
+      /* ---- 7b7) Text Transcription: نص الصور عبر Gemini ----
+         لكل من يملك أداة text-transcription. الجسم: [4 بايت طول JSON][JSON {lang, sizes, mimes, mode}][الملفات متتالية:
+         صور JPEG أو ملفات PDF — PDF يُقرأ كاملاً بصفحاته كمدخل واحد].
+         تُرفع الصور كما هي إلى Files API، يقرؤها Gemini بطلب واحد ويعيد نص كل صورة، ثم تُحذف.
+         mode: text (نص فقط) | doc (كل صورة وثيقة: بطاقة، جواز…) | auto (Gemini يقرّر لكل صورة)
+         | invoice (فاتورة للمحاسبة: تاريخ، رقم، تفاصيل بالإنكليزي، المبلغ الإجمالي — INVOICE_FIELDS).
+         للوثيقة يعيد خاناتها {label, value} بترتيبها على الوثيقة. لا يُحفظ شيء من المحتوى هنا.
+         الرد يتدفّق (slowJSON): {images:[{text, kind, docType, fields}]} أو {error}. */
+      if (request.method === "POST" && path === "/transcribe/images") {
+        var txUser = await getSessionUser(env, request);
+        if (!txUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, txUser, "text-transcription"))) return json({ error: "لا صلاحية" }, 403);
+        var txKey = transcribeKey(env);
+        if (!txKey) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        if (Number(request.headers.get("Content-Length") || 0) > TRANSCRIBE_MAX_BYTES) return json({ error: "الصور أكبر من المسموح" }, 413);
+        if ((await usedToday(env, txUser.email, "transcribe")) >= TRANSCRIBE_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتفريغ الصور. جرّب بكرا." }, 429);
+        var txIn = splitAudioBody(await request.arrayBuffer());
+        if (!txIn) return json({ error: "طلب غير صالح" }, 400);
+        var txSizes = (Array.isArray(txIn.meta.sizes) ? txIn.meta.sizes : []).map(function (n) { return Math.max(0, Math.floor(Number(n) || 0)); });
+        // each file is a JPEG or a PDF (Gemini reads a PDF's pages itself, text layer or scan)
+        var txMimes = txSizes.map(function (n, i) { return Array.isArray(txIn.meta.mimes) && txIn.meta.mimes[i] === "application/pdf" ? "application/pdf" : "image/jpeg"; });
+        var txPdf = txMimes.indexOf("application/pdf") >= 0;
+        if (!txSizes.length || txSizes.length > TRANSCRIBE_MAX_IMAGES || txSizes.reduce(function (s, n) { return s + n; }, 0) !== txIn.audio.byteLength) return json({ error: "طلب غير صالح" }, 400);
+        var txLang = { "ara+eng": "Arabic and English", ara: "Arabic", eng: "English" }[txIn.meta.lang] || "Arabic and English";
+        var txMode = ["text", "doc", "auto", "invoice"].indexOf(txIn.meta.mode) >= 0 ? txIn.meta.mode : "text";
+        var txDocRules = txMode === "text" ? "" : txMode === "invoice" ?
+"EVERY file is an invoice or receipt (for the accounting team). Besides 'text', fill:\n" +
+"- 'invoice_date': the invoice's date exactly as printed (not reformatted); \"\" if there is none.\n" +
+"- 'invoice_number': the invoice or receipt number exactly as printed, digits and letters as they are; \"\" if there is none.\n" +
+"- 'details_en': IN ENGLISH, what the invoice is for — each item or service on its own line with its quantity when shown, like \"2 x A4 printer paper (box)\" or \"Generator maintenance — October\". Translate Arabic item names into plain English; keep brand and model names as they are. Only what the invoice lists; nothing invented.\n" +
+"- 'total': the final amount to pay exactly as printed, with its currency (like \"1,250,000 SYP\" or \"450.00 USD\"); when several totals appear (before and after tax or discount), the final payable one.\n" +
+"Unreadable: […].\n" :
+          (txMode === "doc" ? "EVERY file is an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, form): its kind is \"document\".\n"
+                            : "Decide for each image: an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, filled form) is kind \"document\"; anything else is kind \"text\".\n") +
+"For a document: 'doc_type' names it in Arabic (like «بطاقة شخصية سورية — الوجه» or «جواز سفر»). 'fields' lists every labelled item on it, in the order it appears: 'label' is the field's name as printed (Arabic when the document has it, e.g. «الاسم», «اسم الأب», «اسم الأم», «تاريخ الولادة», «مكان الولادة», «الرقم الوطني»), or a short Arabic name when the value has no printed label; 'value' is exactly what is written there — names, dates and numbers digit for digit, never reformatted or guessed. Unreadable: […]. Leave out the document's title, emblems and printed headings. 'text' still holds the full transcription.\n" +
+"For kind \"text\": 'fields' is [] and 'doc_type' is \"\".\n";
+        return slowJSON(async function () {
+          var off = 0, parts = txSizes.map(function (n) { var b = txIn.audio.slice(off, off + n); off += n; return b; });
+          // Small batches go inline (no upload round trip, ~1 s saved); bigger ones through the
+          // Files API, so the Worker never base64-encodes megabytes.
+          var txInline = txIn.audio.byteLength <= TRANSCRIBE_INLINE_BYTES, txT0 = Date.now();
+          var ups = txInline ? [] : await Promise.all(parts.map(function (b, i) { return geminiUpload(txKey, b, txMimes[i], "text-transcription-" + (i + 1)); }));
+          console.log("transcribe " + (txInline ? "inline" : "upload") + " " + parts.length + " image(s), " + Math.round(txIn.audio.byteLength / 1024) + " KB: " + (Date.now() - txT0) + "ms");
+          var txR;
+          try {
+            var bad = ups.filter(function (u) { return u.error; })[0];
+            if (bad) return { error: bad.error.replace("الصوت", "الصورة") };
+            var txParts = [];
+            parts.forEach(function (b, i) {
+              txParts.push({ text: "File " + (i + 1) + (txMimes[i] === "application/pdf" ? " (PDF):" : " (image):") },
+                txInline ? { inline_data: { mime_type: txMimes[i], data: base64(b) } } : { file_data: { mime_type: txMimes[i], file_uri: ups[i].file.uri } });
+            });
+            txR = await geminiJSON(txKey, ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"], {
+              system_instruction: { parts: [{ text:
+"You transcribe the text in images and PDF files. Each numbered file is one entry in 'images', its 'n' the file's number; a PDF is one entry however many pages it has. For EACH file, in order, write all the text it contains exactly as written: the same language and spelling, no translation, no correction, no summary, nothing added. The text is mostly in " + txLang + ".\n" +
+"Keep the reading order (Arabic right to left, then top to bottom; columns one after another), the line breaks and the paragraphs. Headings and list items go on their own lines. A table is one line per row, its cells separated by ' | '.\n" +
+"Keep Arabic letters, diacritics and digits as they appear. Mark a word you cannot read as […]. If an image has no text, its text is \"\".\n" +
+txDocRules +
+(txPdf ? "For a PDF, transcribe every page in order; before each page after the first, put a line of its own reading exactly: — صفحة N — (with the page number for N, no quotation marks). For a document or invoice that runs over several pages, read its fields from all of them.\n" : "") +
+"Return ONLY JSON: one entry per file in 'images', covering all " + parts.length + " files." }] },
+              contents: [{ role: "user", parts: txParts }],
+              // no thinking: copying text needs none, and it was most of the wait (9.4 s of 12 for one card)
+              generationConfig: { temperature: 0, maxOutputTokens: txPdf ? 65536 : 32768, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: {
+                type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: txMode === "text"
+                  ? { type: "OBJECT", required: ["n", "text"], properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } }
+                  : txMode === "invoice"
+                  ? { type: "OBJECT", required: ["n", "invoice_date", "invoice_number", "details_en", "total", "text"], propertyOrdering: ["n", "invoice_date", "invoice_number", "details_en", "total", "text"], properties: {
+                      n: { type: "INTEGER" }, invoice_date: { type: "STRING" }, invoice_number: { type: "STRING" }, details_en: { type: "STRING" }, total: { type: "STRING" }, text: { type: "STRING" } } }
+                  : { type: "OBJECT", required: ["n", "kind", "doc_type", "fields", "text"], propertyOrdering: ["n", "kind", "doc_type", "fields", "text"], properties: {
+                      n: { type: "INTEGER" }, kind: { type: "STRING", enum: ["text", "document"] }, doc_type: { type: "STRING" },
+                      fields: { type: "ARRAY", items: { type: "OBJECT", required: ["label", "value"], properties: { label: { type: "STRING" }, value: { type: "STRING" } } } },
+                      text: { type: "STRING" } } } } } } }
+            }, "transcribe-images-" + txMode);
+          } finally { ups.forEach(function (u) { geminiDelete(txKey, ctx, u.file); }); }
+          if (txR.error) return { error: txR.error };
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'transcribe', datetime('now'))").bind(txUser.email).run();
+          var images = parts.map(function () { return { text: "", kind: "text", docType: "", fields: [] }; });
+          ((txR.data && txR.data.images) || []).forEach(function (x) {
+            var n = Math.round(Number(x && x.n)); if (!(n >= 1 && n <= images.length)) return;
+            if (txMode === "invoice") {   // the four fields accounting asked for, always present and in this order
+              images[n - 1] = { text: String(x.text || "").slice(0, 200000), kind: "document", docType: "فاتورة",
+                fields: INVOICE_FIELDS.map(function (f) { return { label: f[0], value: String(x[f[1]] || "").trim().slice(0, 2000) }; }) };
+              return;
+            }
+            var fields = (Array.isArray(x.fields) ? x.fields : []).slice(0, 60).map(function (f) {
+              return { label: String(f && f.label || "").trim().slice(0, 80), value: String(f && f.value || "").trim().slice(0, 400) };
+            }).filter(function (f) { return f.label || f.value; });
+            var doc = txMode !== "text" && x.kind === "document" && fields.length > 0;
+            images[n - 1] = { text: String(x.text || "").slice(0, 200000), kind: doc ? "document" : "text", docType: doc ? String(x.doc_type || "").trim().slice(0, 80) : "", fields: doc ? fields : [] };
+          });
+          // lite: the main model was busy or over its daily quota and the lighter one read these — less exact, digits above all
+          return { ok: true, images: images, texts: images.map(function (im) { return im.text; }), model: txR.model, lite: /lite/.test(txR.model || "") };
+        });
       }
 
       /* ---- 7c) تدقيق إملائي/نحوي عبر Gemini (يعيد نصًّا مصحَّحًا لكل حقل) ---- */

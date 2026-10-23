@@ -92,8 +92,10 @@
   .rev-tblwrap{overflow-x:auto;}
   .rev-tbl{border-collapse:collapse;width:100%;font-size:13px;}
   .rev-tbl td{border:1px solid var(--line);padding:6px 9px;color:var(--ink);white-space:nowrap;}
-  .foot{max-width:900px;margin:0 auto;text-align:center;direction:ltr;
-    font-size:11px;font-weight:500;color:#848484;padding:10px 20px 30px;}
+  /* Fixed in place like the other tools, behind anything that scrolls over it. */
+  body{padding-bottom:70px;}
+  .foot{position:fixed;bottom:24px;left:0;right:0;z-index:-1;text-align:center;direction:ltr;
+    font-size:11px;font-weight:500;color:#848484;padding:0 12px;pointer-events:none;}
 </style>
 </head>
 <body>
@@ -173,7 +175,7 @@
 
   <script src="app.js" defer></script>
 
-  <div class="foot">HC Generator, a project by Christian Hope Center. © 2026 All Rights Reserved.</div>
+  <div class="foot">HC Generator, a project by Christian Hope Center. © <?= date('Y') ?> All Rights Reserved.</div>
 
 </body>
 </html>
