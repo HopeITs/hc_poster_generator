@@ -37,6 +37,7 @@ const MOMENTS_MAX_SEGS  = 3000;
 const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مستخدم خلال 24 ساعة (حتى 3 لكل ريل)
 // Text Transcription — تفريغ الصور بـ Gemini (تفريغ الجهاز لا يمرّ من هنا)
 const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
+const MEETING_DAILY_MAX     = 30;               // أجزاء اجتماعات (10 دقائق لكل جزء) لكل مستخدم خلال 24 ساعة
 const TRANSCRIBE_MAX_IMAGES = 6;
 const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
 const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;
@@ -230,7 +231,7 @@ async function geminiJSON(key, models, body, label) {
   }
   for (var i = 0; i < models.length; i++) {
     if (i) await new Promise(function (res) { setTimeout(res, 600 * i); });   // short: a busy model rarely clears in a second or two, and the next try may be another model
-    try { await call(models[i]); } catch (e) { r = null; d = null; continue; }
+    try { await call(models[i]); } catch (e) { console.log("gemini " + (label || "") + " " + models[i] + " failed: " + (e && e.message)); r = null; d = null; continue; }
     if (r.ok) used = models[i];
     if (r.ok || r.status === 401 || r.status === 403 || r.status === 404) break;   // anything else (busy, over quota, rejected) tries the next model
   }
@@ -241,6 +242,48 @@ async function geminiJSON(key, models, body, label) {
   var out = ""; try { out = d.candidates[0].content.parts[0].text || ""; } catch (e) {}
   out = out.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");   // a lenient answer may come fenced
   try { return { data: JSON.parse(out), model: used }; } catch (e) { return { error: "ردّ Gemini غير صالح" }; }   // model: which one answered (a fallback reads less well)
+}
+/* The same request as geminiJSON, but Gemini streams its answer (SSE) while it
+   writes it: a long transcript takes minutes, and a request that sends nothing
+   back for about two minutes is cut off on the way. Main model only, two tries
+   when it is busy. Returns {data, model} or {error}. */
+async function geminiStreamJSON(key, model, body, label) {
+  var last = "";
+  for (var i = 0; i < 2; i++) {
+    if (i) await new Promise(function (res) { setTimeout(res, 3000); });
+    var t0 = Date.now(), r;
+    try {
+      r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":streamGenerateContent?alt=sse&key=" + key,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    } catch (e) { console.log("gemini-stream " + label + " " + model + " fetch failed: " + (e && e.message)); last = "تعذّر الاتصال بـ Gemini"; continue; }
+    if (!r.ok) {
+      var d = await r.json().catch(function () { return null; });
+      console.log("gemini-stream " + label + " " + model + " " + r.status + " " + (Date.now() - t0) + "ms: " + JSON.stringify(d && d.error || d).slice(0, 1500));
+      last = r.status === 503 ? "Gemini مضغوط حالياً — جرّب بعد دقيقة" : r.status === 429 ? "خلص الحد اليومي المجاني لـ Gemini — جرّب بكرا" : ((d && d.error && d.error.message) || "فشل طلب Gemini");
+      if (r.status === 503 || r.status === 500) continue;
+      return { error: last };
+    }
+    var reader = r.body.getReader(), dec = new TextDecoder(), buf = "", out = "", finish = "";
+    try {
+      for (;;) {
+        var ch = await reader.read(); if (ch.done) break;
+        buf += dec.decode(ch.value, { stream: true });
+        var lines = buf.split("\n"); buf = lines.pop();
+        lines.forEach(function (l) {
+          if (l.indexOf("data:") !== 0) return;
+          try {
+            var ev = JSON.parse(l.slice(5)), c = ev.candidates && ev.candidates[0];
+            if (c && c.content && c.content.parts) c.content.parts.forEach(function (p) { if (p.text) out += p.text; });
+            if (c && c.finishReason) finish = c.finishReason;
+          } catch (e) {}
+        });
+      }
+    } catch (e) { console.log("gemini-stream " + label + " " + model + " broke after " + (Date.now() - t0) + "ms: " + (e && e.message)); last = "انقطع ردّ Gemini بالنص"; continue; }
+    console.log("gemini-stream " + label + " " + model + " 200 " + (Date.now() - t0) + "ms, " + out.length + " chars, " + finish);
+    try { return { data: JSON.parse(out), model: model, finish: finish }; }
+    catch (e) { return { error: finish === "MAX_TOKENS" ? "التفريغ طال أكتر من الحد — جزء أقصر بيمشي" : "ردّ Gemini غير صالح", finish: finish }; }
+  }
+  return { error: last || "تعذّر الاتصال بـ Gemini" };
 }
 /* A long answer (a minute or two of Gemini) as a stream: the response starts
    at once and a space goes out every few seconds until the JSON follows, so
@@ -891,6 +934,54 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
           }, "revise");
           var crNew = crE.error ? [] : momentsRuns(crE.data.moments, crSegs, crText);
           return { ok: true, critique: critique, moments: crNew.length ? crNew : null, plan: crE.error ? "" : String(crE.data.plan || "").slice(0, 1200) };
+        });
+      }
+
+      /* ---- 7b6ب) Meeting Transcription: تفريغ الاجتماعات حرفياً (Gemini) ----
+         لكل من يملك أداة meeting-transcription. الصفحة تقسم التسجيل لأجزاء من 10 دقائق متداخلة
+         وترسل كل جزء وحده: [4 بايت طول JSON][JSON {names, terms, pass}][صوت Ogg Opus].
+         names: أسماء (الحاضرين أو الموظفين) لتهجئتها فقط؛ terms: مصطلحات العمل. pass 2 بحرارة أعلى:
+         الاختلاف بين تفريغين يدل على الكلمات المشكوك فيها. النموذج الأساسي فقط — نموذج أخف يُفسد
+         التفريغ الحرفي بصمت، فالأفضل خطأ واضح يُعاد بعده الجزء. الصوت يُحذف من Google بعد قراءته،
+         ولا يُحفظ شيء هنا. الرد يتدفّق (slowJSON): {segments:[{t, speaker, text}], model} أو {error}. */
+      if (request.method === "POST" && path === "/meet/transcribe") {
+        var mtUser = await getSessionUser(env, request);
+        if (!mtUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, mtUser, "meeting-transcription"))) return json({ error: "لا صلاحية" }, 403);
+        var mtKey = reelsKey(env);
+        if (!mtKey) return json({ error: "مفتاح Gemini غير مضبوط" }, 500);
+        if (Number(request.headers.get("Content-Length") || 0) > MOMENTS_MAX_BYTES) return json({ error: "الجزء أكبر من المسموح" }, 413);
+        if ((await usedToday(env, mtUser.email, "meeting")) >= MEETING_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتفريغ الاجتماعات. جرّب بكرا." }, 429);
+        var mtIn = splitAudioBody(await request.arrayBuffer());
+        if (!mtIn || mtIn.audio.byteLength < 1000) return json({ error: "طلب غير صالح" }, 400);
+        var mtNames = (Array.isArray(mtIn.meta.names) ? mtIn.meta.names : []).slice(0, 1500).map(function (n) { return String(n || "").replace(/\s+/g, " ").trim().slice(0, 80); }).filter(Boolean);
+        var mtTerms = String(mtIn.meta.terms || "").slice(0, 2000), mtPass = mtIn.meta.pass === 2 ? 2 : 1;
+        return slowJSON(async function () {
+          var up = await geminiUpload(mtKey, mtIn.audio, "audio/ogg", "meeting-transcription");
+          if (up.error) { geminiDelete(mtKey, ctx, up.file); return { error: up.error }; }
+          var r;
+          try {
+            var mtModel = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.5-pro"].indexOf(mtIn.meta.model) >= 0 ? mtIn.meta.model : "gemini-flash-latest";   // MEET-TEST: model choice while measuring
+            r = await geminiStreamJSON(mtKey, mtModel, {   // streamed; the main model or nothing: a lighter one would spoil a word-for-word transcript
+              system_instruction: { parts: [{ text:
+"You transcribe a recording of a work meeting at Christian Hope Center, an NGO in Syria. The speech is mostly Syrian Arabic, with some English words.\n" +
+"Write EXACTLY what is said, word for word, as spoken: Syrian dialect in Arabic script, never turned into Modern Standard Arabic; English words in Latin letters as they are said. Keep every word, including repetitions, false starts and fillers (يعني، اه، هلق). No translation, no correction, no summary, nothing left out, nothing added.\n" +
+"NEVER invent or guess words. A word you cannot make out is […]. Where two people talk at once, write what you can hear of each.\n" +
+"Split the transcript into segments: a new segment at every change of speaker, and within a long turn at each sentence end. 't' is the segment's start as M:SS from the start of this audio.\n" +
+"'speaker': the person's name when you can tell it (people address each other by name, or introduce themselves); otherwise «متحدث 1», «متحدث 2»… used consistently for the same voice.\n" +
+(mtNames.length ? "Staff of the organisation, for spelling names correctly when they are spoken (do not assume they are present): " + mtNames.join("، ") + ".\n" : "") +
+(mtTerms ? "Terms and names used at work: " + mtTerms + "\n" : "") +
+"Return ONLY JSON." }] },
+              contents: [{ role: "user", parts: [{ file_data: { mime_type: "audio/ogg", file_uri: up.file.uri } }, { text: "Transcribe this meeting audio." }] }],
+              // ten minutes of speech is 5–8k tokens; the cap stops a transcript that starts repeating itself
+              generationConfig: { temperature: mtPass === 2 ? 0.6 : 0, maxOutputTokens: 24576, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json", responseSchema: {
+                type: "OBJECT", required: ["segments"], properties: { segments: { type: "ARRAY", items: { type: "OBJECT", required: ["t", "speaker", "text"], propertyOrdering: ["t", "speaker", "text"],
+                  properties: { t: { type: "STRING" }, speaker: { type: "STRING" }, text: { type: "STRING" } } } } } } }
+            }, "meeting-" + mtPass);
+          } finally { geminiDelete(mtKey, ctx, up.file); }
+          if (r.error) return { error: r.error };
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'meeting', datetime('now'))").bind(mtUser.email).run();
+          return { ok: true, model: r.model, segments: ((r.data && r.data.segments) || []).map(function (s) { return { t: String(s.t || ""), speaker: String(s.speaker || ""), text: String(s.text || "") }; }) };
         });
       }
 

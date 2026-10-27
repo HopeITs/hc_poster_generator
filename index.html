@@ -512,6 +512,9 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
       <a class="proj-card" id="pgTextTr" href="text-transcription/" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Text Transcription <span class="proj-badge new">NEW</span></span>
       </a>
+      <a class="proj-card" id="pgMeetTr" href="meeting-transcription/" style="--pc-hover:#be1f24;display:none">
+        <span class="proj-name">Meeting Transcription <span class="proj-badge new">BETA</span></span>
+      </a>
     </div>
   </div>
   <div class="acct">
@@ -2227,8 +2230,8 @@ async function afterAuth(){
     else { startApp(); }
   }catch(e){ startApp(); }
 }
-var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription";
-var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/"};   // standalone tool pages
+var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription", MEETTR_SLUG="meeting-transcription";
+var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/","meeting-transcription":"meeting-transcription/"};   // standalone tool pages
 function openProject(p){
   if(p && TOOL_PAGES[p.slug]){ location.href=TOOL_PAGES[p.slug]; return; }
   if(p && p.template_type==="hopecenter_v1"){ openHopeCenter(p); }
@@ -2252,9 +2255,9 @@ async function showProjectPicker(){
   var res=await Auth.projects();
   if(!res.ok){ grid.innerHTML='<div class="proj-msg">تعذّر تحميل المشاريع: '+esc(res.error||"")+'</div>'; return; }
   grid.innerHTML="";
-  // Thumbnail Gen, Reels Gen and Text Transcription are projects for access control,
+  // Thumbnail Gen, Reels Gen, Text and Meeting Transcription are projects for access control,
   // but they live in the tools box under Guidelines Assistant rather than in the project list.
-  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"]].forEach(function(t){
+  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"]].forEach(function(t){
     var p=(res.projects||[]).filter(function(x){ return x.slug===t[0]; })[0];
     if($(t[1])) $(t[1]).style.display=(p&&p.status==="ready")?"":"none";
   });
