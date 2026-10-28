@@ -60,6 +60,17 @@ const DISC_STYLE_PROMPT =
 "LIGHTING: soft diffused studio lighting from top-left, gentle ambient occlusion, soft contact shadows, smooth gradients, no harsh shadows.\n\n" +
 "COMPOSITION: isolated object centered, slight three-quarter view, clean silhouette, plain pure white background (or transparent), no environment, no floor texture.\n\n" +
 "RENDER: Blender / Cinema 4D, Octane render quality, ultra-clean, high detail, 4K.";
+// DISC نموذج 3 («برنامج تدريبي»): الشخصية الثابتة كما كتبها فريق التصميم، والمستخدم يكتب المشهد فقط
+const DISC_T3_CHARACTER =
+"Visual Style: High-quality, clean, studio-rendered 3D animation style, similar to Pixar or illumination (not hand-drawn, but rendered CGI).\n" +
+"Character Profile: A young male student, approximately 27 years old, with a warm, friendly, and approachable expression. His skin is detailed with subtle, realistic facial hair stubble and faint pores. His most defining features are his very large, distinctive round black-rimmed glasses (like a modern Harry Potter style), large expressive brown eyes, and thick, wavy, dark-brown hair that is stylishly tousled and curly.\n" +
+"Lighting & Quality: Soft, professional studio lighting with a clean, light grey gradient background. Ultra-detailed textures, particularly on skin, hair strands, and clothing fabric.\n" +
+"The reference image shows this same young man: keep his face, hair and glasses, but ignore its photo style, clothes, pose and drawings.";
+const DISC_T3_LAYOUT =
+"Generate a scene with light gray background walls (#EBEBEB), softly lit and plain. Wide 4:3 frame. " +
+"The character and the scene's props fill the left two-thirds of the frame; the right third is calm, plain light gray, with nothing important in it, because text will cover it. " +
+"No text, letters, logos or watermarks anywhere in the image.";
+const DISC_SCENE_MAX = 800;                     // حروف وصف المشهد
 const TRANSCRIBE_MAX_IMAGES = 6;
 const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
 const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;
@@ -307,6 +318,56 @@ async function geminiStreamJSON(key, model, body, label) {
   }
   return { error: last || "تعذّر الاتصال بـ Gemini" };
 }
+
+/* Magnific (Nano Banana Pro، 1K): صورة من برومبت ثابت مع صورة مرجعية. المرجع يُحفظ مؤقتاً
+   (/tmp-img) لأن Magnific يقرأه من رابط عام فقط، ثم يُسأل عن المهمة حتى تكتمل.
+   يرجع {ok, image: data URL} أو {error}. */
+async function magnificRun(env, origin, email, prompt, mime, data, aspect) {
+  var H = { "Content-Type": "application/json", "x-magnific-api-key": String(env.MAGNIFIC_API_KEY).trim() };   // a pasted key often brings a newline along
+  await env.DB.prepare("DELETE FROM tmp_images WHERE at<datetime('now','-10 minutes')").run();
+  var rsId = makeToken();
+  await env.DB.prepare("INSERT INTO tmp_images (id, mime, data) VALUES (?1, ?2, ?3)").bind(rsId, mime, data).run();
+  function magErr(st, d) {
+    var msg = (d && (d.message || (d.error && (d.error.message || d.error)) || d.detail)) || "";
+    return st === 401 ? "مفتاح Magnific غير صالح" : st === 402 || /credit/i.test(String(msg)) ? "رصيد Magnific ما بيكفي" :
+           st === 429 ? "Magnific مضغوط حالياً — جرّب بعد دقيقة" : "Magnific: " + (String(msg).slice(0, 160) || "HTTP " + st);
+  }
+  try {
+    var st = await fetch(MAGNIFIC_API, { method: "POST", headers: H, body: JSON.stringify({
+      prompt: prompt, reference_images: [{ image: origin + "/tmp-img/" + rsId, mime_type: mime }], aspect_ratio: aspect, resolution: "1K" }) });
+    var sd = await st.json().catch(function () { return {}; });
+    console.log("magnific start " + st.status + " " + JSON.stringify(sd).slice(0, 600));
+    if (!st.ok) return { error: magErr(st.status, sd) };
+    var task = sd.data && sd.data.task_id;
+    if (!task) return { error: "Magnific ما رجّع رقم مهمة" };
+    await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'magnific', datetime('now'))").bind(email).run();
+    // The task runs on Magnific's side: ask every few seconds. Its own path first; the
+    // list of all tasks as a fallback (the docs only describe that one for sure).
+    var urls = null, t0 = Date.now(), last = "";
+    while (Date.now() - t0 < 180000) {
+      await new Promise(function (r) { setTimeout(r, 4000); });
+      var g = await fetch(MAGNIFIC_API + "/" + task, { headers: H }), gd = await g.json().catch(function () { return {}; });
+      var item = g.ok ? gd.data : null;
+      if (!g.ok && g.status === 404) {
+        var l = await fetch(MAGNIFIC_API, { headers: H }), ld = await l.json().catch(function () { return {}; });
+        item = (Array.isArray(ld.data) ? ld.data : []).filter(function (x) { return x && x.task_id === task; })[0] || null;
+      }
+      if (!item) { last = "HTTP " + g.status; continue; }
+      last = item.status;
+      if (item.status === "COMPLETED") { urls = item.generated || []; break; }
+      if (item.status === "FAILED") { console.log("magnific failed " + JSON.stringify(item).slice(0, 600)); return { error: "Magnific ما قدر يولّد الصورة" }; }
+    }
+    console.log("magnific " + task + " " + last + " after " + (Date.now() - t0) + "ms");
+    if (!urls) return { error: "Magnific طوّل كتير (" + last + ") — جرّب مرة تانية" };
+    if (!urls.length) return { error: "Magnific ما رجّع صورة" };
+    var im = await fetch(urls[0]);
+    if (!im.ok) return { error: "تعذّر تنزيل الصورة من Magnific" };
+    return { ok: true, image: "data:" + (im.headers.get("content-type") || "image/png").split(";")[0] + ";base64," + base64(await im.arrayBuffer()) };
+  } finally {
+    await env.DB.prepare("DELETE FROM tmp_images WHERE id=?1").bind(rsId).run();
+  }
+}
+
 /* A long answer (a minute or two of Gemini) as a stream: the response starts
    at once and a space goes out every few seconds until the JSON follows, so
    nothing on the way gives up on the request and sends it again (which would
@@ -1056,51 +1117,28 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
         var rsM = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(rsIn && rsIn.image || "");
         if (!rsM || rsM[2].length > 4 * 1024 * 1024) return json({ error: "صورة غير صالحة أو أكبر من المسموح" }, 400);
         var rsOrigin = new URL(request.url).origin;
-        return slowJSON(async function () {
-          var H = { "Content-Type": "application/json", "x-magnific-api-key": String(env.MAGNIFIC_API_KEY).trim() };   // a pasted key often brings a newline along
-          await env.DB.prepare("DELETE FROM tmp_images WHERE at<datetime('now','-10 minutes')").run();
-          var rsId = makeToken();
-          await env.DB.prepare("INSERT INTO tmp_images (id, mime, data) VALUES (?1, ?2, ?3)").bind(rsId, rsM[1], rsM[2]).run();
-          function magErr(st, d) {
-            var msg = (d && (d.message || (d.error && (d.error.message || d.error)) || d.detail)) || "";
-            return st === 401 ? "مفتاح Magnific غير صالح" : st === 402 || /credit/i.test(String(msg)) ? "رصيد Magnific ما بيكفي" :
-                   st === 429 ? "Magnific مضغوط حالياً — جرّب بعد دقيقة" : "Magnific: " + (String(msg).slice(0, 160) || "HTTP " + st);
-          }
-          try {
-            var st = await fetch(MAGNIFIC_API, { method: "POST", headers: H, body: JSON.stringify({
-              prompt: DISC_STYLE_PROMPT, reference_images: [{ image: rsOrigin + "/tmp-img/" + rsId, mime_type: rsM[1] }], aspect_ratio: "4:3", resolution: "1K" }) });
-            var sd = await st.json().catch(function () { return {}; });
-            console.log("magnific start " + st.status + " " + JSON.stringify(sd).slice(0, 600));
-            if (!st.ok) return { error: magErr(st.status, sd) };
-            var task = sd.data && sd.data.task_id;
-            if (!task) return { error: "Magnific ما رجّع رقم مهمة" };
-            await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'magnific', datetime('now'))").bind(rsUser.email).run();
-            // The task runs on Magnific's side: ask every few seconds. Its own path first; the
-            // list of all tasks as a fallback (the docs only describe that one for sure).
-            var urls = null, t0 = Date.now(), last = "";
-            while (Date.now() - t0 < 180000) {
-              await new Promise(function (r) { setTimeout(r, 4000); });
-              var g = await fetch(MAGNIFIC_API + "/" + task, { headers: H }), gd = await g.json().catch(function () { return {}; });
-              var item = g.ok ? gd.data : null;
-              if (!g.ok && g.status === 404) {
-                var l = await fetch(MAGNIFIC_API, { headers: H }), ld = await l.json().catch(function () { return {}; });
-                item = (Array.isArray(ld.data) ? ld.data : []).filter(function (x) { return x && x.task_id === task; })[0] || null;
-              }
-              if (!item) { last = "HTTP " + g.status; continue; }
-              last = item.status;
-              if (item.status === "COMPLETED") { urls = item.generated || []; break; }
-              if (item.status === "FAILED") { console.log("magnific failed " + JSON.stringify(item).slice(0, 600)); return { error: "Magnific ما قدر يولّد الصورة" }; }
-            }
-            console.log("magnific " + task + " " + last + " after " + (Date.now() - t0) + "ms");
-            if (!urls) return { error: "Magnific طوّل كتير (" + last + ") — جرّب مرة تانية" };
-            if (!urls.length) return { error: "Magnific ما رجّع صورة" };
-            var im = await fetch(urls[0]);
-            if (!im.ok) return { error: "تعذّر تنزيل الصورة من Magnific" };
-            return { ok: true, image: "data:" + (im.headers.get("content-type") || "image/png").split(";")[0] + ";base64," + base64(await im.arrayBuffer()) };
-          } finally {
-            await env.DB.prepare("DELETE FROM tmp_images WHERE id=?1").bind(rsId).run();
-          }
-        });
+        return slowJSON(function () { return magnificRun(env, rsOrigin, rsUser.email, DISC_STYLE_PROMPT, rsM[1], rsM[2], "4:3"); });
+      }
+
+      /* ---- DISC نموذج 3: «توليد الصورة» — نفس الطريق (Magnific، Nano Banana Pro 1K) ----
+         JSON {scene: وصف المشهد كما يكتبه المستخدم، ref: data URL لصورة الشخصية الافتراضية}.
+         البرومبت = DISC_T3_CHARACTER + المشهد + DISC_T3_LAYOUT، فالمفتاح ما بيولّد غير هالشخصية.
+         نفس الحد اليومي. الرد يتدفّق (slowJSON): {ok, image: data URL} أو {error}. */
+      if (request.method === "POST" && path === "/disc/scene") {
+        var scUser = await getSessionUser(env, request);
+        if (!scUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, scUser, "disc"))) return json({ error: "لا صلاحية" }, 403);
+        if (!env.MAGNIFIC_API_KEY) return json({ error: "مفتاح Magnific غير مضبوط" }, 500);
+        if ((await usedToday(env, scUser.email, "magnific")) >= MAGNIFIC_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتوليد الصور (" + MAGNIFIC_DAILY_MAX + "). جرّب بكرا." }, 429);
+        var scIn = await request.json().catch(function () { return null; });
+        var scText = String(scIn && scIn.scene || "").trim();
+        if (!scText) return json({ error: "اكتب وصف المشهد" }, 400);
+        if (scText.length > DISC_SCENE_MAX) return json({ error: "وصف المشهد أطول من " + DISC_SCENE_MAX + " حرف" }, 400);
+        var scM = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(scIn && scIn.ref || "");
+        if (!scM || scM[2].length > 4 * 1024 * 1024) return json({ error: "صورة الشخصية غير صالحة" }, 400);
+        var scOrigin = new URL(request.url).origin;
+        var scPrompt = DISC_T3_CHARACTER + "\n\nFor this scene: " + scText + "\n\n" + DISC_T3_LAYOUT;
+        return slowJSON(function () { return magnificRun(env, scOrigin, scUser.email, scPrompt, scM[1], scM[2], "4:3"); });
       }
 
       /* ---- 7b6ب) Meeting Transcription: تفريغ الاجتماعات حرفياً (Gemini) ----

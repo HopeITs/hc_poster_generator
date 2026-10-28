@@ -1212,7 +1212,35 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
         <select id="dcTpl">
           <option value="1" selected>مسار تدريبي</option>
           <option value="2">شهادة (Testimony)</option>
+          <option value="3">برنامج تدريبي</option>
         </select></div>
+      <div class="dc-t3" style="display:none">
+      <div class="sec-divider">الإعلان</div>
+      <div class="field"><label>السطر <span class="hint">بين نجمتين *هيك* = كحلي عريض</span></label><input type="text" id="dcT3Intro" value="يعلن *مركز التدريب والتكوين DISC* في دمشق عن فتح باب التسجيل في:" dir="auto"></div>
+      <div class="sec-divider">الصورة</div>
+      <div class="field"><label>وصف المشهد <span class="hint">الوضعية واللبس والمكان، بالإنكليزي أفضل</span></label>
+        <textarea id="dcT3Scene" rows="4" dir="auto" maxlength="800" placeholder="He is standing at a sleek desk in a bright office, wearing a navy blazer, holding a folder and smiling at the camera."></textarea>
+        <button type="button" class="dc-ai" id="dcT3GenBtn">توليد الصورة</button>
+        <div class="hint" id="dcT3GenSt"></div></div>
+      <div class="field"><label>أو ارفع صورة <span class="hint">خلفيتها رمادي فاتح، والشخص عاليسار</span> <button type="button" class="lp-reset" id="dcT3ImgReset" style="display:none">استعادة الافتراضي</button></label>
+        <label class="upload has" id="dcT3ImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="dcT3ImgFile"></label></div>
+      <div class="sec-divider">البرنامج</div>
+      <div class="field"><label>العنوان <span class="hint">سطرين</span></label><textarea id="dcT3Title" rows="2" dir="auto">البرنامج التدريبي للتأهيل في مجال
+الإدارة - Administration</textarea></div>
+      <div class="field"><label>الشريط البرتقالي</label><input type="text" id="dcT3Tag" value="طوّر مهاراتك، ابدأ مسيرتك المهنية" dir="auto"></div>
+      <div class="sec-divider">المحاور</div>
+      <div class="field"><label>العنوان</label><input type="text" id="dcT3TopicsHead" value="يتضمن البرنامج المحاور التالية:" dir="auto"></div>
+      <div class="field"><label>المحاور <span class="hint">سطر لكل محور، حتى 6</span></label><textarea id="dcT3Topics" rows="4" dir="auto">إدارة العمليات اليومية
+خدمة العملاء وإدارة السجلات
+تنظيم العمل والمهارات المكتبية
+التنسيق والمتابعة ودعم الإدارة</textarea></div>
+      <div class="sec-divider">التفاصيل</div>
+      <div class="field"><label>السطرين <span class="hint">بين نجمتين *هيك* = كحلي عريض</span></label><textarea id="dcT3Details" rows="2" dir="auto">*60 ساعة تدريبية* ويحصل المشاركين على *شهادة حضور* في ختام التدريب
+*التدريب مجاني* ويجمع بين المعرفة النظرية والتطبيق العملي</textarea></div>
+      <div class="sec-divider">الشريط السفلي</div>
+      <div class="field"><label>العنوان</label><input type="text" id="dcT3Addr" value="العنوان: دمشق - باب توما - حارة كنيسة اللاتين" dir="auto"></div>
+      <div class="field"><label>التواصل</label><input type="text" id="dcT3Phone" value="للتواصل والاستفسار: 0989162116" dir="auto"></div>
+      </div>
       <div class="dc-t2" style="display:none">
       <div class="sec-divider">الصورة الشخصية</div>
       <div class="field"><label>الصورة <span class="hint">PNG بدون خلفية أفضل — بيطلعلها إطار أبيض لحالها</span> <button type="button" class="lp-reset" id="dcPhotoReset" style="display:none">استعادة الافتراضي</button></label>
@@ -1389,6 +1417,12 @@ var Auth = (function(){
           discRestyle:async function(image){
             try{ var res=await api("/disc/restyle","POST",{image:image});
                  return (res.ok&&res.data&&res.data.image)?{ok:true,image:res.data.image}:{ok:false,error:(res.data&&res.data.error)||"فشل التحويل"}; }
+            catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
+          },
+          /* DISC template 3: a scene with DISC's character, from its description and his reference picture. */
+          discScene:async function(scene,ref){
+            try{ var res=await api("/disc/scene","POST",{scene:scene,ref:ref});
+                 return (res.ok&&res.data&&res.data.image)?{ok:true,image:res.data.image}:{ok:false,error:(res.data&&res.data.error)||"فشل التوليد"}; }
             catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
           },
           listUsers:listUsers, addUser:addUser, deleteUser:deleteUser};
@@ -3188,11 +3222,32 @@ $("hcExportBtn").onclick=hcExport;
     name:{x:642.11,y:1055.39,rot:-3.692,sz:24,w:600,fill:"#6d6e71",arW:195},
     sticker:36    // the photo's white edge, in its pixels (≈ 8.6 poster units)
   };
-  var DC={project:null,assets:{},heroUser:null,photoUser:null,tpl:1};
+  /* Template 3 — «برنامج تدريبي» ("final Option.pdf"): the header (logo and
+     the English name) is a picture, the PDF at 2×; everything else is drawn,
+     at the PDF's own places. The grey strip holds one picture, the scene — the
+     character with his surroundings, made by «توليد الصورة» or uploaded; one
+     narrower than the strip fades into its grey on the right, under the boxes.
+     Somar Sans Bold (SemiBold for the announcement), with Latin letters: its own two files. */
+  var DC_T3={
+    navy:"#003853", gray:"#6d6e71", orange:"#f99c25",
+    head:{h:150},
+    strip:{y:292,h:549,fill:"#ebebeb"},
+    intro:{cx:539,by:245.9,sz:30,maxW:980,wt:600},
+    box:{x:557.5,y:473.5,w:522.5,h:120},
+    title:{rx:1036.1,by:[513.4,561.8],sz:28.2,maxW:456},
+    tag:{x:505,y:594,w:395,h:66,rx:879.5,by:632.3,sz:23.93,maxW:354,ws:2.2},   // ws: the file's word spacing
+    topicsHead:{cx:543,by:932.7,sz:27.74,maxW:980},
+    topics:{cx:542,by:979.6,step:46.8,sz:27.74,r:4.5,dotDy:9.1,gapDot:9.8,gapItem:16.4,max:6,maxW:980},
+    details:{cx:540,by:1124.7,step:49.3,sz:27.74,maxW:980,max:2,wt:700},
+    foot:{y:1264.5,h:85.5,by:1312.2,sz:26.81,cx:542,maxW:990,pinW:15.75,pinH:20,gapPin:7.2,gapR:14.25,gapL:17.4,divY1:1288.5,divY2:1326}
+  };
+  var DC={project:null,assets:{},heroUser:null,photoUser:null,sceneUser:null,sceneAR:0,tpl:1};
   var DC_ASSETS={bg:"assets/disc/bg.png",hero:"assets/disc/hero.png",
-                 t2back:"assets/disc/t2-bg3.jpg",t2front:"assets/disc/t2-front2.png",t2person:"assets/disc/t2-person.png"};
-  var DC_TPL_ASSETS={1:["bg","hero"],2:["t2back","t2front","t2person"]};
+                 t2back:"assets/disc/t2-bg3.jpg",t2front:"assets/disc/t2-front2.png",t2person:"assets/disc/t2-person.png",
+                 t3head:"assets/disc/t3-head.png",t3scene:"assets/disc/t3-scene.jpg"};
+  var DC_TPL_ASSETS={1:["bg","hero"],2:["t2back","t2front","t2person"],3:["t3head","t3scene"]};
   var DC_T2_FONTS=[{w:300,url:"assets/disc/SomarSans-Light.otf"},{w:600,url:"assets/disc/SomarSans-SemiBold.otf"}], DC_T2_FAM="DISC Somar";
+  var DC_T3_FONTS=[{w:600,url:"assets/disc/SomarSans-SemiBold.otf"},{w:700,url:"guideline-assistant/fonts/SomarSans-Bold.otf"}], DC_T3_FAM="DISC Somar3";
 
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function val(id){ var e=$(id); return e?String(e.value||""):""; }
@@ -3207,7 +3262,7 @@ $("hcExportBtn").onclick=hcExport;
      load files. Only the open template's pictures (template 2's are ~4 MB). */
   function dcLoadAssets(cb){
     var keys=DC_TPL_ASSETS[DC.tpl].filter(function(k){ return !DC.assets[k]; }), todo=keys.length;
-    var fonts=DC.tpl===2?dcLoadT2Fonts():Promise.resolve();
+    var fonts=DC.tpl===2?dcLoadT2Fonts():DC.tpl===3?dcFaces(DC_T3_FONTS,DC_T3_FAM):Promise.resolve();
     if(!todo){ fonts.then(function(){ cb&&cb(); }); return; }
     keys.forEach(function(k){
       dataURL(DC_ASSETS[k]).then(function(u){ DC.assets[k]=u; }, function(){ DC.assets[k]=DC_ASSETS[k]; })
@@ -3216,18 +3271,19 @@ $("hcExportBtn").onclick=hcExport;
   }
   /* Template 2's own Somar Light and SemiBold: in the page for the preview,
      and as data: URIs in the exported SVG. */
-  var _dcT2Fonts=null;
-  function dcLoadT2Fonts(){
-    if(_dcT2Fonts) return _dcT2Fonts;
-    _dcT2Fonts=Promise.all(DC_T2_FONTS.map(function(f){
+  function dcFaces(list,fam){
+    if(list.ready) return list.ready;
+    list.ready=Promise.all(list.map(function(f){
       return dataURL(f.url).then(function(u){
         f.data=u.replace(/^data:[^;,]*/,"data:font/otf");
-        var ff=new FontFace(DC_T2_FAM,"url("+f.data+")",{weight:String(f.w)}); document.fonts.add(ff); return ff.load();
+        var ff=new FontFace(fam,"url("+f.data+")",{weight:String(f.w)}); document.fonts.add(ff); return ff.load();
       });
     })).catch(function(){});
-    return _dcT2Fonts;
+    return list.ready;
   }
-  function dcT2FontCSS(){ return DC_T2_FONTS.filter(function(f){ return f.data; }).map(function(f){ return "@font-face{font-family:'"+DC_T2_FAM+"';font-weight:"+f.w+";src:url("+f.data+") format('opentype');}"; }).join(""); }
+  function dcFacesCSS(list,fam){ return list.filter(function(f){ return f.data; }).map(function(f){ return "@font-face{font-family:'"+fam+"';font-weight:"+f.w+";src:url("+f.data+") format('opentype');}"; }).join(""); }
+  function dcLoadT2Fonts(){ return dcFaces(DC_T2_FONTS,DC_T2_FAM); }
+  function dcT2FontCSS(){ return dcFacesCSS(DC_T2_FONTS,DC_T2_FAM); }
   /* Somar Sans SemiBold, Bold and ExtraBold from the page's own @font-face rules, for the export. */
   var _dcFonts=null;
   function dcFontCSS(){
@@ -3299,11 +3355,89 @@ $("hcExportBtn").onclick=hcExport;
     s+=t2Quote()+t2Name();
     return s+'</svg>';
   }
+  /* Template 3. «*…*» in a line: those words in navy Bold; the rest grey, in o.wt. */
+  function t3Runs(t){ return String(t).split("*").map(function(x,i){ return {t:x,hl:i%2===1}; }).filter(function(r){ return r.t!==""; }); }
+  function t3Width(runs,sz,wt){ return runs.reduce(function(n,r){ return n+width(r.t,r.hl?700:wt,sz,DC_T3_FAM); },0); }
+  function t3Rich(t,o,by){
+    var runs=t3Runs(t); if(!String(t).replace(/\*/g,"").trim()) return "";
+    var T=DC_T3, w=t3Width(runs,o.sz,o.wt), sz=w>o.maxW?o.sz*o.maxW/w:o.sz;
+    return '<text xml:space="preserve" x="'+o.cx+'" y="'+by+'" text-anchor="middle" direction="rtl" font-family="'+DC_T3_FAM+'" font-weight="'+o.wt+'" font-size="'+sz.toFixed(2)+'" fill="'+T.gray+'">'+
+      runs.map(function(r){ return r.hl?'<tspan font-weight="700" fill="'+T.navy+'">'+esc(r.t)+'</tspan>':esc(r.t); }).join("")+'</text>';
+  }
+  /* One RTL run, its right end at x. */
+  function t3Run(t,x,by,sz,wt,fill,ws){ return '<text xml:space="preserve" x="'+x.toFixed(2)+'" y="'+by+'" text-anchor="start" direction="rtl" font-family="'+DC_T3_FAM+'" font-weight="'+wt+'" font-size="'+sz.toFixed(2)+'"'+(ws?' word-spacing="'+ws+'"':'')+' fill="'+fill+'">'+esc(t)+'</text>'; }
+  function t3Fit(t,o,wt){ var w=width(t,wt,o.sz,DC_T3_FAM)+(o.ws||0)*(t.split(" ").length-1); return w>o.maxW?o.sz*o.maxW/w:o.sz; }
+  /* The topics, two to a row, the first on the right; each with its navy dot. */
+  function t3Topics(){
+    var O=DC_T3.topics, T=DC_T3, s="";
+    var ls=val("dcT3Topics").split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean).slice(0,O.max);
+    for(var i=0;i<ls.length;i+=2){
+      var row=ls.slice(i,i+2), ws=row.map(function(l){ return width(l,700,O.sz,DC_T3_FAM); });
+      var rowW=ws.reduce(function(n,w){ return n+2*O.r+O.gapDot+w; },0)+(row.length-1)*O.gapItem;
+      var k=Math.min(1,O.maxW/rowW), by=O.by+(i/2)*O.step, x=O.cx+rowW*k/2;
+      row.forEach(function(l,j){
+        s+='<circle cx="'+(x-O.r*k).toFixed(2)+'" cy="'+(by-O.dotDy*k).toFixed(2)+'" r="'+(O.r*k).toFixed(2)+'" fill="'+T.navy+'"/>';
+        x-=(2*O.r+O.gapDot)*k;
+        s+=t3Run(l,x,by,O.sz*k,700,T.gray);
+        x-=(ws[j]+O.gapItem)*k;
+      });
+    }
+    return s;
+  }
+  /* The bottom bar: pin, address, a thin line, contact — right to left, centred as one. */
+  function t3Foot(){
+    var F=DC_T3.foot, a=val("dcT3Addr").trim(), c=val("dcT3Phone").trim();
+    var s='<rect x="0" y="'+F.y+'" width="'+W+'" height="'+F.h+'" fill="'+DC_T3.navy+'"/>';
+    if(!a&&!c) return s;
+    var wa=a?width(a,700,F.sz,DC_T3_FAM):0, wc=c?width(c,700,F.sz,DC_T3_FAM):0;
+    var tot=F.pinW+F.gapPin+wa+(a&&c?F.gapR+F.gapL:0)+wc, k=Math.min(1,F.maxW/tot), x=F.cx+tot*k/2, sz=F.sz*k;
+    var r=F.pinW*k/2, cx=x-r, cy=F.by-F.pinH*k+r, tip=F.by;
+    // the pin: a circle drawn down to a point, with a hole
+    s+='<path fill="#fff" d="M'+cx.toFixed(2)+' '+tip+'C'+(cx-r*0.35).toFixed(2)+' '+(tip-r*0.6).toFixed(2)+' '+(cx-r).toFixed(2)+' '+(cy+r*0.75).toFixed(2)+' '+(cx-r).toFixed(2)+' '+cy.toFixed(2)+
+       'A'+r.toFixed(2)+' '+r.toFixed(2)+' 0 0 1 '+(cx+r).toFixed(2)+' '+cy.toFixed(2)+'C'+(cx+r).toFixed(2)+' '+(cy+r*0.75).toFixed(2)+' '+(cx+r*0.35).toFixed(2)+' '+(tip-r*0.6).toFixed(2)+' '+cx.toFixed(2)+' '+tip+'Z"/>'+
+       '<circle cx="'+cx.toFixed(2)+'" cy="'+cy.toFixed(2)+'" r="'+(r*0.42).toFixed(2)+'" fill="'+DC_T3.navy+'"/>';
+    x-=(F.pinW+F.gapPin)*k;
+    if(a){ s+=t3Run(a,x,F.by,sz,700,"#fff"); x-=wa*k; }
+    if(a&&c){ x-=F.gapR*k; s+='<rect x="'+(x-0.6).toFixed(2)+'" y="'+F.divY1+'" width="1.2" height="'+(F.divY2-F.divY1).toFixed(2)+'" fill="#fff"/>'; x-=F.gapL*k; }
+    if(c) s+=t3Run(c,x,F.by,sz,700,"#fff");
+    return s;
+  }
+  /* The scene, the strip's height: as wide as the strip it fills it; narrower, it fades out on the right. */
+  function t3Scene(){
+    var S=DC_T3.strip, A=DC.assets, src=DC.sceneUser||A.t3scene||DC_ASSETS.t3scene;
+    var ar=DC.sceneUser?(DC.sceneAR||4/3):2160/1098, w=S.h*ar;
+    var s='<defs><clipPath id="dcT3Strip"><rect x="0" y="'+S.y+'" width="'+W+'" height="'+S.h+'"/></clipPath>';
+    if(w>=W-1) return s+'</defs><g clip-path="url(#dcT3Strip)"><image href="'+src+'" xlink:href="'+src+'" x="0" y="'+S.y+'" width="'+W+'" height="'+S.h+'" preserveAspectRatio="xMinYMid slice"/></g>';
+    s+='<linearGradient id="dcT3FadeG" x1="0" x2="1" y1="0" y2="0"><stop offset=".62" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>'+
+       '<mask id="dcT3Fade" maskUnits="userSpaceOnUse" x="0" y="'+S.y+'" width="'+w.toFixed(2)+'" height="'+S.h+'"><rect x="0" y="'+S.y+'" width="'+w.toFixed(2)+'" height="'+S.h+'" fill="url(#dcT3FadeG)"/></mask></defs>';
+    return s+'<g clip-path="url(#dcT3Strip)"><image href="'+src+'" xlink:href="'+src+'" x="0" y="'+S.y+'" width="'+w.toFixed(2)+'" height="'+S.h+'" preserveAspectRatio="none" mask="url(#dcT3Fade)"/></g>';
+  }
+  function t3SVG(s){
+    var T=DC_T3, A=DC.assets, B=T.box, G=T.tag;
+    s+='<rect width="'+W+'" height="'+H+'" fill="#fff"/>';
+    s+=img(A.t3head||DC_ASSETS.t3head,{x:0,y:0,w:W,h:T.head.h});
+    s+=t3Rich(val("dcT3Intro"),T.intro,T.intro.by);
+    s+='<rect x="0" y="'+T.strip.y+'" width="'+W+'" height="'+T.strip.h+'" fill="'+T.strip.fill+'"/>'+t3Scene();
+    s+='<rect x="'+B.x+'" y="'+B.y+'" width="'+B.w+'" height="'+B.h+'" fill="'+T.navy+'"/>';
+    var tl=val("dcT3Title").split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean).slice(0,2);
+    var ty=tl.length===1?[(T.title.by[0]+T.title.by[1])/2]:T.title.by;
+    tl.forEach(function(l,i){ s+=t3Run(l,T.title.rx,ty[i],t3Fit(l,T.title,700),700,"#fff",T.title.ws); });
+    var tg=val("dcT3Tag").trim();
+    s+='<rect x="'+G.x+'" y="'+G.y+'" width="'+G.w+'" height="'+G.h+'" fill="'+T.orange+'"/>';
+    if(tg) s+=t3Run(tg,G.rx,G.by,t3Fit(tg,G,700),700,"#fff",G.ws);
+    var th=val("dcT3TopicsHead").trim();
+    if(th) s+='<text xml:space="preserve" x="'+T.topicsHead.cx+'" y="'+T.topicsHead.by+'" text-anchor="middle" direction="rtl" font-family="'+DC_T3_FAM+'" font-weight="700" font-size="'+t3Fit(th,T.topicsHead,700).toFixed(2)+'" fill="'+T.navy+'">'+esc(th)+'</text>';
+    s+=t3Topics();
+    val("dcT3Details").split(/\r?\n/).filter(function(l){ return l.trim(); }).slice(0,T.details.max).forEach(function(l,i){ s+=t3Rich(l,T.details,T.details.by+i*T.details.step); });
+    s+=t3Foot();
+    return s+'</svg>';
+  }
   function dcSVG(withFonts){
     var L=DC_LAY, C=DC_COL, A=DC.assets;
     var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+W+' '+H+'" width="'+W*(withFonts?OUT:1)+'" height="'+H*(withFonts?OUT:1)+'">';
-    if(withFonts) s+='<defs><style>'+(DC.tpl===2?dcT2FontCSS():dcFontCSS())+'</style></defs>';
+    if(withFonts) s+='<defs><style>'+(DC.tpl===2?dcT2FontCSS():DC.tpl===3?dcFacesCSS(DC_T3_FONTS,DC_T3_FAM):dcFontCSS())+'</style></defs>';
     if(DC.tpl===2) return t2SVG(s);
+    if(DC.tpl===3) return t3SVG(s);
     s+=img(A.bg||DC_ASSETS.bg,{x:0,y:0,w:W,h:H});
     s+=img(DC.heroUser||A.hero||DC_ASSETS.hero,L.hero);
     s+=line(L.title,val("dcTitle"),C.navy);
@@ -3321,12 +3455,11 @@ $("hcExportBtn").onclick=hcExport;
   }
   function dcRender(){ var w=$("dcSvg"); if(!w) return; w.innerHTML=dcSVG(false); dcFit(); }
   window.addEventListener("resize",function(){ if($("dcApp")&&$("dcApp").classList.contains("on")) dcFit(); });
-  ["dcTitle","dcSub","dcLine1","dcLine2","dcReg","dcRegHl","dcBar","dcQuote","dcName"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",dcRender); });
+  ["dcTitle","dcSub","dcLine1","dcLine2","dcReg","dcRegHl","dcBar","dcQuote","dcName","dcT3Intro","dcT3Title","dcT3Tag","dcT3TopicsHead","dcT3Topics","dcT3Details","dcT3Addr","dcT3Phone"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",dcRender); });
   /* النموذج: its own fields, pictures and fonts. */
   function dcSetTpl(n){
-    DC.tpl=n===2?2:1; if($("dcTpl")) $("dcTpl").value=String(DC.tpl);
-    [].forEach.call(document.querySelectorAll("#dcApp .dc-t1"),function(e){ e.style.display=DC.tpl===1?"":"none"; });
-    [].forEach.call(document.querySelectorAll("#dcApp .dc-t2"),function(e){ e.style.display=DC.tpl===2?"":"none"; });
+    DC.tpl=n===2||n===3?n:1; if($("dcTpl")) $("dcTpl").value=String(DC.tpl);
+    [1,2,3].forEach(function(t){ [].forEach.call(document.querySelectorAll("#dcApp .dc-t"+t),function(e){ e.style.display=DC.tpl===t?"":"none"; }); });
     dcRender(); dcLoadAssets(dcRender);
   }
   if($("dcTpl")) $("dcTpl").addEventListener("change",function(){ dcSetTpl(+this.value); });
@@ -3353,6 +3486,45 @@ $("hcExportBtn").onclick=hcExport;
     r.onload=function(){ dcSetHero(r.result); }; r.readAsDataURL(f); e.target.value="";
   });
   if($("dcImgReset")) $("dcImgReset").onclick=function(e){ e.preventDefault(); dcSetHero(null); };
+
+  /* Template 3's scene: uploaded, or made by «توليد الصورة». Its proportions decide how it sits in the strip. */
+  function dcSetScene(src){
+    DC.sceneUser=src||null; DC.sceneAR=0;
+    var up=$("dcT3ImgUp"); if(up) up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"✓ الصورة الافتراضية";
+    var rs=$("dcT3ImgReset"); if(rs) rs.style.display=src?"":"none";
+    if(!src){ dcRender(); return; }
+    var im=new Image(); im.onload=function(){ if(DC.sceneUser===src){ DC.sceneAR=im.naturalWidth/im.naturalHeight; dcRender(); } }; im.src=src;
+  }
+  if($("dcT3ImgFile")) $("dcT3ImgFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ dcSetScene(r.result); }; r.readAsDataURL(f); e.target.value="";
+  });
+  if($("dcT3ImgReset")) $("dcT3ImgReset").onclick=function(e){ e.preventDefault(); dcSetScene(null); };
+  /* The character's reference for «توليد الصورة»: the young man in the default scene, its left 380 units. */
+  function dcCharacterRef(){
+    return new Promise(function(res,rej){
+      var im=new Image();
+      im.onload=function(){
+        var sw=Math.round(im.naturalWidth*380/W), sh=im.naturalHeight, k=Math.min(1,1024/Math.max(sw,sh)), c=document.createElement("canvas");
+        c.width=Math.round(sw*k); c.height=Math.round(sh*k); c.getContext("2d").drawImage(im,0,0,sw,sh,0,0,c.width,c.height);
+        res(c.toDataURL("image/jpeg",0.9));
+      };
+      im.onerror=function(){ rej(new Error("تعذّر تحميل صورة الشخصية")); }; im.src=DC.assets.t3scene||DC_ASSETS.t3scene;
+    });
+  }
+  if($("dcT3GenBtn")) $("dcT3GenBtn").onclick=async function(){
+    var btn=this, st=$("dcT3GenSt"), scene=val("dcT3Scene").trim();
+    if(!scene){ st.className="hint err"; st.textContent="اكتب وصف المشهد أولاً"; return; }
+    if(typeof Auth==="undefined"||!Auth.discScene){ st.className="hint err"; st.textContent="غير متاح"; return; }
+    btn.disabled=true; var lbl=btn.textContent; btn.textContent="…جارٍ التوليد (حتى دقيقة)"; st.className="hint"; st.textContent="";
+    try{
+      var res=await Auth.discScene(scene,await dcCharacterRef());
+      if(!res.ok){ st.className="hint err"; st.textContent=res.error; return; }
+      dcSetScene(res.image);
+      st.className="hint"; st.textContent="✓ تم التوليد — «استعادة الافتراضي» بترجّع الصورة الأصلية";
+    }catch(e){ st.className="hint err"; st.textContent=(e&&e.message)||"فشل التوليد"; }
+    finally{ btn.disabled=false; btn.textContent=lbl; }
+  };
 
   /* «حوّل لأسلوب DISC»: the uploaded picture, as a reference, becomes a 3D
      illustration in DISC's colours (Magnific, Nano Banana Pro 1K, through the
@@ -3416,7 +3588,7 @@ $("hcExportBtn").onclick=hcExport;
         var im=new Image();
         im.onload=function(){
           var c=document.createElement("canvas"); c.width=W*OUT; c.height=H*OUT; c.getContext("2d").drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url);
-          var a=document.createElement("a"); a.download="DISC_"+(DC.tpl===2?"Testimony_":"")+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
+          var a=document.createElement("a"); a.download="DISC_"+DC_FILE[DC.tpl]+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
           done();
         };
         im.onerror=function(){ URL.revokeObjectURL(url); alert("خطأ بالتصدير (SVG)"); done(); };
@@ -3426,18 +3598,21 @@ $("hcExportBtn").onclick=hcExport;
   }
   if($("dcExportBtn")) $("dcExportBtn").onclick=dcExport;
 
-  var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar",quote:"dcQuote",name:"dcName"};
-  function dcCollect(){ var d={app:"disc",v:2,tpl:DC.tpl}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; d.photo=DC.photoUser||null; return d; }
+  var DC_FILE={1:"",2:"Testimony_",3:"Program_"};
+  var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar",quote:"dcQuote",name:"dcName",
+                 t3Intro:"dcT3Intro",t3Scene:"dcT3Scene",t3Title:"dcT3Title",t3Tag:"dcT3Tag",t3TopicsHead:"dcT3TopicsHead",t3Topics:"dcT3Topics",t3Details:"dcT3Details",t3Addr:"dcT3Addr",t3Phone:"dcT3Phone"};
+  function dcCollect(){ var d={app:"disc",v:2,tpl:DC.tpl}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; d.photo=DC.photoUser||null; d.scene=DC.sceneUser||null; return d; }
   function dcLoad(d){
     if(!d||typeof d!=="object"||d.app!=="disc"){ alert("بنية غير صحيحة"); return; }
     for(var k in DC_FIELDS){ var e=$(DC_FIELDS[k]); if(e&&typeof d[k]==="string") e.value=d[k]; }
     DC.photoUser=d.photo||null; dcSetPhoto(DC.photoUser);
     dcSetHero(d.image||null);
-    dcSetTpl(d.tpl===2?2:1);   // v1 projects were template 1
+    dcSetScene(d.scene||null);
+    dcSetTpl(d.tpl===2||d.tpl===3?d.tpl:1);   // v1 projects were template 1
   }
   if($("dcSaveBtn")) $("dcSaveBtn").onclick=function(){
     var blob=new Blob([JSON.stringify(dcCollect(),null,2)],{type:"application/json"});
-    var a=document.createElement("a"); a.download="DISC_"+(DC.tpl===2?"Testimony_":"")+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
+    var a=document.createElement("a"); a.download="DISC_"+DC_FILE[DC.tpl]+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
   };
   if($("dcProjFile")) $("dcProjFile").addEventListener("change",function(e){
     var f=e.target.files[0]; if(!f) return; var r=new FileReader();
@@ -3784,7 +3959,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   function fmtDate(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return s; function p(n){ return (n<10?"0":"")+n; } return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
   function mb(b){ return (b/1048576).toFixed(b<10485760?1:0)+" MB"; }
   // DISC's templates have names, not numbers; the archive keeps the number it was saved with
-  var DC_TPL={"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)"};
+  var DC_TPL={"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)","نموذج 3":"برنامج تدريبي"};
   function tplName(f){ return f.project==="disc"&&DC_TPL[f.template]||f.template||""; }
   function load(reset){
     if(reset){ A.offset=0; A.files=[]; }
