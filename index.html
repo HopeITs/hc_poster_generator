@@ -1210,8 +1210,8 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="panel-body">
       <div class="field"><label>النموذج</label>
         <select id="dcTpl">
-          <option value="1" selected>نموذج 1 — دورة</option>
-          <option value="2">نموذج 2 — شهادة (Testimony)</option>
+          <option value="1" selected>مسار تدريبي</option>
+          <option value="2">شهادة (Testimony)</option>
         </select></div>
       <div class="dc-t2" style="display:none">
       <div class="sec-divider">الصورة الشخصية</div>
@@ -1234,7 +1234,7 @@ what we needed.</textarea></div>
       <div class="sec-divider">الصورة</div>
       <div class="field"><label>الصورة الوسطى <span class="hint">PNG شفاف أفضل</span> <button type="button" class="lp-reset" id="dcImgReset" style="display:none">استعادة الافتراضي</button></label>
         <label class="upload has" id="dcImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="dcImgFile"></label>
-        <button type="button" class="dc-ai" id="dcAiBtn">✦ حوّل لأسلوب DISC (AI)</button>
+        <button type="button" class="dc-ai" id="dcAiBtn">تحويل لستايل DISC</button>
         <div class="hint" id="dcAiSt">ارفع صورة لموضوع البوستر، وبتتحوّل لرسمة ثلاثية الأبعاد بألوان DISC (Magnific · Nano Banana Pro)</div></div>
       <div class="sec-divider">المحتوى</div>
       <div class="field"><label>السطر العريض</label><input type="text" id="dcLine1" value="تعلّم البرمجة، التصميم والبرامج المكتبية"></div>
@@ -3783,11 +3783,16 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   window.openArchive=function(){ build(); $("arcPage").classList.add("on"); load(true); };
   function fmtDate(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return s; function p(n){ return (n<10?"0":"")+n; } return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
   function mb(b){ return (b/1048576).toFixed(b<10485760?1:0)+" MB"; }
+  // DISC's templates have names, not numbers; the archive keeps the number it was saved with
+  var DC_TPL={"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)"};
+  function tplName(f){ return f.project==="disc"&&DC_TPL[f.template]||f.template||""; }
   function load(reset){
     if(reset){ A.offset=0; A.files=[]; }
+    var seq=A.seq=(A.seq||0)+1;   // a newer filter or search replaces this one
     var q="?scope="+A.scope+"&offset="+A.offset+"&project="+encodeURIComponent($("arcProj").value)+"&q="+encodeURIComponent($("arcQ").value.trim())+"&from="+$("arcFrom").value+"&to="+$("arcTo").value;
     $("arcEmpty").hidden=false; if(reset) $("arcEmpty").textContent="…جارٍ التحميل";
     api("/archive/list"+q).then(function(r){ return r.json(); }).then(function(d){
+      if(seq!==A.seq) return;
       if(!d.ok){ $("arcEmpty").textContent=d.error||"تعذّر تحميل الأرشيف"; return; }
       A.canAll=d.canAll; A.canDelete=d.canDelete; A.total=d.total; A.files=A.files.concat(d.files); A.offset=A.files.length;
       $("arcTabs").hidden=!A.canAll; $("arcWhoH").hidden=A.scope!=="all";
@@ -3801,7 +3806,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   }
   function render(){
     $("arcBody").innerHTML=A.files.map(function(f,i){
-      return '<tr data-i="'+i+'"><td class="th">'+(f.thumb?'<img src="'+esc(f.thumb)+'" alt="">':'<img alt="">')+'</td><td class="nm">'+esc(f.filename)+'</td><td>'+esc(PROJ[f.project]||f.project)+'</td><td>'+esc(f.template)+'</td><td class="dt">'+fmtDate(f.created_at)+'</td>'+
+      return '<tr data-i="'+i+'"><td class="th">'+(f.thumb?'<img src="'+esc(f.thumb)+'" alt="">':'<img alt="">')+'</td><td class="nm">'+esc(f.filename)+'</td><td>'+esc(PROJ[f.project]||f.project)+'</td><td>'+esc(tplName(f))+'</td><td class="dt">'+fmtDate(f.created_at)+'</td>'+
         (A.scope==="all"?'<td class="em">'+esc(f.email)+'</td>':'')+
         '<td><div class="acts"><button type="button" data-a="dl">تنزيل</button><button type="button" data-a="edit"'+(projPart(f)?'':' disabled')+'>افتح للتعديل</button>'+(A.canDelete?'<button type="button" class="del" data-a="del">حذف</button>':'')+'</div></td></tr>';
     }).join("");
