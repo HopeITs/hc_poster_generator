@@ -2340,7 +2340,10 @@ async function showProjectPicker(){
     var p=(res.projects||[]).filter(function(x){ return x.slug===t[0]; })[0];
     if($(t[1])) $(t[1]).style.display=(p&&p.status==="ready")?"":"none";
   });
-  (res.projects||[]).filter(function(p){ return TOOL_PAGES[p.slug]===undefined; }).forEach(function(p){
+  // The order the Poster Maker box shows; a project not listed here goes last, in the server's order.
+  var PROJ_ORDER=["hope-center","study-zone","children-university","disc","leap"];
+  function projRank(p){ var i=PROJ_ORDER.indexOf(p.slug); return i<0?PROJ_ORDER.length:i; }
+  (res.projects||[]).filter(function(p){ return TOOL_PAGES[p.slug]===undefined; }).sort(function(a,b){ return projRank(a)-projRank(b); }).forEach(function(p){
     var ready=(p.status==="ready");
     var card=document.createElement("button");
     card.type="button";
