@@ -2039,7 +2039,7 @@ wireAcct("pgAvatar","pgAcctMenu");
    follows the user across devices and browsers. */
 var ACCT_PHOTO_PX=256;
 function acctApplyPhoto(src){
-  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"],["cuAvatarPhoto","cuAvatar"],["lpAvatarPhoto","lpAvatar"],["pgAvatarPhoto","pgAvatar"]];
+  var ids=[["szAvatarPhoto","szAvatar"],["hcAvatarPhoto","hcAvatar"],["cuAvatarPhoto","cuAvatar"],["lpAvatarPhoto","lpAvatar"],["dcAvatarPhoto","dcAvatar"],["pgAvatarPhoto","pgAvatar"]];
   for(var i=0;i<ids.length;i++){
     var img=$(ids[i][0]), av=$(ids[i][1]);
     if(!img||!av) continue;
