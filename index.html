@@ -3579,6 +3579,27 @@ $("hcExportBtn").onclick=hcExport;
 .proof-btn:disabled{opacity:.65;cursor:default;}
 .proof-status{font-size:12px;margin-top:8px;min-height:16px;text-align:center;font-family:'Somar Sans';font-weight:700;}
 .proof-status.ok{color:#1a9450;} .proof-status.err{color:#c0392b;}
+/* «لا تنسى تدقّق المحتوى»: on DOWNLOAD with text changed since the last check,
+   the page dims except the check button, with a note, an arrow and two choices. */
+.pf-mask{position:fixed;inset:0;z-index:9998;}
+.pf-hole{position:fixed;z-index:9999;border-radius:12px;box-shadow:0 0 0 200vmax rgba(0,0,0,.62),0 0 0 3px #fff;cursor:pointer;transition:box-shadow .2s;}
+.pf-note{position:fixed;z-index:10000;color:#fff;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;text-align:center;width:260px;}
+.pf-note .pf-big{font-size:34px;font-weight:800;line-height:1.15;}
+.pf-note .pf-small{font-size:22px;font-weight:700;line-height:1.3;margin-top:2px;}
+.pf-note .pf-acts{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
+.pf-note button{border:none;border-radius:10px;padding:11px 14px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;}
+.pf-note .pf-go{background:#fff;color:#222;}
+.pf-note .pf-skip{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.6);font-weight:700;}
+.pf-note .pf-skip:hover{border-color:#fff;}
+.pf-arrow{position:absolute;width:64px;height:40px;overflow:visible;}
+.pf-arrow path{fill:none;stroke:#fff;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;}
+.pf-note.side .pf-arrow{top:-34px;right:-58px;animation:pfNudgeSide 1.1s ease-in-out infinite;}
+.pf-note.below .pf-arrow{top:-46px;left:50%;margin-left:-20px;transform:rotate(-70deg);animation:pfNudgeUp 1.1s ease-in-out infinite;}
+.pf-note.above .pf-arrow{bottom:-48px;left:50%;margin-left:-44px;transform:rotate(110deg);animation:pfNudgeDown 1.1s ease-in-out infinite;}
+@keyframes pfNudgeDown{0%,100%{translate:0 0;}50%{translate:0 7px;}}
+@keyframes pfNudgeSide{0%,100%{translate:0 0;}50%{translate:8px -5px;}}
+@keyframes pfNudgeUp{0%,100%{translate:0 0;}50%{translate:0 -7px;}}
+@media (prefers-reduced-motion:reduce){.pf-note .pf-arrow{animation:none;}}
 </style>
 <script>
 /* ===== تدقيق المحتوى عبر Gemini: زر لكل نموذج يجمع الحقول الظاهرة ويستبدلها
@@ -3608,8 +3629,64 @@ $("hcExportBtn").onclick=hcExport;
       (res.fields||[]).forEach(function(f){ var e=c.map[f.id];
         if(e&&typeof f.text==="string"&&e.value!==f.text){ e.value=f.text; e.dispatchEvent(new Event("input",{bubbles:true})); e.dispatchEvent(new Event("change",{bubbles:true})); changed++; } });
       status.className="proof-status ok"; status.textContent=changed?("تم التصحيح — "+changed+" حقل"):"لا أخطاء";
+      container._pfChecked=snapshot(container);   // DOWNLOAD goes straight through until the text changes again
     });
   }
+  /* The visible fields' text, to tell whether anything changed since the last check. */
+  function snapshot(container){ return JSON.stringify(collect(container).fields.map(function(f){ return f.text; })); }
+
+  /* ----- «لا تنسى تدقّق المحتوى» -----
+     DOWNLOAD (any generator) while the text differs from what was last
+     checked: the page dims except the check button, with a note and an arrow
+     at it, and two choices — check now, or download without checking. Esc or
+     a click elsewhere closes it. Text with nothing in it downloads as before. */
+  var EXPORTS="#exportBtn,#hcExportBtn,#cuExportBtn,#lpExportBtn,#dcExportBtn";
+  function containerOf(btn){
+    var root=btn.closest("#appRoot,#hcApp,#cuApp,#lpApp,#dcApp"), wrap=root&&root.querySelector(".proof-wrap");
+    return wrap?wrap.parentNode:null;
+  }
+  var pfOpen=null;
+  function closeReminder(){ if(!pfOpen) return; pfOpen.forEach(function(e){ e.remove(); }); pfOpen=null; document.removeEventListener("keydown",pfKey); window.removeEventListener("resize",closeReminder); }
+  function pfKey(e){ if(e.key==="Escape") closeReminder(); }
+  function remind(exportBtn,container){
+    var check=container.querySelector(".proof-btn"); if(!check) return;
+    check.scrollIntoView({block:"center"});
+    setTimeout(function(){   // after the scroll settles (a timer, not a frame: it runs even while the tab is not drawn)
+      var r=check.getBoundingClientRect(), pad=6;
+      var mask=document.createElement("div"); mask.className="pf-mask";
+      var hole=document.createElement("div"); hole.className="pf-hole"; hole.title="دقّق المحتوى";
+      hole.style.left=(r.left-pad)+"px"; hole.style.top=(r.top-pad)+"px"; hole.style.width=(r.width+2*pad)+"px"; hole.style.height=(r.height+2*pad)+"px";
+      var NOTE_H=230, side=r.left>300;   // beside the button when there is room; on phones under it, or over it when the screen ends first
+      var where=side?"side":(r.bottom+pad+52+NOTE_H<=window.innerHeight?"below":"above");
+      var note=document.createElement("div");
+      note.className="pf-note "+where;
+      note.innerHTML='<svg class="pf-arrow" viewBox="0 0 64 40" aria-hidden="true"><path d="M4 36C18 34 36 26 54 8"/><path d="M42 7L55 7L53 20"/></svg>'+
+        '<div class="pf-big">لا تنسى</div><div class="pf-small">تدقّق المحتوى</div>'+
+        '<div class="pf-acts"><button type="button" class="pf-go">دقّق الآن</button><button type="button" class="pf-skip">نزّل بدون تدقيق</button></div>';
+      document.body.appendChild(mask); document.body.appendChild(hole); document.body.appendChild(note);
+      if(side){ note.style.left=Math.max(12,r.left-pad-24-260)+"px"; note.style.top=Math.max(12,r.top-10)+"px"; }
+      else {
+        note.style.left=Math.max(12,Math.min(window.innerWidth-272,r.left+r.width/2-130))+"px";
+        note.style.top=(where==="below"?r.bottom+pad+52:Math.max(12,r.top-pad-52-note.offsetHeight))+"px";
+      }
+      pfOpen=[mask,hole,note];
+      function checkNow(){ closeReminder(); check.click(); }
+      hole.onclick=checkNow; note.querySelector(".pf-go").onclick=checkNow;
+      note.querySelector(".pf-skip").onclick=function(){ closeReminder(); exportBtn._pfSkip=true; exportBtn.click(); };
+      mask.onclick=closeReminder;
+      document.addEventListener("keydown",pfKey); window.addEventListener("resize",closeReminder);
+      note.querySelector(".pf-go").focus();
+    },60);
+  }
+  // Capture phase: runs before the generator's own DOWNLOAD handler and can hold it back.
+  document.addEventListener("click",function(e){
+    var btn=e.target.closest&&e.target.closest(EXPORTS); if(!btn) return;
+    if(btn._pfSkip){ btn._pfSkip=false; return; }
+    var c=containerOf(btn); if(!c||!collect(c).fields.length) return;
+    if(c._pfChecked===snapshot(c)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    remind(btn,c);
+  },true);
   function addButton(container){
     if(!container||container.querySelector(".proof-wrap")) return;
     var wrap=document.createElement("div"); wrap.className="proof-wrap";
