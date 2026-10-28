@@ -3179,10 +3179,11 @@ $("hcExportBtn").onclick=hcExport;
                  runW:168, dx:0.9, dy:21.83};
   /* Template 2 — «Testimony» ("005DISC_SYR_Testimony.pdf"): a collage with a
      person's photo, a torn grey card with an English quote, and the name.
-     The collage is two pictures: what lies behind the photo (t2-bg, the
-     designer's own export), and what lies over it (t2-front, the PDF at 2×,
-     transparent: the header, the card, the quote marks, the cloud, the
-     megaphone, the hand). The photo goes between them, clipped by the PDF's
+     The collage is two pictures at 2×: what lies behind the photo (t2-bg3,
+     the designer's own export), and what lies over it (t2-front2: the
+     header, the torn card and its quote marks, from the PDF, transparent;
+     the collage pieces with blend modes stay in the designer's picture,
+     where they mix as designed). The photo goes between them, clipped by the PDF's
      frame, with a white "sticker" edge drawn from its own transparency, and
      the text on top, turned as in the file. The quote is Somar Sans
      Light and the name SemiBold — with Latin letters, which the page's
@@ -3196,7 +3197,7 @@ $("hcExportBtn").onclick=hcExport;
   };
   var DC={project:null,assets:{},heroUser:null,photoUser:null,tpl:1};
   var DC_ASSETS={bg:"assets/disc/bg.png",hero:"assets/disc/hero.png",
-                 t2back:"assets/disc/t2-bg.jpg",t2front:"assets/disc/t2-front.png",t2person:"assets/disc/t2-person.png"};
+                 t2back:"assets/disc/t2-bg3.jpg",t2front:"assets/disc/t2-front2.png",t2person:"assets/disc/t2-person.png"};
   var DC_TPL_ASSETS={1:["bg","hero"],2:["t2back","t2front","t2person"]};
   var DC_T2_FONTS=[{w:300,url:"assets/disc/SomarSans-Light.otf"},{w:600,url:"assets/disc/SomarSans-SemiBold.otf"}], DC_T2_FAM="DISC Somar";
 
