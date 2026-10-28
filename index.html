@@ -1114,6 +1114,11 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 .lp-app .panel{display:flex;flex-direction:column;overflow:hidden;}
 .lp-app .panel-body{flex:1 1 auto;min-height:0;overflow-y:auto;}
 .lp-svg svg{display:block;}
+.dc-app{display:none;}
+.dc-app.on{display:block;}
+.dc-app .panel{display:flex;flex-direction:column;overflow:hidden;}
+.dc-app .panel-body{flex:1 1 auto;min-height:0;overflow-y:auto;}
+.dc-svg svg{display:block;}
 .lp-row{display:flex;gap:6px;}
 .lp-row .field{flex:1;min-width:0;}
 .lp-reset{background:none;border:none;color:#6d6e71;font-family:'Somar Sans';font-weight:700;font-size:12px;cursor:pointer;padding:0 4px;text-decoration:underline;}
@@ -1181,6 +1186,58 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <button id="lpPhotoBtn">تغيير الصورة الشخصية</button>
     <button id="lpMgmtToggle" style="display:none">إدارة المستخدمين</button>
     <button id="lpLogout">تسجيل خروج</button>
+  </div>
+</div>
+</div>
+<div class="dc-app" id="dcApp">
+<div class="app">
+  <div class="panel">
+    <div class="panel-head">
+      <h1><span class="wm" style="direction:ltr">DISC</span></h1>
+      <p>ادخل المحتوى، التصميم مقفول بمعايير ثابتة</p>
+    </div>
+    <div class="user-bar">
+      <button id="dcBackToProjects">← المشاريع</button>
+      <span class="who" id="dcWhoami"></span>
+      <span class="role-badge" id="dcRoleBadge"></span>
+    </div>
+    <div class="panel-body">
+      <div class="sec-divider">العنوان</div>
+      <div class="field"><label>العنوان الرئيسي</label><input type="text" id="dcTitle" value="احترف الحاسوب الآن!"></div>
+      <div class="field"><label>العنوان الفرعي</label><input type="text" id="dcSub" value="(دورة شاملة لتطوير مهاراتك الرقمية)"></div>
+      <div class="sec-divider">الصورة</div>
+      <div class="field"><label>الصورة الوسطى <span class="hint">PNG شفاف أفضل</span> <button type="button" class="lp-reset" id="dcImgReset" style="display:none">استعادة الافتراضي</button></label>
+        <label class="upload has" id="dcImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="dcImgFile"></label></div>
+      <div class="sec-divider">المحتوى</div>
+      <div class="field"><label>السطر العريض</label><input type="text" id="dcLine1" value="تعلّم البرمجة، التصميم والبرامج المكتبية"></div>
+      <div class="field"><label>سطر الوصف</label><input type="text" id="dcLine2" value="من الصفر إلى الاحتراف في ثلاث مهارات يطلبها كل سوق عمل"></div>
+      <div class="sec-divider">التسجيل</div>
+      <div class="lp-row">
+        <div class="field"><label>النص</label><input type="text" id="dcReg" value="التسجيل مفتوح الآن"></div>
+        <div class="field"><label>المميّز <span class="hint">بخط برتقالي تحته</span></label><input type="text" id="dcRegHl" value="لعدد محدود"></div>
+      </div>
+      <div class="sec-divider">الشريط السفلي</div>
+      <div class="field"><label>النص</label><input type="text" id="dcBar" value="رابط التسجيل في البايو"></div>
+    </div>
+    <div class="export-bar">
+      <div class="proj-row">
+        <button class="btn-proj" id="dcSaveBtn">حفظ مشروع</button>
+        <label class="btn-proj" id="dcLoadBtn">فتح مشروع<input type="file" accept=".json,application/json" id="dcProjFile" style="display:none"></label>
+      </div>
+      <button class="btn-export" id="dcExportBtn">DOWNLOAD</button>
+    </div>
+  </div>
+  <div class="preview"><div class="stage" id="dcStage">
+    <div class="dc-svg" id="dcSvg"></div>
+  </div></div>
+</div>
+<div class="acct">
+  <button class="acct-av" id="dcAvatar" type="button" aria-haspopup="true" aria-expanded="false" title="الحساب" aria-label="الحساب"><svg viewBox="0 0 129 129" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><filter id="dc-acctShadowLp" x="0" y="0" width="129" height="129" filterUnits="userSpaceOnUse"><feOffset dx="-4.67" dy="4.67"/><feGaussianBlur result="blur" stdDeviation="6.54"/><feFlood flood-color="#000" flood-opacity=".2"/><feComposite in2="blur" operator="in"/><feComposite in="SourceGraphic"/></filter><clipPath id="dc-acctClipLp"><circle cx="68.97" cy="59.73" r="32.13"/></clipPath></defs><g filter="url(#dc-acctShadowLp)"><circle fill="#fff" cx="68.97" cy="59.73" r="43.81"/></g><path fill="#969696" d="M68.97,92.48c-8.75,0-16.97-3.41-23.16-9.59-6.19-6.19-9.59-14.41-9.59-23.16s3.41-16.97,9.59-23.16c6.19-6.19,14.41-9.59,23.16-9.59s16.97,3.41,23.16,9.59c6.19,6.19,9.59,14.41,9.59,23.16s-3.41,16.97-9.59,23.16c-6.19,6.19-14.41,9.59-23.16,9.59ZM68.97,28.22c-17.37,0-31.51,14.14-31.51,31.51s14.13,31.51,31.51,31.51,31.51-14.13,31.51-31.51-14.13-31.51-31.51-31.51Z"/><g clip-path="url(#dc-acctClipLp)"><circle fill="#969696" cx="68.97" cy="49.7" r="11.9"/><path fill="#969696" d="M68.97,65.94c-13.06.01-23.65,8.75-23.66,19.53,0,1.2,1.18,10.75,2.63,10.75h42.06c1.45,0,2.63-9.55,2.63-10.75-.01-10.78-10.6-19.52-23.66-19.53h0Z"/></g></svg></button>
+  <img class="acct-photo" id="dcAvatarPhoto" alt="">
+  <div class="acct-menu" id="dcAcctMenu">
+    <button id="dcPhotoBtn">تغيير الصورة الشخصية</button>
+    <button id="dcMgmtToggle" style="display:none">إدارة المستخدمين</button>
+    <button id="dcLogout">تسجيل خروج</button>
   </div>
 </div>
 </div>
@@ -2237,6 +2294,7 @@ function openProject(p){
   if(p && p.template_type==="hopecenter_v1"){ openHopeCenter(p); }
   else if(p && (p.template_type==="mixed_v1" || p.slug==="children-university") && typeof window.openChildrenUniversity==="function"){ window.openChildrenUniversity(p); }
   else if(p && (p.template_type==="leap_v1" || p.slug==="leap") && typeof window.openLeap==="function"){ window.openLeap(p); }
+  else if(p && (p.template_type==="disc_v1" || p.slug==="disc") && typeof window.openDisc==="function"){ window.openDisc(p); }
   else { try{ Auth.applyBrand(p); }catch(e){} try{ document.title="HC GENERATOR"; }catch(e){} startApp(); }
 }
 // Wired here rather than as an inline onclick: CSP cannot allow inline event
@@ -3059,13 +3117,191 @@ $("hcExportBtn").onclick=hcExport;
     LP.project=p||LP.project;
     $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
     var um=$("userMgmtPage"); if(um) um.style.display="none";
-    ["hcApp","cuApp"].forEach(function(id){ var x=$(id); if(x) x.classList.remove("on"); });
+    ["hcApp","cuApp","dcApp"].forEach(function(id){ var x=$(id); if(x) x.classList.remove("on"); });
     $("lpApp").classList.add("on");
     lpShowUserBar();
     try{ document.title="HC GENERATOR"; }catch(e){}
     lpRender();
     lpLoadAssets(lpRender);
     if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(lpRender); }
+  };
+})();
+</script>
+<script>
+/* ===== DISC generator (disc_v1) =====
+   Built like LEAP: a 1080×1350 SVG with native <text>, exported at twice that
+   size. Every number in DC_LAY comes from "005DISC_SYR_Computer Science.pdf"
+   (by = baseline, sz = font size, cx = centre). What never changes — the white
+   page, the navy header with the logo and the English name (Avenir, which the
+   site does not have), the circuit pattern and the bottom bar — is one picture,
+   assets/disc/bg.png: the PDF itself rendered at 2× with its text, picture and
+   swoosh taken out. The picture (assets/disc/hero.png) and every line of text
+   are drawn on top of it, so they can change. */
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var W=1080, H=1350, OUT=2;   // design units; the export is OUT× (2160×2700)
+  var DC_COL={navy:"#023c54",gray:"#808285",orange:"#f99d1c",white:"#ffffff"};
+  var DC_LAY={
+    hero:{x:186.92,y:475.18,w:706.16,h:527.27},
+    title:{cx:540,by:379.9,sz:73,w:800},
+    sub:{cx:540,by:451.3,sz:33,w:700},
+    line1:{cx:540,by:1045.4,sz:34,w:600},
+    line2:{cx:540,by:1096.8,sz:30,w:600},
+    reg:{cx:540,by:1185.9,sz:32.26,w:600,hlW:800},
+    bar:{cx:540,by:1307.3,sz:32.73,w:700}
+  };
+  var DC_MAXW=980;
+  /* The orange swoosh under the highlighted words, from the PDF (drawn there
+     for a 168-unit run starting 0.9 left of the words, 21.8 below the baseline;
+     PDF space is y-up, hence the flip). It stretches with the words. */
+  var DC_SWOOSH={d:"M0 0C26.749 2.46 53.591 4.41 80.471 3.955C107.109 3.504 133.625 .662 160.093-2.174C163.927-2.585 163.898 3.419 160.093 3.826C133.625 6.662 107.109 9.504 80.471 9.955C53.591 10.41 26.749 8.46 0 6C-3.813 5.649-3.85-.354 0 0Z",
+                 runW:168, dx:0.9, dy:21.83};
+  var DC={project:null,assets:{},ready:false,heroUser:null};
+  var DC_ASSETS={bg:"assets/disc/bg.png",hero:"assets/disc/hero.png"};
+
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function val(id){ var e=$(id); return e?String(e.value||""):""; }
+  function todayMMDDYYYY(){ var d=new Date(); function p(n){return(n<10?"0":"")+n;} return p(d.getMonth()+1)+p(d.getDate())+d.getFullYear(); }
+
+  /* Pictures as data: URIs: an SVG drawn through <img> for the export cannot load files. */
+  function dcLoadAssets(cb){
+    if(DC.ready){ cb&&cb(); return; }
+    var keys=Object.keys(DC_ASSETS), todo=keys.length;
+    keys.forEach(function(k){
+      fetch(DC_ASSETS[k]).then(function(r){ return r.blob(); }).then(function(b){
+        return new Promise(function(res){ var fr=new FileReader(); fr.onload=function(){ DC.assets[k]=fr.result; res(); }; fr.readAsDataURL(b); });
+      }).catch(function(){ DC.assets[k]=DC_ASSETS[k]; }).then(function(){ if(--todo===0){ DC.ready=true; cb&&cb(); } });
+    });
+  }
+  /* Somar Sans SemiBold, Bold and ExtraBold from the page's own @font-face rules, for the export. */
+  var _dcFonts=null;
+  function dcFontCSS(){
+    if(_dcFonts!=null) return _dcFonts;
+    var out="", want={"somar sans|600":1,"somar sans|700":1,"somar sans|800":1};
+    for(var i=0;i<document.styleSheets.length;i++){
+      var rules; try{ rules=document.styleSheets[i].cssRules; }catch(e){ continue; }
+      if(!rules) continue;
+      for(var j=0;j<rules.length;j++){
+        var r=rules[j]; if(r.type!==5) continue;
+        var fam=(r.style.getPropertyValue("font-family")||"").replace(/['"]/g,"").toLowerCase().trim();
+        var key=fam+"|"+(r.style.getPropertyValue("font-weight")||"400").trim();
+        if(want[key]){ out+=r.cssText; want[key]=0; }
+      }
+    }
+    _dcFonts=out; return out;
+  }
+  var _dcCtx=null;
+  function width(t,w,sz){ if(!_dcCtx) _dcCtx=document.createElement("canvas").getContext("2d"); _dcCtx.font=w+" "+sz+"px 'Somar Sans'"; return _dcCtx.measureText(t).width; }
+  /* One centred RTL line, shrunk to fit when it would run past DC_MAXW. */
+  function line(o,txt,fill){
+    if(!txt.trim()) return "";
+    var tw=width(txt,o.w,o.sz), sz=tw>DC_MAXW?o.sz*DC_MAXW/tw:o.sz;
+    return '<text xml:space="preserve" x="'+o.cx+'" y="'+o.by+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+o.w+'" font-size="'+sz.toFixed(2)+'" fill="'+fill+'">'+esc(txt)+'</text>';
+  }
+  /* «التسجيل مفتوح الآن لعدد محدود»: SemiBold, then the highlighted words in
+     ExtraBold with the swoosh under them; the two are centred as one line, the
+     highlighted words at its left end (RTL). */
+  function regLine(){
+    var L=DC_LAY.reg, a=val("dcReg").trim(), b=val("dcRegHl").trim();
+    if(!a&&!b) return "";
+    var sp=a&&b?" ":"", wa=width(a+sp,L.w,L.sz), wb=width(b,L.hlW,L.sz), k=Math.min(1,DC_MAXW/(wa+wb));
+    var sz=L.sz*k, s='<text xml:space="preserve" x="'+L.cx+'" y="'+L.by+'" text-anchor="middle" direction="rtl" font-family="Somar Sans" font-weight="'+L.w+'" font-size="'+sz.toFixed(2)+'" fill="'+DC_COL.navy+'">'+esc(a+sp)+(b?'<tspan font-weight="'+L.hlW+'">'+esc(b)+'</tspan>':"")+'</text>';
+    if(b){
+      var left=L.cx-(wa+wb)*k/2, sx=wb*k/DC_SWOOSH.runW;
+      s+='<path fill="'+DC_COL.orange+'" transform="matrix('+sx.toFixed(4)+' 0 0 '+(-k).toFixed(4)+' '+(left+DC_SWOOSH.dx*k).toFixed(2)+' '+(L.by+DC_SWOOSH.dy*k).toFixed(2)+')" d="'+DC_SWOOSH.d+'"/>';
+    }
+    return s;
+  }
+  function img(src,b){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+b.x+'" y="'+b.y+'" width="'+b.w+'" height="'+b.h+'" preserveAspectRatio="xMidYMid meet"/>'; }
+
+  function dcSVG(withFonts){
+    var L=DC_LAY, C=DC_COL, A=DC.assets;
+    var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+W+' '+H+'" width="'+W*(withFonts?OUT:1)+'" height="'+H*(withFonts?OUT:1)+'">';
+    if(withFonts) s+='<defs><style>'+dcFontCSS()+'</style></defs>';
+    s+=img(A.bg||DC_ASSETS.bg,{x:0,y:0,w:W,h:H});
+    s+=img(DC.heroUser||A.hero||DC_ASSETS.hero,L.hero);
+    s+=line(L.title,val("dcTitle"),C.navy);
+    s+=line(L.sub,val("dcSub"),C.gray);
+    s+=line(L.line1,val("dcLine1"),C.navy);
+    s+=line(L.line2,val("dcLine2"),C.gray);
+    s+=regLine();
+    s+=line(L.bar,val("dcBar"),C.white);
+    return s+'</svg>';
+  }
+  function dcFit(){
+    var st=$("dcStage"); if(!st) return; var pv=st.parentNode; if(!pv||!pv.clientWidth||!pv.clientHeight) return;
+    var sc=Math.min((pv.clientWidth-60)/W,(pv.clientHeight-60)/H,1);
+    st.style.width=W+"px"; st.style.height=H+"px"; st.style.transform="scale("+sc+")";
+  }
+  function dcRender(){ var w=$("dcSvg"); if(!w) return; w.innerHTML=dcSVG(false); dcFit(); }
+  window.addEventListener("resize",function(){ if($("dcApp")&&$("dcApp").classList.contains("on")) dcFit(); });
+  ["dcTitle","dcSub","dcLine1","dcLine2","dcReg","dcRegHl","dcBar"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",dcRender); });
+
+  function dcSetHero(src){
+    DC.heroUser=src||null;
+    var up=$("dcImgUp"); if(up) up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"✓ الصورة الافتراضية";
+    var rs=$("dcImgReset"); if(rs) rs.style.display=src?"":"none";
+    dcRender();
+  }
+  if($("dcImgFile")) $("dcImgFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ dcSetHero(r.result); }; r.readAsDataURL(f); e.target.value="";
+  });
+  if($("dcImgReset")) $("dcImgReset").onclick=function(e){ e.preventDefault(); dcSetHero(null); };
+
+  function dcExport(){
+    var btn=$("dcExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
+    function done(){ btn.disabled=false; btn.textContent="DOWNLOAD"; }
+    dcLoadAssets(function(){
+      (document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(function(){
+        var url=URL.createObjectURL(new Blob([dcSVG(true)],{type:"image/svg+xml;charset=utf-8"}));
+        var im=new Image();
+        im.onload=function(){
+          var c=document.createElement("canvas"); c.width=W*OUT; c.height=H*OUT; c.getContext("2d").drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url);
+          var a=document.createElement("a"); a.download="DISC_"+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
+          done();
+        };
+        im.onerror=function(){ URL.revokeObjectURL(url); alert("خطأ بالتصدير (SVG)"); done(); };
+        im.src=url;
+      });
+    });
+  }
+  if($("dcExportBtn")) $("dcExportBtn").onclick=dcExport;
+
+  var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar"};
+  function dcCollect(){ var d={app:"disc",v:1}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; return d; }
+  function dcLoad(d){
+    if(!d||typeof d!=="object"||d.app!=="disc"){ alert("بنية غير صحيحة"); return; }
+    for(var k in DC_FIELDS){ var e=$(DC_FIELDS[k]); if(e&&typeof d[k]==="string") e.value=d[k]; }
+    dcSetHero(d.image||null);
+  }
+  if($("dcSaveBtn")) $("dcSaveBtn").onclick=function(){
+    var blob=new Blob([JSON.stringify(dcCollect(),null,2)],{type:"application/json"});
+    var a=document.createElement("a"); a.download="DISC_"+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
+  };
+  if($("dcProjFile")) $("dcProjFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ try{ dcLoad(JSON.parse(r.result)); }catch(err){ alert("ملف غير صالح"); } };
+    r.readAsText(f); e.target.value="";
+  });
+
+  if($("dcBackToProjects")) $("dcBackToProjects").onclick=function(){ $("dcApp").classList.remove("on"); if(typeof showProjectPicker==="function") showProjectPicker(); };
+  function dcShowUserBar(){ try{ var u=Auth.current(); if(!u) return; $("dcWhoami").textContent=u.email; $("dcRoleBadge").textContent=(window.ROLE_LABEL&&ROLE_LABEL[u.role])||u.role; if(typeof acctLoadPhoto==="function") acctLoadPhoto(); var mg=$("dcMgmtToggle"); if(mg) mg.style.display=(Auth.can&&Auth.can("manage_users"))?"":"none"; }catch(e){} }
+  try{ if(typeof wireAcct==="function") wireAcct("dcAvatar","dcAcctMenu"); }catch(e){}
+  if($("dcPhotoBtn")) $("dcPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
+  if($("dcMgmtToggle")&&typeof openUserMgmt==="function") $("dcMgmtToggle").onclick=openUserMgmt;
+  if($("dcLogout")) $("dcLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("dcApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  window.openDisc=function(p){
+    DC.project=p||DC.project;
+    $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
+    var um=$("userMgmtPage"); if(um) um.style.display="none";
+    ["hcApp","cuApp","lpApp"].forEach(function(id){ var x=$(id); if(x) x.classList.remove("on"); });
+    $("dcApp").classList.add("on");
+    dcShowUserBar();
+    try{ document.title="HC GENERATOR"; }catch(e){}
+    dcRender();
+    dcLoadAssets(dcRender);
+    if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(dcRender); }
   };
 })();
 </script>
@@ -3265,7 +3501,7 @@ $("hcExportBtn").onclick=hcExport;
     wrap.appendChild(btn); wrap.appendChild(status); container.appendChild(wrap);
     btn.onclick=function(){ run(btn,container,status); };
   }
-  function scan(){ ["#cuApp .panel-body","#lpApp .panel-body","#appRoot > .panel > .panel-body",".hc-pbody"].forEach(function(sel){ var c=document.querySelector(sel); if(c) addButton(c); }); }
+  function scan(){ ["#cuApp .panel-body","#lpApp .panel-body","#dcApp .panel-body","#appRoot > .panel > .panel-body",".hc-pbody"].forEach(function(sel){ var c=document.querySelector(sel); if(c) addButton(c); }); }
   if(document.readyState!=="loading") scan(); else document.addEventListener("DOMContentLoaded",scan);
 })();
 </script>
