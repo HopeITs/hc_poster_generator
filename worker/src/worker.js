@@ -39,6 +39,11 @@ const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مس�
 const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
 const MEETING_DAILY_MAX     = 30;               // أجزاء اجتماعات (10 دقائق لكل جزء) لكل مستخدم خلال 24 ساعة
 const MAGNIFIC_DAILY_MAX    = 15;               // صور «أسلوب DISC» (Magnific، رصيد مدفوع) لكل مستخدم خلال 24 ساعة
+// الأرشيف: كل تصميم يُنزَّل من Poster Maker وThumbnail Gen، مع ملف مشروعه، في قاعدة ARCHIVE المنفصلة
+const ARCHIVE_PROJECTS = ["study-zone", "hope-center", "children-university", "leap", "disc", "thumbnail-gen"];
+const ARCHIVE_CHUNK = 700 * 1024;               // بايت لكل قطعة (base64 ≈ 0.93 MB، تحت حدّ السجل 2 MB)
+const ARCHIVE_MAX_FILE = 15 * 1048576, ARCHIVE_MAX_PROJECT = 25 * 1048576;
+const ARCHIVE_DB_LIMIT = 500 * 1048576;         // حجم قاعدة D1 بالخطة المجانية
 const MAGNIFIC_API = "https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro";
 // برومبت «أسلوب DISC» كما كتبه فريق التصميم — ثابت هنا، فلا يصلح المفتاح لتوليد أي شيء آخر
 const DISC_STYLE_PROMPT =
@@ -952,6 +957,74 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
           var crNew = crE.error ? [] : momentsRuns(crE.data.moments, crSegs, crText);
           return { ok: true, critique: critique, moments: crNew.length ? crNew : null, plan: crE.error ? "" : String(crE.data.plan || "").slice(0, 1200) };
         });
+      }
+
+      /* ---- الأرشيف: Poster Maker وThumbnail Gen ----
+         كل DOWNLOAD يرسل نسخة: [4 بايت طول JSON][JSON {project, tool, template, filename, mime,
+         fileSize, projSize, thumb}][الملف][ملف المشروع JSON]. يُحفظ في قاعدة ARCHIVE المنفصلة:
+         سطر في files (ومعه معاينة صغيرة data URL) والملف ومشروعه قطعاً في chunks.
+         يرى كل مستخدم ملفاته؛ الـ Owner والـ Comms يرون الكل؛ الـ Owner وحده يحذف. */
+      if (path === "/archive" || path.indexOf("/archive/") === 0) {
+        if (!env.ARCHIVE) return json({ error: "الأرشيف غير مضبوط" }, 500);
+        var arUser = await getSessionUser(env, request);
+        if (!arUser) return json({ error: "غير مسجّل دخول" }, 401);
+        var arAll = isGlobalRole(arUser.role);
+
+        if (request.method === "POST" && path === "/archive") {
+          var arIn = splitAudioBody(await request.arrayBuffer());
+          if (!arIn) return json({ error: "طلب غير صالح" }, 400);
+          var am = arIn.meta || {}, fSize = Math.floor(Number(am.fileSize) || 0), pSize = Math.floor(Number(am.projSize) || 0);
+          if (ARCHIVE_PROJECTS.indexOf(am.project) < 0) return json({ error: "مشروع غير معروف" }, 400);
+          if (!(await hasProjectSlug(env, arUser, am.project))) return json({ error: "لا صلاحية" }, 403);
+          if (fSize < 1 || fSize > ARCHIVE_MAX_FILE || pSize < 0 || pSize > ARCHIVE_MAX_PROJECT || fSize + pSize !== arIn.audio.byteLength) return json({ error: "حجم غير صالح" }, 400);
+          var used = await env.ARCHIVE.prepare("SELECT COALESCE(SUM(size + proj_size), 0) AS b FROM files").first();
+          if (used && used.b + fSize + pSize > ARCHIVE_DB_LIMIT * 0.95) return json({ error: "الأرشيف ممتلئ" }, 507);
+          var arId = makeToken().slice(0, 32), stmts = [];
+          stmts.push(env.ARCHIVE.prepare("INSERT INTO files (id, email, project, tool, template, filename, mime, size, proj_size, thumb) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)").bind(
+            arId, arUser.email, am.project, am.project === "thumbnail-gen" ? "thumbnail" : "poster", String(am.template || "").slice(0, 60),
+            String(am.filename || "design.png").replace(/[\\/:*?"<>|]/g, "").slice(0, 160), /^image\/(png|jpeg|webp)$/.test(am.mime) ? am.mime : "image/png",
+            fSize, pSize, /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(am.thumb || "") && am.thumb.length < 120000 ? am.thumb : ""));
+          [["file", arIn.audio.slice(0, fSize)], ["project", arIn.audio.slice(fSize)]].forEach(function (p) {
+            for (var off = 0, seq = 0; off < p[1].byteLength; off += ARCHIVE_CHUNK, seq++)
+              stmts.push(env.ARCHIVE.prepare("INSERT INTO chunks (file_id, part, seq, data) VALUES (?1,?2,?3,?4)").bind(arId, p[0], seq, base64(p[1].slice(off, off + ARCHIVE_CHUNK))));
+          });
+          await env.ARCHIVE.batch(stmts);
+          return json({ ok: true, id: arId });
+        }
+
+        if (request.method === "GET" && path === "/archive/list") {
+          var q = url.searchParams, all = q.get("scope") === "all" && arAll, where = [], args = [];
+          if (!all) { where.push("email = ?"); args.push(arUser.email); }
+          if (ARCHIVE_PROJECTS.indexOf(q.get("project")) >= 0) { where.push("project = ?"); args.push(q.get("project")); }
+          if (q.get("q")) { where.push("(filename LIKE ? OR email LIKE ?)"); args.push("%" + q.get("q").slice(0, 80) + "%", "%" + q.get("q").slice(0, 80) + "%"); }
+          if (/^\d{4}-\d{2}-\d{2}$/.test(q.get("from") || "")) { where.push("created_at >= ?"); args.push(q.get("from")); }
+          if (/^\d{4}-\d{2}-\d{2}$/.test(q.get("to") || "")) { where.push("created_at < date(?, '+1 day')"); args.push(q.get("to")); }
+          var w = where.length ? " WHERE " + where.join(" AND ") : "", off2 = Math.max(0, Math.floor(Number(q.get("offset")) || 0));
+          function withArgs(st) { return args.length ? st.bind.apply(st, args) : st; }
+          var rows = await withArgs(env.ARCHIVE.prepare("SELECT id, email, project, tool, template, filename, mime, size, proj_size, thumb, created_at FROM files" + w + " ORDER BY created_at DESC LIMIT 30 OFFSET " + off2)).all();
+          var cnt = await withArgs(env.ARCHIVE.prepare("SELECT COUNT(*) AS c FROM files" + w)).first();
+          var out = { ok: true, scope: all ? "all" : "mine", canAll: arAll, canDelete: arUser.role === "owner", total: cnt ? cnt.c : 0, files: rows.results || [] };
+          if (arAll) { var u2 = await env.ARCHIVE.prepare("SELECT COALESCE(SUM(size + proj_size), 0) AS b FROM files").first(); out.usedBytes = u2 ? u2.b : 0; out.limitBytes = ARCHIVE_DB_LIMIT; }
+          return json(out);
+        }
+
+        if (request.method === "GET" && path === "/archive/blob") {
+          var bid = url.searchParams.get("id") || "", part = url.searchParams.get("part") === "project" ? "project" : "file";
+          var f = await env.ARCHIVE.prepare("SELECT email, filename, mime FROM files WHERE id = ?1").bind(bid).first();
+          if (!f || (!arAll && f.email !== arUser.email)) return json({ error: "غير موجود" }, 404);
+          var cs = await env.ARCHIVE.prepare("SELECT data FROM chunks WHERE file_id = ?1 AND part = ?2 ORDER BY seq").bind(bid, part).all();
+          var parts = (cs.results || []).map(function (r) { var b = atob(r.data), u8 = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i); return u8; });
+          var headers = cors(); headers["Content-Type"] = part === "project" ? "application/json" : f.mime;
+          return new Response(new Blob(parts), { headers: headers });
+        }
+
+        if (request.method === "POST" && path === "/archive/delete") {
+          if (arUser.role !== "owner") return json({ error: "الحذف للـ Owner فقط" }, 403);
+          var did = String(((await request.json().catch(function () { return {}; })) || {}).id || "");
+          await env.ARCHIVE.batch([env.ARCHIVE.prepare("DELETE FROM chunks WHERE file_id = ?1").bind(did), env.ARCHIVE.prepare("DELETE FROM files WHERE id = ?1").bind(did)]);
+          return json({ ok: true });
+        }
+        return json({ error: "غير موجود" }, 404);
       }
 
       /* ---- DISC: صورة مرجعية مؤقتة ----

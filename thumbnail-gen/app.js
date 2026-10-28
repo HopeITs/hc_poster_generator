@@ -246,9 +246,12 @@
   /* ---------- project files (same idea as the other generators) ----------
      The uploaded picture travels inside the JSON as a data URL; the bundled
      default is stored as null. */
+  function projectData() {
+    return { app: "thumbnail-gen", v: 1, title: $("tgTitle").value,
+             image: S.isDefault ? null : S.pic.src, zoom: S.zoom, panX: S.panX, panY: S.panY };
+  }
   function saveProject() {
-    var d = { app: "thumbnail-gen", v: 1, title: $("tgTitle").value,
-              image: S.isDefault ? null : S.pic.src, zoom: S.zoom, panX: S.panX, panY: S.panY };
+    var d = projectData();
     var a = document.createElement("a"); a.download = fileName("json");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: "application/json" })); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
@@ -284,6 +287,7 @@
           c.toBlob(function (b) {
             if (b.size > YT_MAX_BYTES && q > 0.85) { q = Math.round((q - 0.02) * 100) / 100; encode(); return; }
             var a = document.createElement("a"); a.download = fileName(); a.href = URL.createObjectURL(b); a.click();
+            archive(b, a.download);
             setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
             btn.disabled = false; btn.textContent = "DOWNLOAD"; status("✓ تم التحميل (" + (b.size / 1048576).toFixed(1) + " MB)");
             S.fx = null; render();               // the export replaced the cached full-size effects
@@ -293,10 +297,33 @@
     }, 30);
   }
 
+  /* ---------- the archive ----------
+     Each downloaded thumbnail goes, in the background, to the Worker's archive
+     with its project and a small preview (the same as Poster Maker); a design
+     opened from the archive arrives through sessionStorage. */
+  function archive(file, name) {
+    var pj = new TextEncoder().encode(JSON.stringify(projectData()));
+    var u = URL.createObjectURL(file), im = new Image();
+    im.onload = function () {
+      var c = document.createElement("canvas"); c.width = 320; c.height = Math.round(320 * im.naturalHeight / im.naturalWidth);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+      var meta = { project: "thumbnail-gen", template: "", filename: name, mime: file.type || "image/jpeg", fileSize: file.size, projSize: pj.length, thumb: c.toDataURL("image/jpeg", 0.72) };
+      var m = new TextEncoder().encode(JSON.stringify(meta)), h = new Uint8Array(4); new DataView(h.buffer).setUint32(0, m.length);
+      fetch(WORKER + "/archive", { method: "POST", headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/octet-stream" }, body: new Blob([h, m, file, pj]) })
+        .then(function (r) { if (!r.ok) console.warn("archive: HTTP " + r.status); }, function (e) { console.warn("archive", e); });
+    };
+    im.onerror = function () { URL.revokeObjectURL(u); };
+    im.src = u;
+  }
+  function fromArchive() {
+    var t = null; try { t = sessionStorage.getItem("arcOpen"); sessionStorage.removeItem("arcOpen"); } catch (e) {}
+    if (t) { try { loadProject(JSON.parse(t)); } catch (e) { status("تعذّر فتح التصميم من الأرشيف", true); } }
+  }
+
   checkAccess().then(function () {
     $("tgGate").hidden = true; $("tgApp").hidden = false;
     return loadAssets();
   }).then(function () {
-    wire(); $("tgDownload").disabled = false; render();
+    wire(); $("tgDownload").disabled = false; render(); fromArchive();
   }).catch(function (e) { if (["no session", "session", "denied"].indexOf(e.message) < 0) deny("تعذّر تحميل الأداة: " + e.message); });
 })();

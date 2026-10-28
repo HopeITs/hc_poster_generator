@@ -2643,6 +2643,8 @@ $("hcExportBtn").onclick=hcExport;
   if($("cuPhotoBtn")) $("cuPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
   if($("cuMgmtToggle")&&typeof openUserMgmt==="function") $("cuMgmtToggle").onclick=openUserMgmt;
   if($("cuLogout")) $("cuLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("cuApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  // the archive takes this project with each download, and gives it back through cuLoad
+  window.ARC_REG=window.ARC_REG||{}; ARC_REG.cu={collect:cuCollect,load:cuLoad};
   window.openChildrenUniversity=function(p){
     CU.project=p||CU.project;
     $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
@@ -3150,6 +3152,7 @@ $("hcExportBtn").onclick=hcExport;
   if($("lpPhotoBtn")) $("lpPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
   if($("lpMgmtToggle")&&typeof openUserMgmt==="function") $("lpMgmtToggle").onclick=openUserMgmt;
   if($("lpLogout")) $("lpLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("lpApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  window.ARC_REG=window.ARC_REG||{}; ARC_REG.lp={collect:lpCollect,load:function(d){ lpLoad(d); if(d.qr&&typeof lpSetQr==="function") lpSetQr(d.qr); }};
   window.openLeap=function(p){
     LP.project=p||LP.project;
     $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
@@ -3474,6 +3477,7 @@ $("hcExportBtn").onclick=hcExport;
   if($("dcPhotoBtn")) $("dcPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
   if($("dcMgmtToggle")&&typeof openUserMgmt==="function") $("dcMgmtToggle").onclick=openUserMgmt;
   if($("dcLogout")) $("dcLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("dcApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  window.ARC_REG=window.ARC_REG||{}; ARC_REG.dc={collect:dcCollect,load:dcLoad};
   window.openDisc=function(p){
     DC.project=p||DC.project;
     $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
@@ -3635,6 +3639,212 @@ $("hcExportBtn").onclick=hcExport;
   function boot(){ ensurePop(); scan();
     if(document.body){ try{ new MutationObserver(scan).observe(document.body,{childList:true,subtree:true}); }catch(e){} } }
   if(document.readyState!=="loading") boot(); else document.addEventListener("DOMContentLoaded",boot);
+})();
+</script>
+<style>
+/* ===== الأرشيف: كل تصميم يُنزَّل، مع ملف مشروعه ===== */
+.arc-note{font-size:11px;font-weight:600;color:#8a8a8d;text-align:center;margin-top:6px;font-family:'Somar Sans',system-ui,sans-serif;}
+#arcPage{position:fixed;inset:0;z-index:9000;background:#eef1f3;overflow:auto;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;display:none;}
+#arcPage.on{display:block;}
+.arc-wrap{max-width:1180px;margin:0 auto;padding:24px 20px 70px;}
+.arc-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.arc-top h1{margin:0;font-size:24px;font-weight:900;color:#0a3c55;flex:1;}
+.arc-btn{background:#fff;border:1px solid #d3d3d5;border-radius:10px;padding:9px 14px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:#414042;}
+.arc-btn:hover{border-color:#0a3c55;color:#0a3c55;}
+.arc-tabs{display:flex;gap:6px;}
+.arc-tab{background:#fff;border:1px solid #d3d3d5;border-radius:999px;padding:7px 16px;font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;color:#414042;}
+.arc-tab.on{background:#0a3c55;border-color:#0a3c55;color:#fff;}
+.arc-card{background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.08);padding:16px 18px;}
+.arc-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12px;color:#6f6e71;font-weight:700;}
+.arc-filters input,.arc-filters select{border:1px solid #d3d3d5;border-radius:9px;padding:8px 10px;font-family:inherit;font-size:13px;color:#414042;background:#fff;}
+.arc-filters #arcQ{flex:1;min-width:160px;}
+.arc-usage{font-size:12px;color:#6f6e71;font-weight:700;margin-bottom:12px;}
+.arc-bar{height:6px;background:#f0f0f1;border-radius:9px;overflow:hidden;margin-top:5px;} .arc-bar i{display:block;height:100%;background:#0a3c55;}
+table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
+.arc-t th{text-align:right;color:#6f6e71;font-weight:800;font-size:12px;padding:8px;border-bottom:1px solid #e6e6e8;white-space:nowrap;}
+.arc-t td{padding:8px;border-bottom:1px solid #f0f0f1;vertical-align:middle;color:#414042;}
+.arc-t img{width:56px;height:56px;object-fit:cover;border-radius:8px;background:#f4f4f5;display:block;}
+.arc-t .nm{font-weight:700;direction:ltr;text-align:right;word-break:break-all;}
+.arc-t .em{direction:ltr;text-align:right;color:#6f6e71;font-size:12px;word-break:break-all;}
+.arc-t .dt{white-space:nowrap;direction:ltr;text-align:right;color:#6f6e71;font-size:12px;}
+.arc-t .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+.arc-t .acts button{background:#fff;border:1px solid #d3d3d5;border-radius:8px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:#414042;white-space:nowrap;}
+.arc-t .acts button:hover{border-color:#0a3c55;color:#0a3c55;}
+.arc-t .acts .del{color:#c0392b;} .arc-t .acts .del:hover{border-color:#c0392b;color:#c0392b;}
+.arc-t .acts button:disabled{opacity:.45;cursor:default;}
+.arc-empty{padding:34px;text-align:center;color:#6f6e71;font-weight:700;}
+.arc-more{display:block;margin:14px auto 0;}
+#arcPage [hidden]{display:none !important;}
+@media(max-width:760px){
+  .arc-t thead{display:none;}
+  .arc-t tr{display:grid;grid-template-columns:56px 1fr;gap:2px 12px;padding:10px 0;border-bottom:1px solid #eee;}
+  .arc-t td{border:none;padding:1px 0;} .arc-t td.th{grid-row:span 6;}
+  .arc-t .acts{justify-content:flex-start;margin-top:4px;}
+}
+</style>
+<script>
+/* ===== الأرشيف =====
+   Every design downloaded from Poster Maker (Study Zone, Hope Center,
+   Children University, LEAP, DISC) is also sent, in the background, to the
+   Worker's archive with its full project file and a small preview: the
+   download itself is untouched, and a failure only shows in the console.
+   Downloads are caught at the one place they all pass through, <a>.click()
+   (blob: links are remembered when created, since they may be revoked right
+   after). «الأرشيف» in the account menu lists one's own files; the Owner and
+   the Comms Manager also see everyone's, and only the Owner deletes — the
+   Worker checks all of it. «افتح للتعديل» opens the design in its generator. */
+(function(){
+  var WORKER="https://studyzone-auth.ct-aleppo3.workers.dev", TOKEN_KEY="sz_auth_token";
+  var $=function(id){return document.getElementById(id);};
+  function tok(){ try{ return localStorage.getItem(TOKEN_KEY)||sessionStorage.getItem(TOKEN_KEY); }catch(e){ return null; } }
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  var PROJ={"hope-center":"Hope Center","study-zone":"Study Zone","children-university":"Children University","disc":"DISC","leap":"LEAP","thumbnail-gen":"Thumbnail Gen"};
+  var KEY={"study-zone":"sz","hope-center":"hc","children-university":"cu","leap":"lp","disc":"dc"};
+
+  /* Study Zone and Hope Center live in the page's global scope; the others register in ARC_REG. */
+  var REG={
+    sz:{collect:function(){ return model===2?collectProject2():collectProject(); },
+        load:function(d){ if(d.model===2) loadProject2(d); else loadProject(d); }},
+    hc:{collect:function(){ return {app:"hopecenter",v:1,city:$("hcCity").value,program:$("hcProgram").value,job:$("hcJob").value,format:HC.format}; },
+        load:function(d){
+          [["hcCity",d.city],["hcProgram",d.program],["hcJob",d.job]].forEach(function(f){ var e=$(f[0]); if(e&&typeof f[1]==="string"){ e.value=f[1]; e.dispatchEvent(new Event("change",{bubbles:true})); e.dispatchEvent(new Event("input",{bubbles:true})); } });
+          var fb=$(d.format==="poster"?"hcFmtPoster":"hcFmtStory"); if(fb) fb.click(); if(typeof hcRender==="function") hcRender();
+        }}
+  };
+  function reg(key){ return (window.ARC_REG&&ARC_REG[key])||REG[key]; }
+  function openApp(){
+    var on=function(id){ var e=$(id); return e&&e.classList.contains("on"); };
+    if(on("dcApp")) return "disc"; if(on("lpApp")) return "leap"; if(on("cuApp")) return "children-university"; if(on("hcApp")) return "hope-center";
+    var r=$("appRoot"); if(r&&getComputedStyle(r).display!=="none") return "study-zone";
+    return null;
+  }
+
+  /* ----- catching downloads ----- */
+  var blobs=new Map(), mkURL=URL.createObjectURL;
+  URL.createObjectURL=function(o){ var u=mkURL.call(URL,o); if(o instanceof Blob&&/^image\//.test(o.type)){ blobs.set(u,o); if(blobs.size>12) blobs.delete(blobs.keys().next().value); } return u; };
+  var aclick=HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click=function(){
+    try{ if(this.download&&!this._noArchive&&/\.(png|jpe?g|webp)$/i.test(this.download)&&/^(data:image\/|blob:)/.test(this.href)) capture(this.download,this.href); }catch(e){ console.warn("archive",e); }
+    return aclick.apply(this,arguments);
+  };
+  function dataToBlob(d){ var m=/^data:([^;,]+);base64,(.*)$/.exec(d); if(!m) return null; var b=atob(m[2]), u=new Uint8Array(b.length); for(var i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new Blob([u],{type:m[1]}); }
+  function capture(name,href){
+    var slug=openApp(), r=slug&&reg(KEY[slug]); if(!r) return;
+    var file=href.indexOf("blob:")===0?blobs.get(href):dataToBlob(href); if(!file) return;
+    var proj=null; try{ proj=r.collect(); }catch(e){}
+    var tpl=slug==="hope-center"?(/_Poster/i.test(name)?"Poster":"Story"):(proj&&(proj.model||proj.tpl))?"نموذج "+(proj.model||proj.tpl):"";
+    send({project:slug,template:tpl,filename:name,mime:file.type||"image/png"},file,proj);
+  }
+  function thumbOf(b){
+    return new Promise(function(res){
+      var u=mkURL.call(URL,b), im=new Image();
+      im.onload=function(){ var k=Math.min(1,320/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement("canvas"); c.width=Math.max(1,Math.round(im.naturalWidth*k)); c.height=Math.max(1,Math.round(im.naturalHeight*k));
+        var g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg",0.72)); };
+      im.onerror=function(){ URL.revokeObjectURL(u); res(""); }; im.src=u;
+    });
+  }
+  function send(meta,file,proj){
+    if(!tok()) return Promise.resolve();
+    var pj=new TextEncoder().encode(proj?JSON.stringify(proj):"");
+    return thumbOf(file).then(function(t){
+      meta.thumb=t; meta.fileSize=file.size; meta.projSize=pj.length;
+      var m=new TextEncoder().encode(JSON.stringify(meta)), h=new Uint8Array(4); new DataView(h.buffer).setUint32(0,m.length);
+      return fetch(WORKER+"/archive",{method:"POST",headers:{"Authorization":"Bearer "+tok(),"Content-Type":"application/octet-stream"},body:new Blob([h,m,file,pj])});
+    }).then(function(r){ if(!r.ok) console.warn("archive: HTTP "+r.status); }).catch(function(e){ console.warn("archive",e); });
+  }
+
+  /* ----- the archive page ----- */
+  var A={scope:"mine",offset:0,total:0,canAll:false,canDelete:false,files:[]};
+  function api(path){ return fetch(WORKER+path,{headers:{"Authorization":"Bearer "+tok()}}); }
+  function build(){
+    if($("arcPage")) return;
+    var d=document.createElement("div"); d.id="arcPage";
+    d.innerHTML='<div class="arc-wrap"><div class="arc-top"><h1>الأرشيف</h1>'+
+      '<div class="arc-tabs" id="arcTabs" hidden><button type="button" class="arc-tab on" data-s="mine">ملفاتي</button><button type="button" class="arc-tab" data-s="all">كل الملفات</button></div>'+
+      '<button type="button" class="arc-btn" id="arcClose">← رجوع</button></div>'+
+      '<div class="arc-card"><div class="arc-usage" id="arcUsage" hidden></div>'+
+      '<div class="arc-filters"><select id="arcProj"><option value="">كل المشاريع</option>'+Object.keys(PROJ).map(function(k){ return '<option value="'+k+'">'+PROJ[k]+'</option>'; }).join("")+'</select>'+
+      '<input type="search" id="arcQ" placeholder="بحث باسم الملف أو الإيميل"><span>من</span><input type="date" id="arcFrom"><span>لـ</span><input type="date" id="arcTo"></div>'+
+      '<table class="arc-t"><thead><tr><th></th><th>اسم الملف</th><th>المشروع</th><th>النموذج</th><th>التاريخ</th><th id="arcWhoH">أنشأه</th><th></th></tr></thead><tbody id="arcBody"></tbody></table>'+
+      '<div class="arc-empty" id="arcEmpty" hidden></div><button type="button" class="arc-btn arc-more" id="arcMore" hidden>عرض المزيد</button></div></div>';
+    document.body.appendChild(d);
+    $("arcClose").onclick=function(){ d.classList.remove("on"); };
+    $("arcTabs").onclick=function(e){ var b=e.target.closest(".arc-tab"); if(!b) return; A.scope=b.dataset.s; [].forEach.call(this.children,function(x){ x.classList.toggle("on",x===b); }); load(true); };
+    var t=null; ["arcProj","arcFrom","arcTo"].forEach(function(id){ $(id).onchange=function(){ load(true); }; });
+    $("arcQ").oninput=function(){ clearTimeout(t); t=setTimeout(function(){ load(true); },350); };
+    $("arcMore").onclick=function(){ load(false); };
+    $("arcBody").onclick=onAction;
+    document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&d.classList.contains("on")&&!document.querySelector(".pf-hole")) d.classList.remove("on"); });
+  }
+  window.openArchive=function(){ build(); $("arcPage").classList.add("on"); load(true); };
+  function fmtDate(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return s; function p(n){ return (n<10?"0":"")+n; } return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+  function mb(b){ return (b/1048576).toFixed(b<10485760?1:0)+" MB"; }
+  function load(reset){
+    if(reset){ A.offset=0; A.files=[]; }
+    var q="?scope="+A.scope+"&offset="+A.offset+"&project="+encodeURIComponent($("arcProj").value)+"&q="+encodeURIComponent($("arcQ").value.trim())+"&from="+$("arcFrom").value+"&to="+$("arcTo").value;
+    $("arcEmpty").hidden=false; if(reset) $("arcEmpty").textContent="…جارٍ التحميل";
+    api("/archive/list"+q).then(function(r){ return r.json(); }).then(function(d){
+      if(!d.ok){ $("arcEmpty").textContent=d.error||"تعذّر تحميل الأرشيف"; return; }
+      A.canAll=d.canAll; A.canDelete=d.canDelete; A.total=d.total; A.files=A.files.concat(d.files); A.offset=A.files.length;
+      $("arcTabs").hidden=!A.canAll; $("arcWhoH").hidden=A.scope!=="all";
+      if(d.usedBytes!=null){ var pc=Math.min(100,100*d.usedBytes/d.limitBytes); $("arcUsage").hidden=false; $("arcUsage").innerHTML="المساحة المستعملة: "+mb(d.usedBytes)+" من "+mb(d.limitBytes)+" ("+pc.toFixed(1)+"%)<div class=\"arc-bar\"><i style=\"width:"+pc+"%\"></i></div>"; }
+      render();
+    }).catch(function(){ $("arcEmpty").textContent="تعذّر الاتصال"; });
+  }
+  function render(){
+    $("arcBody").innerHTML=A.files.map(function(f,i){
+      return '<tr data-i="'+i+'"><td class="th">'+(f.thumb?'<img src="'+esc(f.thumb)+'" alt="">':'<img alt="">')+'</td><td class="nm">'+esc(f.filename)+'</td><td>'+esc(PROJ[f.project]||f.project)+'</td><td>'+esc(f.template)+'</td><td class="dt">'+fmtDate(f.created_at)+'</td>'+
+        (A.scope==="all"?'<td class="em">'+esc(f.email)+'</td>':'')+
+        '<td><div class="acts"><button type="button" data-a="dl">تنزيل</button><button type="button" data-a="edit"'+(f.proj_size?'':' disabled')+'>افتح للتعديل</button>'+(A.canDelete?'<button type="button" class="del" data-a="del">حذف</button>':'')+'</div></td></tr>';
+    }).join("");
+    $("arcEmpty").hidden=A.files.length>0; if(!A.files.length) $("arcEmpty").textContent=$("arcQ").value||$("arcProj").value||$("arcFrom").value||$("arcTo").value?"ما في ملفات بهالبحث":"لسا ما في ملفات — كل تصميم بتنزّله بيتحفظ هون";
+    $("arcMore").hidden=A.files.length>=A.total;
+  }
+  function blobOf(f,part){ return api("/archive/blob?id="+f.id+"&part="+part).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.blob(); }); }
+  function onAction(e){
+    var b=e.target.closest("button[data-a]"); if(!b) return;
+    var f=A.files[+b.closest("tr").dataset.i]; if(!f) return;
+    if(b.dataset.a==="dl"){
+      b.disabled=true;
+      blobOf(f,"file").then(function(x){ var a=document.createElement("a"); a._noArchive=true; a.download=f.filename; a.href=mkURL.call(URL,x); aclick.call(a); setTimeout(function(){ URL.revokeObjectURL(a.href); },2000); })
+        .catch(function(err){ alert("تعذّر التنزيل: "+err.message); }).then(function(){ b.disabled=false; });
+    } else if(b.dataset.a==="edit"){
+      b.disabled=true;
+      blobOf(f,"project").then(function(x){ return x.text(); }).then(function(t){ openForEdit(f.project,JSON.parse(t)); })
+        .catch(function(err){ alert("تعذّر فتح المشروع: "+err.message); }).then(function(){ b.disabled=false; });
+    } else if(b.dataset.a==="del"){
+      if(!b._sure){ b._sure=true; b.textContent="تأكيد الحذف"; setTimeout(function(){ b._sure=false; b.textContent="حذف"; },3000); return; }
+      b.disabled=true;
+      fetch(WORKER+"/archive/delete",{method:"POST",headers:{"Authorization":"Bearer "+tok(),"Content-Type":"application/json"},body:JSON.stringify({id:f.id})})
+        .then(function(r){ return r.json(); }).then(function(d){ if(!d.ok) throw new Error(d.error||""); A.files.splice(A.files.indexOf(f),1); A.total--; A.offset=A.files.length; render(); })
+        .catch(function(err){ alert("تعذّر الحذف: "+err.message); b.disabled=false; });
+    }
+  }
+  /* «افتح للتعديل»: the generator of that project, with the saved design in it. */
+  function openForEdit(slug,d){
+    if(slug==="thumbnail-gen"){ try{ sessionStorage.setItem("arcOpen",JSON.stringify(d)); }catch(e){} location.href="thumbnail-gen/"; return; }
+    Auth.projects().then(function(res){
+      var p=((res&&res.projects)||[]).filter(function(x){ return x.slug===slug; })[0];
+      if(!p){ alert("ما عندك صلاحية على مشروع "+(PROJ[slug]||slug)); return; }
+      $("arcPage").classList.remove("on");
+      openProject(p);
+      setTimeout(function(){ var r=reg(KEY[slug]); try{ r.load(d); }catch(err){ alert("تعذّر تحميل التصميم: "+err.message); } },400);
+    });
+  }
+
+  /* «الأرشيف» in every account menu, and a word under every DOWNLOAD. */
+  function decorate(){
+    [].forEach.call(document.querySelectorAll(".acct-menu"),function(m){
+      if(m.querySelector(".arc-menu")) return;
+      var b=document.createElement("button"); b.type="button"; b.className="arc-menu"; b.textContent="الأرشيف"; b.onclick=function(){ window.openArchive(); };
+      m.insertBefore(b,m.firstChild);
+    });
+    ["exportBtn","hcExportBtn","cuExportBtn","lpExportBtn","dcExportBtn"].forEach(function(id){
+      var b=$(id); if(!b||b.parentNode.querySelector(".arc-note")) return;
+      var n=document.createElement("div"); n.className="arc-note"; n.textContent="نسخة من التصميم بتنحفظ بأرشيفك"; b.insertAdjacentElement("afterend",n);
+    });
+  }
+  if(document.readyState!=="loading") decorate(); else document.addEventListener("DOMContentLoaded",decorate);
 })();
 </script>
 <style>

@@ -162,6 +162,7 @@ into Success</textarea>
             <label class="btn-proj">فتح مشروع<input type="file" accept=".json,application/json" id="tgProjFile"></label>
           </div>
           <button class="btn" id="tgDownload" disabled>DOWNLOAD</button>
+          <div class="hint" style="text-align:center;margin-top:6px">نسخة من التصميم بتنحفظ بأرشيفك</div>
           <div class="status" id="tgStatus"></div>
         </div>
       </div>
