@@ -2449,6 +2449,15 @@ function hcFitStage(){
 window.addEventListener("resize",hcFitStage);
 function hcRender(){ try{ $("hcStage").innerHTML=hcSVG(HC.format,false); hcFitStage(); }catch(e){} }
 function hcMsg(t,e){ var m=$("hcMsg"); if(m){ m.textContent=t; m.className="hc-msg "+(e?"err":"ok"); } }
+/* The archive keeps Hope Center's fields as its project (it has no project file of its own) and gives them back here. */
+window.ARC_REG=window.ARC_REG||{}; ARC_REG.hc={
+  collect:function(){ return {app:"hopecenter",v:1,city:$("hcCity").value,program:$("hcProgram").value,job:$("hcJob").value,format:HC.format}; },
+  load:function(d){
+    [["hcCity",d.city],["hcProgram",d.program],["hcJob",d.job]].forEach(function(f){ var e=$(f[0]); if(e&&typeof f[1]==="string"){ e.value=f[1]; e.dispatchEvent(new Event("change",{bubbles:true})); e.dispatchEvent(new Event("input",{bubbles:true})); } });
+    var fb=$(d.format==="poster"?"hcFmtPoster":"hcFmtStory"); if(fb) fb.click();
+    hcRender();
+  }
+};
 window.openHopeCenter=function(p){
   HC.project=p||HC.project;
   $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
@@ -3648,18 +3657,18 @@ $("hcExportBtn").onclick=hcExport;
 #arcPage.on{display:block;}
 .arc-wrap{max-width:1180px;margin:0 auto;padding:24px 20px 70px;}
 .arc-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
-.arc-top h1{margin:0;font-size:24px;font-weight:900;color:#0a3c55;flex:1;}
+.arc-top h1{margin:0;font-size:24px;font-weight:900;color:#be1f24;flex:1;}
 .arc-btn{background:#fff;border:1px solid #d3d3d5;border-radius:10px;padding:9px 14px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:#414042;}
-.arc-btn:hover{border-color:#0a3c55;color:#0a3c55;}
+.arc-btn:hover{border-color:#be1f24;color:#be1f24;}
 .arc-tabs{display:flex;gap:6px;}
 .arc-tab{background:#fff;border:1px solid #d3d3d5;border-radius:999px;padding:7px 16px;font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;color:#414042;}
-.arc-tab.on{background:#0a3c55;border-color:#0a3c55;color:#fff;}
+.arc-tab.on{background:#be1f24;border-color:#be1f24;color:#fff;}
 .arc-card{background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.08);padding:16px 18px;}
 .arc-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12px;color:#6f6e71;font-weight:700;}
 .arc-filters input,.arc-filters select{border:1px solid #d3d3d5;border-radius:9px;padding:8px 10px;font-family:inherit;font-size:13px;color:#414042;background:#fff;}
 .arc-filters #arcQ{flex:1;min-width:160px;}
 .arc-usage{font-size:12px;color:#6f6e71;font-weight:700;margin-bottom:12px;}
-.arc-bar{height:6px;background:#f0f0f1;border-radius:9px;overflow:hidden;margin-top:5px;} .arc-bar i{display:block;height:100%;background:#0a3c55;}
+.arc-bar{height:6px;background:#f0f0f1;border-radius:9px;overflow:hidden;margin-top:5px;} .arc-bar i{display:block;height:100%;background:#be1f24;}
 table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
 .arc-t th{text-align:right;color:#6f6e71;font-weight:800;font-size:12px;padding:8px;border-bottom:1px solid #e6e6e8;white-space:nowrap;}
 .arc-t td{padding:8px;border-bottom:1px solid #f0f0f1;vertical-align:middle;color:#414042;}
@@ -3669,7 +3678,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
 .arc-t .dt{white-space:nowrap;direction:ltr;text-align:right;color:#6f6e71;font-size:12px;}
 .arc-t .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
 .arc-t .acts button{background:#fff;border:1px solid #d3d3d5;border-radius:8px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:#414042;white-space:nowrap;}
-.arc-t .acts button:hover{border-color:#0a3c55;color:#0a3c55;}
+.arc-t .acts button:hover{border-color:#be1f24;color:#be1f24;}
 .arc-t .acts .del{color:#c0392b;} .arc-t .acts .del:hover{border-color:#c0392b;color:#c0392b;}
 .arc-t .acts button:disabled{opacity:.45;cursor:default;}
 .arc-empty{padding:34px;text-align:center;color:#6f6e71;font-weight:700;}
@@ -3701,15 +3710,10 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   var PROJ={"hope-center":"Hope Center","study-zone":"Study Zone","children-university":"Children University","disc":"DISC","leap":"LEAP","thumbnail-gen":"Thumbnail Gen"};
   var KEY={"study-zone":"sz","hope-center":"hc","children-university":"cu","leap":"lp","disc":"dc"};
 
-  /* Study Zone and Hope Center live in the page's global scope; the others register in ARC_REG. */
+  /* Study Zone lives in the page's global scope; the others register in ARC_REG from inside their own blocks. */
   var REG={
     sz:{collect:function(){ return model===2?collectProject2():collectProject(); },
-        load:function(d){ if(d.model===2) loadProject2(d); else loadProject(d); }},
-    hc:{collect:function(){ return {app:"hopecenter",v:1,city:$("hcCity").value,program:$("hcProgram").value,job:$("hcJob").value,format:HC.format}; },
-        load:function(d){
-          [["hcCity",d.city],["hcProgram",d.program],["hcJob",d.job]].forEach(function(f){ var e=$(f[0]); if(e&&typeof f[1]==="string"){ e.value=f[1]; e.dispatchEvent(new Event("change",{bubbles:true})); e.dispatchEvent(new Event("input",{bubbles:true})); } });
-          var fb=$(d.format==="poster"?"hcFmtPoster":"hcFmtStory"); if(fb) fb.click(); if(typeof hcRender==="function") hcRender();
-        }}
+        load:function(d){ if(d.model===2) loadProject2(d); else loadProject(d); }}
   };
   function reg(key){ return (window.ARC_REG&&ARC_REG[key])||REG[key]; }
   function openApp(){
@@ -3728,12 +3732,20 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     return aclick.apply(this,arguments);
   };
   function dataToBlob(d){ var m=/^data:([^;,]+);base64,(.*)$/.exec(d); if(!m) return null; var b=atob(m[2]), u=new Uint8Array(b.length); for(var i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new Blob([u],{type:m[1]}); }
+  /* What the archive keeps is the design's project (JSON), which reopens it
+     for editing; the downloaded picture only makes the small preview. One
+     project downloaded twice in a row (Hope Center's Story and Poster) is kept once. */
+  var lastSent={key:"",at:0};
   function capture(name,href){
     var slug=openApp(), r=slug&&reg(KEY[slug]); if(!r) return;
-    var file=href.indexOf("blob:")===0?blobs.get(href):dataToBlob(href); if(!file) return;
-    var proj=null; try{ proj=r.collect(); }catch(e){}
-    var tpl=slug==="hope-center"?(/_Poster/i.test(name)?"Poster":"Story"):(proj&&(proj.model||proj.tpl))?"نموذج "+(proj.model||proj.tpl):"";
-    send({project:slug,template:tpl,filename:name,mime:file.type||"image/png"},file,proj);
+    var proj=null; try{ proj=r.collect(); }catch(e){ console.warn("archive: project",e); }
+    if(!proj) return;
+    var text=JSON.stringify(proj), key=slug+"|"+text.length+"|"+text.slice(0,200);
+    if(key===lastSent.key&&Date.now()-lastSent.at<8000) return;
+    lastSent={key:key,at:Date.now()};
+    var img=href.indexOf("blob:")===0?blobs.get(href):dataToBlob(href);
+    var tpl=slug==="hope-center"?"Story + Poster":(proj.model||proj.tpl)?"نموذج "+(proj.model||proj.tpl):"";
+    send({project:slug,template:tpl,filename:name.replace(/(_Story|_Poster)?\.(png|jpe?g|webp)$/i,".json"),mime:"application/json"},new Blob([text],{type:"application/json"}),img);
   }
   function thumbOf(b){
     return new Promise(function(res){
@@ -3743,13 +3755,12 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
       im.onerror=function(){ URL.revokeObjectURL(u); res(""); }; im.src=u;
     });
   }
-  function send(meta,file,proj){
+  function send(meta,file,preview){
     if(!tok()) return Promise.resolve();
-    var pj=new TextEncoder().encode(proj?JSON.stringify(proj):"");
-    return thumbOf(file).then(function(t){
-      meta.thumb=t; meta.fileSize=file.size; meta.projSize=pj.length;
+    return (preview?thumbOf(preview):Promise.resolve("")).then(function(t){
+      meta.thumb=t; meta.fileSize=file.size; meta.projSize=0;
       var m=new TextEncoder().encode(JSON.stringify(meta)), h=new Uint8Array(4); new DataView(h.buffer).setUint32(0,m.length);
-      return fetch(WORKER+"/archive",{method:"POST",headers:{"Authorization":"Bearer "+tok(),"Content-Type":"application/octet-stream"},body:new Blob([h,m,file,pj])});
+      return fetch(WORKER+"/archive",{method:"POST",headers:{"Authorization":"Bearer "+tok(),"Content-Type":"application/octet-stream"},body:new Blob([h,m,file])});
     }).then(function(r){ if(!r.ok) console.warn("archive: HTTP "+r.status); }).catch(function(e){ console.warn("archive",e); });
   }
 
@@ -3787,7 +3798,11 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
       if(!d.ok){ $("arcEmpty").textContent=d.error||"تعذّر تحميل الأرشيف"; return; }
       A.canAll=d.canAll; A.canDelete=d.canDelete; A.total=d.total; A.files=A.files.concat(d.files); A.offset=A.files.length;
       $("arcTabs").hidden=!A.canAll; $("arcWhoH").hidden=A.scope!=="all";
-      if(d.usedBytes!=null){ var pc=Math.min(100,100*d.usedBytes/d.limitBytes); $("arcUsage").hidden=false; $("arcUsage").innerHTML="المساحة المستعملة: "+mb(d.usedBytes)+" من "+mb(d.limitBytes)+" ("+pc.toFixed(1)+"%)<div class=\"arc-bar\"><i style=\"width:"+pc+"%\"></i></div>"; }
+      // only the Owner and the Comms Manager get usedBytes from the Worker; the line stays hidden for everyone else
+      if(d.usedBytes!=null){ var pc=Math.min(100,100*d.usedBytes/d.limitBytes), pct=pc>0&&pc<0.1?"&lt;0.1%":pc.toFixed(1)+"%";
+        $("arcUsage").hidden=false;
+        $("arcUsage").innerHTML="المساحة المستعملة: <bdi dir=\"ltr\">"+mb(d.usedBytes)+"</bdi> من <bdi dir=\"ltr\">"+mb(d.limitBytes)+"</bdi> (<bdi dir=\"ltr\">"+pct+"</bdi>)<div class=\"arc-bar\"><i style=\"width:"+Math.max(pc,d.usedBytes?0.5:0)+"%\"></i></div>"; }
+      else $("arcUsage").hidden=true;
       render();
     }).catch(function(){ $("arcEmpty").textContent="تعذّر الاتصال"; });
   }
@@ -3795,11 +3810,13 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     $("arcBody").innerHTML=A.files.map(function(f,i){
       return '<tr data-i="'+i+'"><td class="th">'+(f.thumb?'<img src="'+esc(f.thumb)+'" alt="">':'<img alt="">')+'</td><td class="nm">'+esc(f.filename)+'</td><td>'+esc(PROJ[f.project]||f.project)+'</td><td>'+esc(f.template)+'</td><td class="dt">'+fmtDate(f.created_at)+'</td>'+
         (A.scope==="all"?'<td class="em">'+esc(f.email)+'</td>':'')+
-        '<td><div class="acts"><button type="button" data-a="dl">تنزيل</button><button type="button" data-a="edit"'+(f.proj_size?'':' disabled')+'>افتح للتعديل</button>'+(A.canDelete?'<button type="button" class="del" data-a="del">حذف</button>':'')+'</div></td></tr>';
+        '<td><div class="acts"><button type="button" data-a="dl">تنزيل</button><button type="button" data-a="edit"'+(projPart(f)?'':' disabled')+'>افتح للتعديل</button>'+(A.canDelete?'<button type="button" class="del" data-a="del">حذف</button>':'')+'</div></td></tr>';
     }).join("");
     $("arcEmpty").hidden=A.files.length>0; if(!A.files.length) $("arcEmpty").textContent=$("arcQ").value||$("arcProj").value||$("arcFrom").value||$("arcTo").value?"ما في ملفات بهالبحث":"لسا ما في ملفات — كل تصميم بتنزّله بيتحفظ هون";
     $("arcMore").hidden=A.files.length>=A.total;
   }
+  // where an entry's project is: the entry itself (a JSON), or, in the first entries, beside the picture
+  function projPart(f){ return f.mime==="application/json"?"file":f.proj_size?"project":null; }
   function blobOf(f,part){ return api("/archive/blob?id="+f.id+"&part="+part).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.blob(); }); }
   function onAction(e){
     var b=e.target.closest("button[data-a]"); if(!b) return;
@@ -3810,7 +3827,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
         .catch(function(err){ alert("تعذّر التنزيل: "+err.message); }).then(function(){ b.disabled=false; });
     } else if(b.dataset.a==="edit"){
       b.disabled=true;
-      blobOf(f,"project").then(function(x){ return x.text(); }).then(function(t){ openForEdit(f.project,JSON.parse(t)); })
+      blobOf(f,projPart(f)).then(function(x){ return x.text(); }).then(function(t){ openForEdit(f.project,JSON.parse(t)); })
         .catch(function(err){ alert("تعذّر فتح المشروع: "+err.message); }).then(function(){ b.disabled=false; });
     } else if(b.dataset.a==="del"){
       if(!b._sure){ b._sure=true; b.textContent="تأكيد الحذف"; setTimeout(function(){ b._sure=false; b.textContent="حذف"; },3000); return; }
@@ -3841,7 +3858,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     });
     ["exportBtn","hcExportBtn","cuExportBtn","lpExportBtn","dcExportBtn"].forEach(function(id){
       var b=$(id); if(!b||b.parentNode.querySelector(".arc-note")) return;
-      var n=document.createElement("div"); n.className="arc-note"; n.textContent="نسخة من التصميم بتنحفظ بأرشيفك"; b.insertAdjacentElement("afterend",n);
+      var n=document.createElement("div"); n.className="arc-note"; n.textContent="نسخة من مشروع التصميم بتنحفظ بأرشيفك"; b.insertAdjacentElement("afterend",n);
     });
   }
   if(document.readyState!=="loading") decorate(); else document.addEventListener("DOMContentLoaded",decorate);

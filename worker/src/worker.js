@@ -960,9 +960,10 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
       }
 
       /* ---- الأرشيف: Poster Maker وThumbnail Gen ----
-         كل DOWNLOAD يرسل نسخة: [4 بايت طول JSON][JSON {project, tool, template, filename, mime,
-         fileSize, projSize, thumb}][الملف][ملف المشروع JSON]. يُحفظ في قاعدة ARCHIVE المنفصلة:
-         سطر في files (ومعه معاينة صغيرة data URL) والملف ومشروعه قطعاً في chunks.
+         كل DOWNLOAD يرسل مشروع التصميم (JSON، يفتحه للتعديل) ومعاينة صغيرة من صورته:
+         [4 بايت طول JSON][JSON {project, tool, template, filename, mime, fileSize, projSize, thumb}][الملف]
+         (أول السجلات حفظت الصورة ومشروعها معاً: projSize). يُحفظ في قاعدة ARCHIVE المنفصلة:
+         سطر في files (ومعه المعاينة data URL) والملف قطعاً في chunks.
          يرى كل مستخدم ملفاته؛ الـ Owner والـ Comms يرون الكل؛ الـ Owner وحده يحذف. */
       if (path === "/archive" || path.indexOf("/archive/") === 0) {
         if (!env.ARCHIVE) return json({ error: "الأرشيف غير مضبوط" }, 500);
@@ -982,7 +983,7 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
           var arId = makeToken().slice(0, 32), stmts = [];
           stmts.push(env.ARCHIVE.prepare("INSERT INTO files (id, email, project, tool, template, filename, mime, size, proj_size, thumb) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)").bind(
             arId, arUser.email, am.project, am.project === "thumbnail-gen" ? "thumbnail" : "poster", String(am.template || "").slice(0, 60),
-            String(am.filename || "design.png").replace(/[\\/:*?"<>|]/g, "").slice(0, 160), /^image\/(png|jpeg|webp)$/.test(am.mime) ? am.mime : "image/png",
+            String(am.filename || "design.png").replace(/[\\/:*?"<>|]/g, "").slice(0, 160), /^(image\/(png|jpeg|webp)|application\/json)$/.test(am.mime) ? am.mime : "image/png",
             fSize, pSize, /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(am.thumb || "") && am.thumb.length < 120000 ? am.thumb : ""));
           [["file", arIn.audio.slice(0, fSize)], ["project", arIn.audio.slice(fSize)]].forEach(function (p) {
             for (var off = 0, seq = 0; off < p[1].byteLength; off += ARCHIVE_CHUNK, seq++)

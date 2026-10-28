@@ -298,18 +298,18 @@
   }
 
   /* ---------- the archive ----------
-     Each downloaded thumbnail goes, in the background, to the Worker's archive
-     with its project and a small preview (the same as Poster Maker); a design
+     Each downloaded thumbnail's project goes, in the background, to the
+     Worker's archive with a small preview (the same as Poster Maker); a design
      opened from the archive arrives through sessionStorage. */
   function archive(file, name) {
-    var pj = new TextEncoder().encode(JSON.stringify(projectData()));
+    var pj = new Blob([JSON.stringify(projectData())], { type: "application/json" });   // the project is what is kept; the picture makes the preview
     var u = URL.createObjectURL(file), im = new Image();
     im.onload = function () {
       var c = document.createElement("canvas"); c.width = 320; c.height = Math.round(320 * im.naturalHeight / im.naturalWidth);
       c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
-      var meta = { project: "thumbnail-gen", template: "", filename: name, mime: file.type || "image/jpeg", fileSize: file.size, projSize: pj.length, thumb: c.toDataURL("image/jpeg", 0.72) };
+      var meta = { project: "thumbnail-gen", template: "", filename: name.replace(/\.(jpe?g|png)$/i, ".json"), mime: "application/json", fileSize: pj.size, projSize: 0, thumb: c.toDataURL("image/jpeg", 0.72) };
       var m = new TextEncoder().encode(JSON.stringify(meta)), h = new Uint8Array(4); new DataView(h.buffer).setUint32(0, m.length);
-      fetch(WORKER + "/archive", { method: "POST", headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/octet-stream" }, body: new Blob([h, m, file, pj]) })
+      fetch(WORKER + "/archive", { method: "POST", headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/octet-stream" }, body: new Blob([h, m, pj]) })
         .then(function (r) { if (!r.ok) console.warn("archive: HTTP " + r.status); }, function (e) { console.warn("archive", e); });
     };
     im.onerror = function () { URL.revokeObjectURL(u); };
