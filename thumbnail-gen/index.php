@@ -80,6 +80,8 @@
   .stage canvas{display:block;width:100%;height:100%;}
   .stage .busy{position:absolute;inset-inline-start:12px;bottom:10px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;opacity:0;transition:opacity .2s;pointer-events:none;}
   .stage .busy.on{opacity:1;}
+  .saved{width:max-content;margin:10px auto 0;background:#fff;color:var(--red);border:1.5px solid var(--red);border-radius:999px;padding:7px 16px;font-size:13px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.08);transition:opacity .45s;}
+  .saved.out{opacity:0;}
   .note{font-size:12px;color:var(--muted);margin-top:10px;text-align:center;position:relative;top:2px;}
 
   /* ---- Live YouTube mockup (full-width card under the editor) ----
@@ -172,6 +174,7 @@ into Success</textarea>
           <canvas id="tgCanvas" width="1000" height="563"></canvas>
           <span class="busy" id="tgBusy">…جارٍ المعالجة</span>
         </div>
+        <div class="saved" id="tgSaved" hidden>✓ تم الحفظ في الأرشيف</div>
         <div class="note">اسحب الصورة داخل المعاينة لتحريكها</div>
       </div>
 

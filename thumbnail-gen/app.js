@@ -310,10 +310,16 @@
       var meta = { project: "thumbnail-gen", template: "", filename: name.replace(/\.(jpe?g|png)$/i, ".json"), mime: "application/json", fileSize: pj.size, projSize: 0, thumb: c.toDataURL("image/jpeg", 0.72) };
       var m = new TextEncoder().encode(JSON.stringify(meta)), h = new Uint8Array(4); new DataView(h.buffer).setUint32(0, m.length);
       fetch(WORKER + "/archive", { method: "POST", headers: { "Authorization": "Bearer " + token(), "Content-Type": "application/octet-stream" }, body: new Blob([h, m, pj]) })
-        .then(function (r) { if (!r.ok) console.warn("archive: HTTP " + r.status); }, function (e) { console.warn("archive", e); });
+        .then(function (r) { if (r.ok) savedNote(); else console.warn("archive: HTTP " + r.status); }, function (e) { console.warn("archive", e); });
     };
     im.onerror = function () { URL.revokeObjectURL(u); };
     im.src = u;
+  }
+  /* «✓ تم الحفظ في الأرشيف» under the preview, once the Worker has the copy. */
+  var savedTimer = null;
+  function savedNote() {
+    var n = $("tgSaved"); n.classList.remove("out"); n.hidden = false; clearTimeout(savedTimer);
+    savedTimer = setTimeout(function () { n.classList.add("out"); savedTimer = setTimeout(function () { n.hidden = true; n.classList.remove("out"); }, 500); }, 3500);
   }
   function fromArchive() {
     var t = null; try { t = sessionStorage.getItem("arcOpen"); sessionStorage.removeItem("arcOpen"); } catch (e) {}

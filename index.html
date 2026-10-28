@@ -1360,11 +1360,6 @@ var Auth = (function(){
       return res.ok?null:((res.data&&res.data.error)||"فشل الحذف"); }
     catch(e){ return "تعذّر الاتصال"; }
   }
-  async function notify(attachments,title,projectName){
-    try{ var res=await api("/notify","POST",{attachments:attachments,title:title,project_name:projectName});
-      return res.ok?{ok:true,data:res.data}:{ok:false,error:(res.data&&res.data.error)||"فشل إرسال الإشعار"}; }
-    catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
-  }
   return {restore:restore, login:login, logout:logout, can:can, current:function(){return current;},
           projects:async function(){ try{ var r=await api("/projects","GET"); return r.ok?{ok:true,projects:r.data.projects||[]}:{ok:false,error:(r.data&&r.data.error)||"تعذّر الجلب",projects:[]}; }catch(e){ return {ok:false,error:"تعذّر الاتصال",projects:[]}; } },
           applyBrand:applyBrand,
@@ -1395,7 +1390,7 @@ var Auth = (function(){
                  return (res.ok&&res.data&&res.data.image)?{ok:true,image:res.data.image}:{ok:false,error:(res.data&&res.data.error)||"فشل التحويل"}; }
             catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
           },
-          listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify};
+          listUsers:listUsers, addUser:addUser, deleteUser:deleteUser};
 })();
 
 var heroIMG=null, origIMG=null, fmt="square";
@@ -1685,7 +1680,7 @@ $("exportBtn").onclick=function(){
   function capture(i){
     if(i>=targets.length){
       finish();
-      sendNotification(captured);
+      showToast("✓ تم التحميل");
       return;
     }
     var t=targets[i],name=t[0],W=t[1],H=t[2];
@@ -1850,36 +1845,11 @@ function exportModel2(){
     var fn=fileName2();
     var a=document.createElement("a");a.download=fn;a.href=url;a.click();
     btn.disabled=false;btn.textContent="DOWNLOAD";
-    sendNotification2([{filename:fn, b64:url.split(",")[1]}]);
+    showToast("✓ تم التحميل");
   }).catch(function(err){ alert("خطأ بالتصدير: "+(err&&err.message||err)); $("stage").style.transform=prevT; btn.disabled=false;btn.textContent="DOWNLOAD"; });
 }
-async function sendNotification2(captured){
-  try{
-    var code=CITY_CODE[$("city2").value]||$("city2").value;
-    var title=m2Title();
-    var safe=title.replace(/[\/\\:*?"<>|]/g,"").replace(/\s+/g," ")||"ستوري";
-    var jsonB64=btoa(unescape(encodeURIComponent(JSON.stringify(collectProject2(),null,2))));
-    var attachments=captured.slice();
-    attachments.push({filename:"006SZ_"+code+"_"+todayMMDDYYYY()+".json", b64:jsonB64});
-    var res=await Auth.notify(attachments, title);
-    if(res.ok){ showToast("✓ تم إرسال نسخة للإدارة بالإيميل"); }
-    else{ showToast("⚠ تعذّر إرسال الإشعار: "+(res.error||""), true); }
-  }catch(e){ showToast("⚠ تعذّر إرسال الإشعار", true); }
-}
-async function sendNotification(captured){
-  try{
-    var code=CITY_CODE[$("city").value]||$("city").value;
-    var rawTitle=($("title").value||"").trim();
-    var safe=rawTitle.replace(/[\/\\:*?"<>|]/g,"").replace(/\s+/g," ")||"مشروع";
-    var jsonStr=JSON.stringify(collectProject(),null,2);
-    var jsonB64=btoa(unescape(encodeURIComponent(jsonStr)));
-    var attachments=captured.slice();
-    attachments.push({filename:"006SZ_"+code+"_"+titleForName()+"_"+todayMMDDYYYY()+".json", b64:jsonB64});
-    var res=await Auth.notify(attachments, rawTitle);
-    if(res.ok){ showToast("✓ تم إرسال نسخة للإدارة بالإيميل"); }
-    else{ showToast("⚠ تعذّر إرسال الإشعار: "+(res.error||""), true); }
-  }catch(e){ showToast("⚠ تعذّر إرسال الإشعار", true); }
-}
+/* The email to the Owner and the Comms Manager after each download is gone: its relay was never
+   configured, so it only ever failed. The archive keeps every downloaded design instead. */
 function showToast(msg, isErr){
   var t=document.createElement("div");
   t.textContent=msg;
@@ -2480,7 +2450,7 @@ function hcDate(){ var d=new Date(); var mm=("0"+(d.getMonth()+1)).slice(-2); va
 function hcClean(x){ return String(x||"").replace(new RegExp('[\\\\/:*?"<>|]','g'),"").trim(); }
 function hcExport(){
   var btn=$("hcExportBtn"); if(btn) btn.disabled=true;
-  hcMsg("جاري التحميل والإرسال…",false);
+  hcMsg("جاري التحميل…",false);
   var city=$("hcCity").value; var cc=HC_CITY_CODE[city]||city;
   var program=$("hcProgram").value;
   var job=($("hcJob").value||"Hiring").trim()||"Hiring";
@@ -2488,13 +2458,9 @@ function hcExport(){
   Promise.all([pngFromSVG("story"),pngFromSVG("poster")]).then(function(r){
     var a1=document.createElement("a"); a1.download=base+"_Story.png"; a1.href="data:image/png;base64,"+r[0]; a1.click();
     setTimeout(function(){ var a2=document.createElement("a"); a2.download=base+"_Poster.png"; a2.href="data:image/png;base64,"+r[1]; a2.click(); }, 500);
-    var proj={ template:"hopecenter_v1", city:city, project:program, job:job };
-    var jb64=btoa(unescape(encodeURIComponent(JSON.stringify(proj,null,2))));
-    return Auth.notify([{filename:base+"_Story.png",b64:r[0]},{filename:base+"_Poster.png",b64:r[1]},{filename:base+".json",b64:jb64}], "We’re Hiring — "+job, "Hope Center");
-  }).then(function(res){
+  }).then(function(){
     if(btn) btn.disabled=false;
-    if(res&&res.ok){ hcMsg("✓ تم التحميل والإرسال بالإيميل",false); }
-    else { hcMsg("تم التحميل ✓ — تعذّر الإرسال: "+((res&&res.error)||""),true); }
+    hcMsg("✓ تم التحميل",false);
   }).catch(function(e){ if(btn) btn.disabled=false; hcMsg("خطأ: "+(e&&e.message||e),true); });
 }
 // Mirrors showUserBar() for the Hope Center panel.
@@ -3652,6 +3618,8 @@ $("hcExportBtn").onclick=hcExport;
 </script>
 <style>
 /* ===== الأرشيف: كل تصميم يُنزَّل، مع ملف مشروعه ===== */
+.arc-saved{position:fixed;z-index:8000;transform:translateX(-50%);background:#fff;color:#003c54;border:1.5px solid #003c54;border-radius:999px;padding:7px 16px;font-family:'Somar Sans',system-ui,sans-serif;font-size:13px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.12);white-space:nowrap;transition:opacity .45s;pointer-events:none;}
+.arc-saved.out{opacity:0;}
 .arc-note{font-size:11px;font-weight:600;color:#8a8a8d;text-align:center;margin-top:6px;font-family:'Somar Sans',system-ui,sans-serif;}
 #arcPage{position:fixed;inset:0;z-index:9000;background:#eef1f3;overflow:auto;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;display:none;}
 #arcPage.on{display:block;}
@@ -3761,7 +3729,33 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
       meta.thumb=t; meta.fileSize=file.size; meta.projSize=0;
       var m=new TextEncoder().encode(JSON.stringify(meta)), h=new Uint8Array(4); new DataView(h.buffer).setUint32(0,m.length);
       return fetch(WORKER+"/archive",{method:"POST",headers:{"Authorization":"Bearer "+tok(),"Content-Type":"application/octet-stream"},body:new Blob([h,m,file])});
-    }).then(function(r){ if(!r.ok) console.warn("archive: HTTP "+r.status); }).catch(function(e){ console.warn("archive",e); });
+    }).then(function(r){ if(r.ok) savedNote(meta.project); else console.warn("archive: HTTP "+r.status); }).catch(function(e){ console.warn("archive",e); });
+  }
+  /* «✓ تم الحفظ في الأرشيف» under the preview poster, once the Worker has the copy. */
+  var STAGE={"study-zone":"stage","hope-center":"hcStage","children-university":"cuStage","leap":"lpStage","disc":"dcStage"};
+  var SAVED_INK={"hope-center":"#be1f24","study-zone":"#003c54","children-university":"#003c54","leap":"#053c54","disc":"#023c54"};   // the project's own red or navy
+  var EXPORT_BTN={"study-zone":"exportBtn","hope-center":"hcExportBtn","children-university":"cuExportBtn","leap":"lpExportBtn","disc":"dcExportBtn"};
+  /* The archive often answers while the generator is still exporting (Study Zone
+     renders several sizes, the preview blown up meanwhile): wait for its DOWNLOAD
+     button to come back, so the note sits under the poster where it settles. */
+  function savedNote(slug,tries){
+    var eb=$(EXPORT_BTN[slug]);
+    if(eb&&eb.disabled&&(tries||0)<150){ setTimeout(function(){ savedNote(slug,(tries||0)+1); },200); return; }
+    setTimeout(function(){ showSaved(slug); },120);
+  }
+  function showSaved(slug){
+    var st=$(STAGE[slug]); if(!st||!st.offsetParent) return;
+    var old=document.querySelector(".arc-saved"); if(old) old.remove();
+    var r=st.getBoundingClientRect(), n=document.createElement("div"); n.className="arc-saved"; n.textContent="✓ تم الحفظ في الأرشيف";
+    n.style.color=n.style.borderColor=SAVED_INK[slug]||"#003c54";
+    document.body.appendChild(n);
+    // under the poster's visible part (a preview can run past the window, as Study Zone's does),
+    // or just inside its bottom edge when the window ends first
+    var bottom=Math.min(r.bottom,window.innerHeight), h=n.offsetHeight;
+    var top=bottom+10+h<=window.innerHeight-8?bottom+10:bottom-h-14;
+    var left=Math.max(r.left,0)+(Math.min(r.right,window.innerWidth)-Math.max(r.left,0))/2;
+    n.style.top=Math.max(8,top)+"px"; n.style.left=left+"px";
+    setTimeout(function(){ n.classList.add("out"); setTimeout(function(){ n.remove(); },500); },3500);
   }
 
   /* ----- the archive page ----- */
