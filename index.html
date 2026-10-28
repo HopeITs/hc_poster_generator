@@ -1202,6 +1202,26 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       <span class="role-badge" id="dcRoleBadge"></span>
     </div>
     <div class="panel-body">
+      <div class="field"><label>النموذج</label>
+        <select id="dcTpl">
+          <option value="1" selected>نموذج 1 — دورة</option>
+          <option value="2">نموذج 2 — شهادة (Testimony)</option>
+        </select></div>
+      <div class="dc-t2" style="display:none">
+      <div class="sec-divider">الصورة الشخصية</div>
+      <div class="field"><label>الصورة <span class="hint">PNG بدون خلفية أفضل — بيطلعلها إطار أبيض لحالها</span> <button type="button" class="lp-reset" id="dcPhotoReset" style="display:none">استعادة الافتراضي</button></label>
+        <label class="upload has" id="dcPhotoUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="dcPhotoFile"></label></div>
+      <div class="sec-divider">الشهادة</div>
+      <div class="field"><label>النص <span class="hint">سطر لكل صف</span></label>
+        <textarea id="dcQuote" rows="6" dir="auto">Working with this team
+completely changed how we
+run our business. They were
+responsive, thoughtful, and
+always one step ahead of
+what we needed.</textarea></div>
+      <div class="field"><label>الاسم</label><input type="text" id="dcName" value="Wissam Mssady" dir="auto"></div>
+      </div>
+      <div class="dc-t1">
       <div class="sec-divider">العنوان</div>
       <div class="field"><label>العنوان الرئيسي</label><input type="text" id="dcTitle" value="احترف الحاسوب الآن!"></div>
       <div class="field"><label>العنوان الفرعي</label><input type="text" id="dcSub" value="(دورة شاملة لتطوير مهاراتك الرقمية)"></div>
@@ -1218,6 +1238,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
       </div>
       <div class="sec-divider">الشريط السفلي</div>
       <div class="field"><label>النص</label><input type="text" id="dcBar" value="رابط التسجيل في البايو"></div>
+      </div>
     </div>
     <div class="export-bar">
       <div class="proj-row">
@@ -3156,23 +3177,63 @@ $("hcExportBtn").onclick=hcExport;
      PDF space is y-up, hence the flip). It stretches with the words. */
   var DC_SWOOSH={d:"M0 0C26.749 2.46 53.591 4.41 80.471 3.955C107.109 3.504 133.625 .662 160.093-2.174C163.927-2.585 163.898 3.419 160.093 3.826C133.625 6.662 107.109 9.504 80.471 9.955C53.591 10.41 26.749 8.46 0 6C-3.813 5.649-3.85-.354 0 0Z",
                  runW:168, dx:0.9, dy:21.83};
-  var DC={project:null,assets:{},ready:false,heroUser:null};
-  var DC_ASSETS={bg:"assets/disc/bg.png",hero:"assets/disc/hero.png"};
+  /* Template 2 — «Testimony» ("005DISC_SYR_Testimony.pdf"): a collage with a
+     person's photo, a torn grey card with an English quote, and the name.
+     The collage is two pictures: what lies behind the photo (t2-bg, the
+     designer's own export), and what lies over it (t2-front, the PDF at 2×,
+     transparent: the header, the card, the quote marks, the cloud, the
+     megaphone, the hand). The photo goes between them, clipped by the PDF's
+     frame, with a white "sticker" edge drawn from its own transparency, and
+     the text on top, turned as in the file. The quote is Somar Sans
+     Light and the name SemiBold — with Latin letters, which the page's
+     embedded Somar faces lack, so this template loads its own two files. */
+  var DC_T2={
+    clip:"M280.05 344.75C235.28 366.90 199.28 403.23 177.32 447.39L199.28 684.72C209.15 697.81 220.38 709.77 232.75 720.40L557.68 690.34C569.37 675.78 579.28 659.78 587.11 642.70L566.28 417.56C536.44 375.26 492.65 343.96 442.27 329.74Z",
+    photo:{w:1626,h:1541,m:"0.238867 -0.022098 0.022100 0.238886 168.780553 355.043310"},   // the PDF's image matrix, for an image 1626×1541 px
+    quote:{x:275.17,y:717.68,rot:-2.572,sz:37,step:45.99,maxW:530,maxLines:6,w:300,fill:"#ffffff"},
+    name:{x:642.11,y:1055.39,rot:-3.692,sz:24,w:600,fill:"#6d6e71",arW:195},
+    sticker:36    // the photo's white edge, in its pixels (≈ 8.6 poster units)
+  };
+  var DC={project:null,assets:{},heroUser:null,photoUser:null,tpl:1};
+  var DC_ASSETS={bg:"assets/disc/bg.png",hero:"assets/disc/hero.png",
+                 t2back:"assets/disc/t2-bg.jpg",t2front:"assets/disc/t2-front.png",t2person:"assets/disc/t2-person.png"};
+  var DC_TPL_ASSETS={1:["bg","hero"],2:["t2back","t2front","t2person"]};
+  var DC_T2_FONTS=[{w:300,url:"assets/disc/SomarSans-Light.otf"},{w:600,url:"assets/disc/SomarSans-SemiBold.otf"}], DC_T2_FAM="DISC Somar";
 
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function val(id){ var e=$(id); return e?String(e.value||""):""; }
   function todayMMDDYYYY(){ var d=new Date(); function p(n){return(n<10?"0":"")+n;} return p(d.getMonth()+1)+p(d.getDate())+d.getFullYear(); }
 
-  /* Pictures as data: URIs: an SVG drawn through <img> for the export cannot load files. */
-  function dcLoadAssets(cb){
-    if(DC.ready){ cb&&cb(); return; }
-    var keys=Object.keys(DC_ASSETS), todo=keys.length;
-    keys.forEach(function(k){
-      fetch(DC_ASSETS[k]).then(function(r){ return r.blob(); }).then(function(b){
-        return new Promise(function(res){ var fr=new FileReader(); fr.onload=function(){ DC.assets[k]=fr.result; res(); }; fr.readAsDataURL(b); });
-      }).catch(function(){ DC.assets[k]=DC_ASSETS[k]; }).then(function(){ if(--todo===0){ DC.ready=true; cb&&cb(); } });
+  function dataURL(url){
+    return fetch(url).then(function(r){ return r.blob(); }).then(function(b){
+      return new Promise(function(res){ var fr=new FileReader(); fr.onload=function(){ res(fr.result); }; fr.readAsDataURL(b); });
     });
   }
+  /* Pictures as data: URIs: an SVG drawn through <img> for the export cannot
+     load files. Only the open template's pictures (template 2's are ~4 MB). */
+  function dcLoadAssets(cb){
+    var keys=DC_TPL_ASSETS[DC.tpl].filter(function(k){ return !DC.assets[k]; }), todo=keys.length;
+    var fonts=DC.tpl===2?dcLoadT2Fonts():Promise.resolve();
+    if(!todo){ fonts.then(function(){ cb&&cb(); }); return; }
+    keys.forEach(function(k){
+      dataURL(DC_ASSETS[k]).then(function(u){ DC.assets[k]=u; }, function(){ DC.assets[k]=DC_ASSETS[k]; })
+        .then(function(){ if(--todo===0) fonts.then(function(){ cb&&cb(); }); });
+    });
+  }
+  /* Template 2's own Somar Light and SemiBold: in the page for the preview,
+     and as data: URIs in the exported SVG. */
+  var _dcT2Fonts=null;
+  function dcLoadT2Fonts(){
+    if(_dcT2Fonts) return _dcT2Fonts;
+    _dcT2Fonts=Promise.all(DC_T2_FONTS.map(function(f){
+      return dataURL(f.url).then(function(u){
+        f.data=u.replace(/^data:[^;,]*/,"data:font/otf");
+        var ff=new FontFace(DC_T2_FAM,"url("+f.data+")",{weight:String(f.w)}); document.fonts.add(ff); return ff.load();
+      });
+    })).catch(function(){});
+    return _dcT2Fonts;
+  }
+  function dcT2FontCSS(){ return DC_T2_FONTS.filter(function(f){ return f.data; }).map(function(f){ return "@font-face{font-family:'"+DC_T2_FAM+"';font-weight:"+f.w+";src:url("+f.data+") format('opentype');}"; }).join(""); }
   /* Somar Sans SemiBold, Bold and ExtraBold from the page's own @font-face rules, for the export. */
   var _dcFonts=null;
   function dcFontCSS(){
@@ -3191,7 +3252,7 @@ $("hcExportBtn").onclick=hcExport;
     _dcFonts=out; return out;
   }
   var _dcCtx=null;
-  function width(t,w,sz){ if(!_dcCtx) _dcCtx=document.createElement("canvas").getContext("2d"); _dcCtx.font=w+" "+sz+"px 'Somar Sans'"; return _dcCtx.measureText(t).width; }
+  function width(t,w,sz,fam){ if(!_dcCtx) _dcCtx=document.createElement("canvas").getContext("2d"); _dcCtx.font=w+" "+sz+"px '"+(fam||"Somar Sans")+"'"; return _dcCtx.measureText(t).width; }
   /* One centred RTL line, shrunk to fit when it would run past DC_MAXW. */
   function line(o,txt,fill){
     if(!txt.trim()) return "";
@@ -3214,10 +3275,41 @@ $("hcExportBtn").onclick=hcExport;
   }
   function img(src,b){ return '<image href="'+src+'" xlink:href="'+src+'" x="'+b.x+'" y="'+b.y+'" width="'+b.w+'" height="'+b.h+'" preserveAspectRatio="xMidYMid meet"/>'; }
 
+  /* Template 2: lines of text turned as in the file. The quote keeps its six
+     designed lines' place: more lines, or a line wider than the card, make the
+     type smaller. Arabic runs from the card's right edge. */
+  var AR=/[؀-ۿ]/;
+  function t2Quote(){
+    var Q=DC_T2.quote, ls=val("dcQuote").split(/\r?\n/).filter(function(l){ return l.trim()!==""; });
+    if(!ls.length) return "";
+    var ar=AR.test(ls.join("")), wide=Math.max.apply(null,ls.map(function(l){ return width(l,Q.w,Q.sz,DC_T2_FAM); }));
+    var k=Math.min(1,Q.maxW/wide,Q.maxLines/ls.length), sz=Q.sz*k, step=Q.step*k;
+    var s='<text xml:space="preserve" transform="translate('+Q.x+' '+Q.y+') rotate('+Q.rot+')" font-family="'+DC_T2_FAM+'" font-weight="'+Q.w+'" font-size="'+sz.toFixed(2)+'" fill="'+Q.fill+'"'+(ar?' direction="rtl" text-anchor="start"':' direction="ltr"')+'>';   // the page is RTL: English says so
+    ls.forEach(function(l,i){ s+='<tspan x="'+(ar?Q.maxW:0)+'" y="'+(i*step).toFixed(2)+'">'+esc(l)+'</tspan>'; });
+    return s+'</text>';
+  }
+  function t2Name(){
+    var N=DC_T2.name, t=val("dcName").trim(); if(!t) return "";
+    var ar=AR.test(t);
+    return '<text xml:space="preserve" transform="translate('+N.x+' '+N.y+') rotate('+N.rot+')" x="'+(ar?N.arW:0)+'" font-family="'+DC_T2_FAM+'" font-weight="'+N.w+'" font-size="'+N.sz+'" fill="'+N.fill+'"'+(ar?' direction="rtl" text-anchor="start"':' direction="ltr"')+'>'+esc(t)+'</text>';
+  }
+  function t2SVG(s){
+    var T=DC_T2, A=DC.assets, P=T.photo, user=DC.photoUser;
+    var pic='<image href="'+(user||A.t2person||DC_ASSETS.t2person)+'" xlink:href="'+(user||A.t2person||DC_ASSETS.t2person)+'" width="'+P.w+'" height="'+P.h+'" preserveAspectRatio="xMidYMax meet"/>';
+    s+='<defs><clipPath id="dcT2Clip"><path d="'+T.clip+'"/></clipPath>'+
+       '<filter id="dcT2Sticker" x="-15%" y="-15%" width="130%" height="130%"><feMorphology in="SourceAlpha" operator="dilate" radius="'+T.sticker+'" result="d"/><feFlood flood-color="#ffffff"/><feComposite in2="d" operator="in"/></filter></defs>';
+    s+=img(A.t2back||DC_ASSETS.t2back,{x:0,y:0,w:W,h:H});
+    s+='<g transform="matrix('+P.m+')" filter="url(#dcT2Sticker)">'+pic+'</g>';   // the photo's white edge, cut to whoever is in it
+    s+='<g clip-path="url(#dcT2Clip)"><g transform="matrix('+P.m+')">'+pic+'</g></g>';
+    s+=img(A.t2front||DC_ASSETS.t2front,{x:0,y:0,w:W,h:H});
+    s+=t2Quote()+t2Name();
+    return s+'</svg>';
+  }
   function dcSVG(withFonts){
     var L=DC_LAY, C=DC_COL, A=DC.assets;
     var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+W+' '+H+'" width="'+W*(withFonts?OUT:1)+'" height="'+H*(withFonts?OUT:1)+'">';
-    if(withFonts) s+='<defs><style>'+dcFontCSS()+'</style></defs>';
+    if(withFonts) s+='<defs><style>'+(DC.tpl===2?dcT2FontCSS():dcFontCSS())+'</style></defs>';
+    if(DC.tpl===2) return t2SVG(s);
     s+=img(A.bg||DC_ASSETS.bg,{x:0,y:0,w:W,h:H});
     s+=img(DC.heroUser||A.hero||DC_ASSETS.hero,L.hero);
     s+=line(L.title,val("dcTitle"),C.navy);
@@ -3235,7 +3327,26 @@ $("hcExportBtn").onclick=hcExport;
   }
   function dcRender(){ var w=$("dcSvg"); if(!w) return; w.innerHTML=dcSVG(false); dcFit(); }
   window.addEventListener("resize",function(){ if($("dcApp")&&$("dcApp").classList.contains("on")) dcFit(); });
-  ["dcTitle","dcSub","dcLine1","dcLine2","dcReg","dcRegHl","dcBar"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",dcRender); });
+  ["dcTitle","dcSub","dcLine1","dcLine2","dcReg","dcRegHl","dcBar","dcQuote","dcName"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",dcRender); });
+  /* النموذج: its own fields, pictures and fonts. */
+  function dcSetTpl(n){
+    DC.tpl=n===2?2:1; if($("dcTpl")) $("dcTpl").value=String(DC.tpl);
+    [].forEach.call(document.querySelectorAll("#dcApp .dc-t1"),function(e){ e.style.display=DC.tpl===1?"":"none"; });
+    [].forEach.call(document.querySelectorAll("#dcApp .dc-t2"),function(e){ e.style.display=DC.tpl===2?"":"none"; });
+    dcRender(); dcLoadAssets(dcRender);
+  }
+  if($("dcTpl")) $("dcTpl").addEventListener("change",function(){ dcSetTpl(+this.value); });
+  function dcSetPhoto(src){
+    DC.photoUser=src||null;
+    var up=$("dcPhotoUp"); if(up) up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"✓ الصورة الافتراضية";
+    var rs=$("dcPhotoReset"); if(rs) rs.style.display=src?"":"none";
+    dcRender();
+  }
+  if($("dcPhotoFile")) $("dcPhotoFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ dcSetPhoto(r.result); }; r.readAsDataURL(f); e.target.value="";
+  });
+  if($("dcPhotoReset")) $("dcPhotoReset").onclick=function(e){ e.preventDefault(); dcSetPhoto(null); };
 
   function dcSetHero(src){
     DC.heroUser=src||null;
@@ -3258,7 +3369,7 @@ $("hcExportBtn").onclick=hcExport;
         var im=new Image();
         im.onload=function(){
           var c=document.createElement("canvas"); c.width=W*OUT; c.height=H*OUT; c.getContext("2d").drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url);
-          var a=document.createElement("a"); a.download="DISC_"+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
+          var a=document.createElement("a"); a.download="DISC_"+(DC.tpl===2?"Testimony_":"")+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
           done();
         };
         im.onerror=function(){ URL.revokeObjectURL(url); alert("خطأ بالتصدير (SVG)"); done(); };
@@ -3268,16 +3379,18 @@ $("hcExportBtn").onclick=hcExport;
   }
   if($("dcExportBtn")) $("dcExportBtn").onclick=dcExport;
 
-  var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar"};
-  function dcCollect(){ var d={app:"disc",v:1}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; return d; }
+  var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar",quote:"dcQuote",name:"dcName"};
+  function dcCollect(){ var d={app:"disc",v:2,tpl:DC.tpl}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; d.photo=DC.photoUser||null; return d; }
   function dcLoad(d){
     if(!d||typeof d!=="object"||d.app!=="disc"){ alert("بنية غير صحيحة"); return; }
     for(var k in DC_FIELDS){ var e=$(DC_FIELDS[k]); if(e&&typeof d[k]==="string") e.value=d[k]; }
+    DC.photoUser=d.photo||null; dcSetPhoto(DC.photoUser);
     dcSetHero(d.image||null);
+    dcSetTpl(d.tpl===2?2:1);   // v1 projects were template 1
   }
   if($("dcSaveBtn")) $("dcSaveBtn").onclick=function(){
     var blob=new Blob([JSON.stringify(dcCollect(),null,2)],{type:"application/json"});
-    var a=document.createElement("a"); a.download="DISC_"+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
+    var a=document.createElement("a"); a.download="DISC_"+(DC.tpl===2?"Testimony_":"")+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
   };
   if($("dcProjFile")) $("dcProjFile").addEventListener("change",function(e){
     var f=e.target.files[0]; if(!f) return; var r=new FileReader();
