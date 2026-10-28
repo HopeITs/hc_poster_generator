@@ -38,6 +38,23 @@ const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مس�
 // Text Transcription — تفريغ الصور بـ Gemini (تفريغ الجهاز لا يمرّ من هنا)
 const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
 const MEETING_DAILY_MAX     = 30;               // أجزاء اجتماعات (10 دقائق لكل جزء) لكل مستخدم خلال 24 ساعة
+const MAGNIFIC_DAILY_MAX    = 15;               // صور «أسلوب DISC» (Magnific، رصيد مدفوع) لكل مستخدم خلال 24 ساعة
+const MAGNIFIC_API = "https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro";
+// برومبت «أسلوب DISC» كما كتبه فريق التصميم — ثابت هنا، فلا يصلح المفتاح لتوليد أي شيء آخر
+const DISC_STYLE_PROMPT =
+"Transform the subject of the reference image into a clean, modern 3D illustration in the style of premium tech-brand 3D icons. Keep the main subject, composition and idea recognizable, but restyle everything into this look:\n\n" +
+"STYLE: stylized 3D render, simplified chunky shapes, thick rounded edges with large soft bevels, no sharp corners, minimal details, friendly and playful but professional. Any text, symbols, lines or icons become raised, extruded 3D elements attached to surfaces, like soft plastic pieces, never flat drawings.\n\n" +
+"CHARACTERS (if any): turn people or creatures into a cute rounded robot with a capsule-shaped segmented body, a dark screen-face with two glowing white vertical oval eyes, mechanical arms with visible rounded joints, and thin glowing white light strips on the body seams.\n\n" +
+"MATERIALS: soft matte plastic and smooth clay-like surfaces, very subtle satin sheen on the edges, no metallic chrome, no glossy reflections.\n\n" +
+"STRICT COLOR PALETTE (use only these):\n" +
+"- Primary dominant color: deep navy blue #023c54 — for large surfaces, boards, screens, frames, bases and structures.\n" +
+"- Secondary color: silver gray #848484 — for character bodies, devices, arms, joints and mechanical parts.\n" +
+"- Accent color: warm orange #f99d1c — used very sparingly, only on one or two tiny details (a small button, a light, a marker) when needed.\n" +
+"- White only for tiny highlights: eyes, raised text and thin light strips.\n" +
+"No other colors.\n\n" +
+"LIGHTING: soft diffused studio lighting from top-left, gentle ambient occlusion, soft contact shadows, smooth gradients, no harsh shadows.\n\n" +
+"COMPOSITION: isolated object centered, slight three-quarter view, clean silhouette, plain pure white background (or transparent), no environment, no floor texture.\n\n" +
+"RENDER: Blender / Cinema 4D, Octane render quality, ultra-clean, high detail, 4K.";
 const TRANSCRIBE_MAX_IMAGES = 6;
 const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
 const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;
@@ -934,6 +951,81 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
           }, "revise");
           var crNew = crE.error ? [] : momentsRuns(crE.data.moments, crSegs, crText);
           return { ok: true, critique: critique, moments: crNew.length ? crNew : null, plan: crE.error ? "" : String(crE.data.plan || "").slice(0, 1200) };
+        });
+      }
+
+      /* ---- DISC: صورة مرجعية مؤقتة ----
+         Magnific يقرأ الصورة المرجعية من رابط عام فقط، فتُحفظ هنا برقم عشوائي (64 خانة hex)
+         لعشر دقائق على الأكثر، وتُحذف حين ينتهي الطلب. لا يُعرض شيء غيرها. */
+      if (request.method === "GET" && path.indexOf("/tmp-img/") === 0) {
+        var tiId = path.slice(9);
+        if (!/^[a-f0-9]{64}$/.test(tiId)) return new Response("not found", { status: 404 });
+        var ti = await env.DB.prepare("SELECT mime, data FROM tmp_images WHERE id=?1 AND at>datetime('now','-10 minutes')").bind(tiId).first();
+        if (!ti) return new Response("not found", { status: 404 });
+        var tiBin = atob(ti.data), tiBytes = new Uint8Array(tiBin.length);
+        for (var tk = 0; tk < tiBin.length; tk++) tiBytes[tk] = tiBin.charCodeAt(tk);
+        return new Response(tiBytes, { headers: { "Content-Type": ti.mime, "Cache-Control": "no-store" } });
+      }
+
+      /* ---- DISC: «حوّل لأسلوب DISC» — Magnific API، Nano Banana Pro بدقة 1K ----
+         لمن يملك مشروع DISC. JSON {image: data URL (PNG/JPEG/WebP)}. الصورة تُحفظ مؤقتاً
+         (/tmp-img) ويُطلب من Magnific تحويلها بـ DISC_STYLE_PROMPT، ثم يُسأل عن المهمة حتى
+         تكتمل، وتُعاد الصورة الناتجة. رصيد Magnific مدفوع: حد يومي لكل مستخدم.
+         الرد يتدفّق (slowJSON): {ok, image: data URL} أو {error}. */
+      if (request.method === "POST" && path === "/disc/restyle") {
+        var rsUser = await getSessionUser(env, request);
+        if (!rsUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, rsUser, "disc"))) return json({ error: "لا صلاحية" }, 403);
+        if (!env.MAGNIFIC_API_KEY) return json({ error: "مفتاح Magnific غير مضبوط" }, 500);
+        if ((await usedToday(env, rsUser.email, "magnific")) >= MAGNIFIC_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتحويل الصور (" + MAGNIFIC_DAILY_MAX + "). جرّب بكرا." }, 429);
+        var rsIn = await request.json().catch(function () { return null; });
+        var rsM = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(rsIn && rsIn.image || "");
+        if (!rsM || rsM[2].length > 4 * 1024 * 1024) return json({ error: "صورة غير صالحة أو أكبر من المسموح" }, 400);
+        var rsOrigin = new URL(request.url).origin;
+        return slowJSON(async function () {
+          var H = { "Content-Type": "application/json", "x-magnific-api-key": String(env.MAGNIFIC_API_KEY).trim() };   // a pasted key often brings a newline along
+          await env.DB.prepare("DELETE FROM tmp_images WHERE at<datetime('now','-10 minutes')").run();
+          var rsId = makeToken();
+          await env.DB.prepare("INSERT INTO tmp_images (id, mime, data) VALUES (?1, ?2, ?3)").bind(rsId, rsM[1], rsM[2]).run();
+          function magErr(st, d) {
+            var msg = (d && (d.message || (d.error && (d.error.message || d.error)) || d.detail)) || "";
+            return st === 401 ? "مفتاح Magnific غير صالح" : st === 402 || /credit/i.test(String(msg)) ? "رصيد Magnific ما بيكفي" :
+                   st === 429 ? "Magnific مضغوط حالياً — جرّب بعد دقيقة" : "Magnific: " + (String(msg).slice(0, 160) || "HTTP " + st);
+          }
+          try {
+            var st = await fetch(MAGNIFIC_API, { method: "POST", headers: H, body: JSON.stringify({
+              prompt: DISC_STYLE_PROMPT, reference_images: [{ image: rsOrigin + "/tmp-img/" + rsId, mime_type: rsM[1] }], aspect_ratio: "4:3", resolution: "1K" }) });
+            var sd = await st.json().catch(function () { return {}; });
+            console.log("magnific start " + st.status + " " + JSON.stringify(sd).slice(0, 600));
+            if (!st.ok) return { error: magErr(st.status, sd) };
+            var task = sd.data && sd.data.task_id;
+            if (!task) return { error: "Magnific ما رجّع رقم مهمة" };
+            await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'magnific', datetime('now'))").bind(rsUser.email).run();
+            // The task runs on Magnific's side: ask every few seconds. Its own path first; the
+            // list of all tasks as a fallback (the docs only describe that one for sure).
+            var urls = null, t0 = Date.now(), last = "";
+            while (Date.now() - t0 < 180000) {
+              await new Promise(function (r) { setTimeout(r, 4000); });
+              var g = await fetch(MAGNIFIC_API + "/" + task, { headers: H }), gd = await g.json().catch(function () { return {}; });
+              var item = g.ok ? gd.data : null;
+              if (!g.ok && g.status === 404) {
+                var l = await fetch(MAGNIFIC_API, { headers: H }), ld = await l.json().catch(function () { return {}; });
+                item = (Array.isArray(ld.data) ? ld.data : []).filter(function (x) { return x && x.task_id === task; })[0] || null;
+              }
+              if (!item) { last = "HTTP " + g.status; continue; }
+              last = item.status;
+              if (item.status === "COMPLETED") { urls = item.generated || []; break; }
+              if (item.status === "FAILED") { console.log("magnific failed " + JSON.stringify(item).slice(0, 600)); return { error: "Magnific ما قدر يولّد الصورة" }; }
+            }
+            console.log("magnific " + task + " " + last + " after " + (Date.now() - t0) + "ms");
+            if (!urls) return { error: "Magnific طوّل كتير (" + last + ") — جرّب مرة تانية" };
+            if (!urls.length) return { error: "Magnific ما رجّع صورة" };
+            var im = await fetch(urls[0]);
+            if (!im.ok) return { error: "تعذّر تنزيل الصورة من Magnific" };
+            return { ok: true, image: "data:" + (im.headers.get("content-type") || "image/png").split(";")[0] + ";base64," + base64(await im.arrayBuffer()) };
+          } finally {
+            await env.DB.prepare("DELETE FROM tmp_images WHERE id=?1").bind(rsId).run();
+          }
         });
       }
 

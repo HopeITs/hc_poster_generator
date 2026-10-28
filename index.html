@@ -1119,6 +1119,11 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 .dc-app .panel{display:flex;flex-direction:column;overflow:hidden;}
 .dc-app .panel-body{flex:1 1 auto;min-height:0;overflow-y:auto;}
 .dc-svg svg{display:block;}
+.dc-ai{width:100%;margin-top:8px;background:#023c54;color:#fff;border:none;border-radius:10px;padding:11px;font-family:'Somar Sans';font-weight:800;font-size:14px;cursor:pointer;transition:.15s;}
+.dc-ai:hover{filter:brightness(1.15);}
+.dc-ai:disabled{opacity:.6;cursor:default;}
+#dcAiSt{margin-top:6px;line-height:1.6;}
+#dcAiSt.err{color:#c0392b;font-weight:700;}
 .lp-row{display:flex;gap:6px;}
 .lp-row .field{flex:1;min-width:0;}
 .lp-reset{background:none;border:none;color:#6d6e71;font-family:'Somar Sans';font-weight:700;font-size:12px;cursor:pointer;padding:0 4px;text-decoration:underline;}
@@ -1227,7 +1232,9 @@ what we needed.</textarea></div>
       <div class="field"><label>العنوان الفرعي</label><input type="text" id="dcSub" value="(دورة شاملة لتطوير مهاراتك الرقمية)"></div>
       <div class="sec-divider">الصورة</div>
       <div class="field"><label>الصورة الوسطى <span class="hint">PNG شفاف أفضل</span> <button type="button" class="lp-reset" id="dcImgReset" style="display:none">استعادة الافتراضي</button></label>
-        <label class="upload has" id="dcImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="dcImgFile"></label></div>
+        <label class="upload has" id="dcImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="dcImgFile"></label>
+        <button type="button" class="dc-ai" id="dcAiBtn">✦ حوّل لأسلوب DISC (AI)</button>
+        <div class="hint" id="dcAiSt">ارفع صورة لموضوع البوستر، وبتتحوّل لرسمة ثلاثية الأبعاد بألوان DISC (Magnific · Nano Banana Pro)</div></div>
       <div class="sec-divider">المحتوى</div>
       <div class="field"><label>السطر العريض</label><input type="text" id="dcLine1" value="تعلّم البرمجة، التصميم والبرامج المكتبية"></div>
       <div class="field"><label>سطر الوصف</label><input type="text" id="dcLine2" value="من الصفر إلى الاحتراف في ثلاث مهارات يطلبها كل سوق عمل"></div>
@@ -1380,6 +1387,12 @@ var Auth = (function(){
           proofread:async function(fields){
             try{ var res=await api("/proofread","POST",{fields:fields});
                  return res.ok?{ok:true,fields:res.data.fields||[]}:{ok:false,error:(res.data&&res.data.error)||"فشل التدقيق"}; }
+            catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
+          },
+          /* DISC: the picture in DISC's 3D style (Magnific, through the Worker). Takes a data URL, gives one back. */
+          discRestyle:async function(image){
+            try{ var res=await api("/disc/restyle","POST",{image:image});
+                 return (res.ok&&res.data&&res.data.image)?{ok:true,image:res.data.image}:{ok:false,error:(res.data&&res.data.error)||"فشل التحويل"}; }
             catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
           },
           listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify};
@@ -3363,6 +3376,59 @@ $("hcExportBtn").onclick=hcExport;
     r.onload=function(){ dcSetHero(r.result); }; r.readAsDataURL(f); e.target.value="";
   });
   if($("dcImgReset")) $("dcImgReset").onclick=function(e){ e.preventDefault(); dcSetHero(null); };
+
+  /* «حوّل لأسلوب DISC»: the uploaded picture, as a reference, becomes a 3D
+     illustration in DISC's colours (Magnific, Nano Banana Pro 1K, through the
+     Worker). It comes back on white; the white touching the edges is taken
+     out (a flood from the border, so white inside the subject — eyes, light
+     strips — stays), and the result replaces the picture. */
+  function dcShrink(src,max){
+    return new Promise(function(res,rej){
+      var im=new Image();
+      im.onload=function(){
+        var k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement("canvas");
+        c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k);
+        var g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height);
+        res(c.toDataURL("image/jpeg",0.9));
+      };
+      im.onerror=function(){ rej(new Error("تعذّر قراءة الصورة")); }; im.src=src;
+    });
+  }
+  function dcCutWhite(src){
+    return new Promise(function(res){
+      var im=new Image();
+      im.onload=function(){
+        var w=im.naturalWidth,h=im.naturalHeight,c=document.createElement("canvas"); c.width=w; c.height=h;
+        var g=c.getContext("2d"); g.drawImage(im,0,0); var d=g.getImageData(0,0,w,h), p=d.data;
+        var seen=new Uint8Array(w*h), stack=[], TH=232;
+        function white(i){ return p[i*4]>=TH&&p[i*4+1]>=TH&&p[i*4+2]>=TH; }
+        for(var x=0;x<w;x++){ stack.push(x,(h-1)*w+x); } for(var y=0;y<h;y++){ stack.push(y*w,y*w+w-1); }
+        while(stack.length){
+          var i=stack.pop(); if(seen[i]||!white(i)) continue; seen[i]=1; p[i*4+3]=0;
+          var cx=i%w, cy=(i-cx)/w;
+          if(cx>0) stack.push(i-1); if(cx<w-1) stack.push(i+1); if(cy>0) stack.push(i-w); if(cy<h-1) stack.push(i+w);
+        }
+        // soften the cut: a pixel next to the cleared area keeps part of its white as transparency
+        for(var j=0;j<w*h;j++){ if(seen[j]||p[j*4+3]===0) continue; var jx=j%w;
+          if((jx>0&&seen[j-1])||(jx<w-1&&seen[j+1])||(j>=w&&seen[j-w])||(j<w*h-w&&seen[j+w])){ var l=(p[j*4]+p[j*4+1]+p[j*4+2])/3; if(l>200) p[j*4+3]=Math.round(255*(255-l)/55); } }
+        g.putImageData(d,0,0); res(c.toDataURL("image/png"));
+      };
+      im.onerror=function(){ res(src); }; im.src=src;
+    });
+  }
+  if($("dcAiBtn")) $("dcAiBtn").onclick=async function(){
+    var btn=this, st=$("dcAiSt");
+    if(!DC.heroUser){ st.className="hint err"; st.textContent="ارفع صورة أولاً من «الصورة الوسطى»، وبعدين اضغط التحويل"; return; }
+    if(typeof Auth==="undefined"||!Auth.discRestyle){ st.className="hint err"; st.textContent="غير متاح"; return; }
+    btn.disabled=true; var lbl=btn.textContent; btn.textContent="…جارٍ التحويل (حتى دقيقة)"; st.className="hint"; st.textContent="الصورة بتنبعت لـ Magnific وبترجع رسمة ثلاثية الأبعاد";
+    try{
+      var res=await Auth.discRestyle(await dcShrink(DC.heroUser,1024));
+      if(!res.ok){ st.className="hint err"; st.textContent=res.error; return; }
+      dcSetHero(await dcCutWhite(res.image));
+      st.className="hint"; st.textContent="✓ تم التحويل — «استعادة الافتراضي» بترجّع صورة DISC الأصلية";
+    }catch(e){ st.className="hint err"; st.textContent=(e&&e.message)||"فشل التحويل"; }
+    finally{ btn.disabled=false; btn.textContent=lbl; }
+  };
 
   function dcExport(){
     var btn=$("dcExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
