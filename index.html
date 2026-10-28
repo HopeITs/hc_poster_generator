@@ -707,7 +707,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 <div class="app" id="appRoot" style="display:none">
 <div class="panel">
   <div class="panel-head">
-    <h1><span class="wm"><span class="o">S</span>TUDY <span class="o">Z</span>ONE</span> &nbsp;Poster Generator</h1>
+    <h1><span class="wm"><span class="o">S</span>TUDY <span class="o">Z</span>ONE</span></h1>
     <p>ادخل المحتوى، التصميم مقفول بمعايير ثابتة</p>
   </div>
   <div class="user-bar">
@@ -1680,7 +1680,6 @@ $("exportBtn").onclick=function(){
   function capture(i){
     if(i>=targets.length){
       finish();
-      showToast("✓ تم التحميل");
       return;
     }
     var t=targets[i],name=t[0],W=t[1],H=t[2];
@@ -1845,7 +1844,6 @@ function exportModel2(){
     var fn=fileName2();
     var a=document.createElement("a");a.download=fn;a.href=url;a.click();
     btn.disabled=false;btn.textContent="DOWNLOAD";
-    showToast("✓ تم التحميل");
   }).catch(function(err){ alert("خطأ بالتصدير: "+(err&&err.message||err)); $("stage").style.transform=prevT; btn.disabled=false;btn.textContent="DOWNLOAD"; });
 }
 /* The email to the Owner and the Comms Manager after each download is gone: its relay was never
