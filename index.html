@@ -476,8 +476,8 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .proj-card:hover:not(:disabled){border-color:var(--pc-hover,#003c54);background:var(--pc-hover,#003c54);color:#fff;}
 .proj-card:hover:not(:disabled) .proj-go{color:#fff;}
 .proj-card.soon{cursor:not-allowed;opacity:.6;background:#f4f6f8;color:#8697a3;}
-/* A tool this account has no access to: shown with a lock, and it does not open. */
-.proj-card.locked,.proj-card.locked:hover{cursor:not-allowed;border-color:#d8e0e5;background:#f4f6f8;color:#9aa8b2;}
+/* A tool this account has no access to: shown with a lock; a click asks for it. */
+.proj-card.locked,.proj-card.locked:hover{cursor:pointer;border-color:#d8e0e5;background:#f4f6f8;color:#9aa8b2;}
 .pg-ga .proj-card.locked:hover .proj-badge.new{background:#be1f24;color:#fff;}
 .proj-card.locked .proj-badge{opacity:.55;}
 .proj-lock{display:inline-block;width:13px;height:13px;margin-right:8px;vertical-align:-1px;fill:currentColor;}
@@ -1437,6 +1437,12 @@ var Auth = (function(){
                  return (res.ok&&res.data&&res.data.image)?{ok:true,image:res.data.image}:{ok:false,error:(res.data&&res.data.error)||"فشل التحويل"}; }
             catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
           },
+          /* Access requests: a user asks for locked tools; the Owner or the Comms Manager decides each one. */
+          accessMine:async function(){ try{ var r=await api("/access/mine","GET"); return r.ok?{ok:true,requests:r.data.requests||[]}:{ok:false,error:(r.data&&r.data.error)||""}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          accessRequest:async function(slugs,reason){ try{ var r=await api("/access/request","POST",{slugs:slugs,reason:reason}); return r.ok?{ok:true,added:r.data.added||[]}:{ok:false,error:(r.data&&r.data.error)||"فشل إرسال الطلب"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          accessSeen:async function(ids){ try{ await api("/access/seen","POST",{ids:ids}); }catch(e){} },
+          accessList:async function(){ try{ var r=await api("/access/requests","GET"); return r.ok?{ok:true,requests:r.data.requests||[]}:{ok:false,error:(r.data&&r.data.error)||"تعذّر تحميل الطلبات"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          accessDecide:async function(id,approve,note){ try{ var r=await api("/access/decide","POST",{id:id,approve:approve,note:note}); return r.ok?{ok:true}:{ok:false,error:(r.data&&r.data.error)||"فشل الحفظ"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
           /* DISC template 3: a scene with DISC's character, from its description and his reference picture. */
           discScene:async function(scene,ref){
             try{ var res=await api("/disc/scene","POST",{scene:scene,ref:ref});
@@ -2386,7 +2392,7 @@ async function showProjectPicker(){
   // but they live in the tools box under Guidelines Assistant rather than in the project list.
   [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"]].forEach(function(t){
     var a=$(t[1]), p=mine[t[0]]; if(!a) return;
-    a.style.display="";
+    a.style.display=""; a.dataset.slug=t[0];
     setLocked(a,!(p&&p.status==="ready"));
   });
   // The Poster Maker box: these five in this order, then any other project of this account.
@@ -2402,12 +2408,13 @@ async function showProjectPicker(){
     card.type="button";
     card.className="proj-card"+(p.locked||ready?"":" soon");
     card.disabled=!p.locked&&!ready;   // a locked card stays enabled, so its hint shows on hover
-    card.innerHTML='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
+    card.innerHTML='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>'; card.dataset.slug=p.slug;
     if(PROJ_HINT[p.slug]) card.setAttribute("data-hint",PROJ_HINT[p.slug]);
     if(p.locked) setLocked(card,true);
     else if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); card.onclick=function(){ selectProject(p); }; }
     grid.appendChild(card);
   });
+  if(window.accApply) accApply();   // requests: ⏳ on asked-for tools, new decisions, the approvers' count
 }
 var LOCK_SVG='<svg class="proj-lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2h.5A1.5 1.5 0 0 1 13.5 8.5v5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 4 7zm1.6 0h3.8V5a1.9 1.9 0 0 0-3.8 0z"/></svg>';
 /* A tool card with or without its lock: the hint then says why it does not open. */
@@ -2420,11 +2427,11 @@ function setLocked(el,on){
   // always left of the name: first in an English (LTR) name, last in an RTL one
   if(on&&name&&!lk) name.insertAdjacentHTML(getComputedStyle(name).direction==="ltr"?"afterbegin":"beforeend",LOCK_SVG);
   if(!on&&lk) lk.remove();
-  // what the tool does, then why it does not open (the hint keeps line breaks)
-  var why="ما عندك صلاحية على هي الأداة، تواصل مع مديرك لو محتاج تستخدمها";
+  // what the tool does, then how to get it (the hint keeps line breaks)
+  var why="هي الأداة مو مفعّلة لحسابك، اكبس عليها لتطلب صلاحية";
   if(on) el.setAttribute("data-hint",(el.dataset.toolHint?el.dataset.toolHint+"\n":"")+why);
   else if(el.dataset.toolHint) el.setAttribute("data-hint",el.dataset.toolHint);
-  el.onclick=on?function(e){ e.preventDefault(); }:(el.tagName==="A"?null:el.onclick);
+  el.onclick=on?function(e){ e.preventDefault(); if(window.accOpenRequest) accOpenRequest(el.dataset.slug); }:(el.tagName==="A"?null:el.onclick);
 }
 function selectProject(p){
   $("projectGate").style.display="none";
@@ -4239,6 +4246,211 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   }
   function scan(){ ["#cuApp .panel-body","#lpApp .panel-body","#dcApp .panel-body","#appRoot > .panel > .panel-body",".hc-pbody"].forEach(function(sel){ var c=document.querySelector(sel); if(c) addButton(c); }); }
   if(document.readyState!=="loading") scan(); else document.addEventListener("DOMContentLoaded",scan);
+})();
+</script>
+<style>
+/* ===== طلبات الصلاحيات ===== */
+.proj-card.pending,.proj-card.pending:hover{cursor:default;border-color:#d8e0e5;background:#f4f6f8;color:#9aa8b2;}
+.pg-ga .proj-card.pending:hover .proj-badge.new{background:#be1f24;color:#fff;}
+.proj-card.pending .proj-badge{opacity:.55;}
+/* The request window */
+.acc-back{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;}
+.acc-box{width:min(92vw,420px);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:24px 22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.acc-box h2{margin:0 0 4px;font-size:20px;font-weight:900;color:#be1f24;}
+.acc-box .acc-sub{margin:0 0 14px;font-size:12.5px;color:#6f6e71;line-height:1.6;}
+.acc-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.acc-list label{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid #e1e5e8;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;color:#414042;}
+.acc-list label:has(input:checked){border-color:#be1f24;}
+.acc-list input{accent-color:#be1f24;width:16px;height:16px;margin:0;}
+.acc-list .acc-name{direction:ltr;}
+.acc-box textarea{width:100%;box-sizing:border-box;min-height:70px;border:1px solid #d8e0e5;border-radius:10px;padding:9px 11px;font-family:inherit;font-size:13px;resize:vertical;}
+.acc-box .acc-lbl{font-size:12.5px;font-weight:800;color:#414042;margin-bottom:6px;}
+.acc-box .acc-lbl span{font-weight:600;color:#9aa8b2;}
+.acc-acts{display:flex;gap:8px;margin-top:14px;}
+.acc-acts button{flex:1;border:none;border-radius:10px;padding:11px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;}
+.acc-send{background:#be1f24;color:#fff;} .acc-send:disabled{opacity:.6;cursor:default;}
+.acc-cancel{background:#f1f2f3;color:#414042;}
+.acc-st{font-size:12.5px;font-weight:700;margin-top:10px;min-height:16px;text-align:center;}
+.acc-st.err{color:#c0392b;}
+.acc-toast{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:9600;max-width:min(92vw,520px);background:#be1f24;color:#fff;padding:11px 20px;border-radius:10px;
+  font-family:'Somar Sans',system-ui,sans-serif;font-size:13px;font-weight:700;direction:rtl;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.25);transition:opacity .4s;}
+.acc-toast.out{opacity:0;}
+/* The number of waiting requests on the photo (Owner, Comms Manager) */
+.acct .acc-count{position:absolute;pointer-events:none;top:calc(0.1 * var(--acct-box));left:calc(0.72 * var(--acct-box));min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;
+  border-radius:10px;background:#be1f24;color:#fff;font:800 11px/20px 'Somar Sans',system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff;}
+/* The requests page */
+#accPage{position:fixed;inset:0;z-index:9000;background:#eef1f3;overflow:auto;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;display:none;}
+#accPage.on{display:block;}
+#accPage .acc-tool{font-weight:800;direction:ltr;text-align:right;}
+#accPage .acc-time{display:block;color:#9aa8b2;font-size:11px;margin-top:2px;}
+#accPage .acc-why{color:#58595b;font-size:12.5px;max-width:280px;}
+#accPage .acc-done{font-size:12px;font-weight:700;white-space:nowrap;}
+#accPage .acc-done.ok{color:#1a8a4a;} #accPage .acc-done.no{color:#c0392b;}
+#accPage .acc-done small{display:block;font-weight:600;color:#9aa8b2;direction:ltr;text-align:right;}
+#accPage .acts .ok{color:#1a8a4a;} #accPage .acts .ok:hover{border-color:#1a8a4a;color:#1a8a4a;}
+#accPage .acc-note{display:flex;gap:6px;margin-top:6px;}
+#accPage .acc-note input{flex:1;min-width:120px;border:1px solid #d8e0e5;border-radius:8px;padding:6px 8px;font-family:inherit;font-size:12px;}
+#accPage .acc-note button{background:#be1f24;border:1px solid #be1f24;border-radius:8px;padding:6px 12px;font-family:inherit;font-weight:700;font-size:12px;color:#fff;cursor:pointer;white-space:nowrap;}
+#accPage .acc-note button:hover{background:#a3191e;border-color:#a3191e;}
+#accPage .acc-note button:disabled{opacity:.45;cursor:default;}
+#accPage .acc-note input:focus{outline:none;border-color:#be1f24;}
+</style>
+<script>
+/* ===== طلبات الصلاحيات =====
+   On the tools list, a locked tool opens «طلب صلاحية»: the tool, the other
+   locked ones to add, and an optional reason. A tool asked for shows ⏳ until
+   the Owner or the Comms Manager decides; a new decision shows once, as a
+   toast, as does a tool taken away in «إدارة المستخدمين». They see the waiting requests' number on their photo, and decide
+   each tool on «طلبات الصلاحيات», from the account menu. */
+(function(){
+  var $=function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  var CLOCK='<svg class="proj-lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm0 1.6a4.9 4.9 0 1 0 0 9.8 4.9 4.9 0 0 0 0-9.8zM8.8 4.5v3.2l2.1 1.3-.8 1.3L7.2 8.6V4.5z"/></svg>';
+  function global(){ var u=Auth.current&&Auth.current(); return !!(u&&(u.role==="owner"||u.role==="comms")); }
+  function cards(){ return [].slice.call(document.querySelectorAll("#projectGate .proj-card[data-slug]")); }
+  function cardName(c){ var n=c.querySelector(".proj-name"); if(!n) return c.dataset.slug; n=n.cloneNode(true); [].forEach.call(n.querySelectorAll(".proj-badge,svg"),function(x){ x.remove(); }); return n.textContent.trim(); }
+  function fmtDate(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return s||""; function p(n){ return (n<10?"0":"")+n; } return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear(); }
+  function fmtTime(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return ""; function p(n){ return (n<10?"0":"")+n; } return p(d.getHours())+":"+p(d.getMinutes()); }
+
+  /* A note in the brand red, high enough to clear the page's footer line. */
+  function toast(msg){
+    var t=document.createElement("div"); t.className="acc-toast"; t.textContent=msg; document.body.appendChild(t);
+    setTimeout(function(){ t.classList.add("out"); setTimeout(function(){ t.remove(); },400); },4000);
+  }
+  /* A card asked for: ⏳ in place of the lock, and it waits. */
+  function setPending(c){
+    c.classList.remove("locked"); c.classList.add("pending");
+    var lk=c.querySelector(".proj-lock"); if(lk) lk.outerHTML=CLOCK;
+    c.setAttribute("data-hint",(c.dataset.toolHint?c.dataset.toolHint+"\n":"")+"طلبك قيد المراجعة، رح تنفتح الأداة أول ما ينوافق عليه");
+    c.onclick=function(e){ e.preventDefault(); };
+  }
+
+  /* After the tools list draws: this account's requests on its cards, decisions it has not seen, and for the approvers, the count. */
+  window.accApply=async function(){
+    if(global()){ countWaiting(); return; }
+    var r=await Auth.accessMine(); if(!r.ok) return;
+    var seen=[];
+    r.requests.forEach(function(q){
+      var c=cards().filter(function(x){ return x.dataset.slug===q.slug; })[0];
+      if(q.status==="pending"&&c&&c.classList.contains("locked")) setPending(c);
+      if(q.status==="rejected"&&c&&c.classList.contains("locked"))
+        c.setAttribute("data-hint",(c.dataset.toolHint?c.dataset.toolHint+"\n":"")+"انرفض طلبك"+(q.note?": "+q.note:"")+". فيك تطلبها مرة تانية بعد 7 أيام من الرفض");
+      if(q.status!=="pending"&&!q.seen){
+        seen.push(q.id);
+        toast(q.status==="approved"?"✓ انفتحتلك أداة "+q.name:q.status==="revoked"?"تم إيقاف أداة "+q.name+" لديك":"انرفض طلب "+q.name+(q.note?": "+q.note:""));
+      }
+    });
+    if(seen.length) Auth.accessSeen(seen);
+  };
+
+  var ACC_EXAMPLE={"hope-center":"بدي اعمل بوستر لإعلان وظيفة بـ Hope Center","study-zone":"بدي اعمل بوستر لدورة جديدة بـ Study Zone",
+    "children-university":"بدي اعمل دعوة تخرّج لدفعة الأطفال","disc":"بدي اعمل بوسترات لدورة الشهر الجاي بـ DISC",
+    "leap":"بدي اعمل بوستر لفتح باب التقديم على LEAP","thumbnail-gen":"بدي اعمل صور مصغّرة لفيديوهات القناة",
+    "reels-gen":"بدي اعمل ريلز لنشاطات المشروع","text-transcription":"بدي فرّغ فواتير الشهر بجدول",
+    "meeting-transcription":"بدي فرّغ اجتماعات الفريق الأسبوعية"};
+  /* «طلب صلاحية» */
+  window.accOpenRequest=function(slug){
+    var locked=cards().filter(function(c){ return c.classList.contains("locked"); });
+    if(!locked.length) return;
+    var back=document.createElement("div"); back.className="acc-back";
+    back.innerHTML='<div class="acc-box" role="dialog" aria-modal="true" aria-labelledby="accTitle"><h2 id="accTitle">طلب صلاحية</h2>'+
+      '<p class="acc-sub">اختر الأدوات اللي بدك صلاحية عليها من القائمة</p>'+
+      '<div class="acc-list">'+locked.map(function(c){ return '<label><input type="checkbox" value="'+esc(c.dataset.slug)+'"'+(c.dataset.slug===slug?' checked':'')+'><span class="acc-name">'+esc(cardName(c))+'</span></label>'; }).join("")+'</div>'+
+      '<div class="acc-lbl">ليش بدك ياها؟ <span>(اختياري)</span></div><textarea id="accReason" maxlength="500" dir="auto"></textarea>'+
+      '<div class="acc-acts"><button type="button" class="acc-send">إرسال الطلب</button><button type="button" class="acc-cancel">إلغاء</button></div><div class="acc-st"></div></div>';
+    document.body.appendChild(back);
+    function close(){ back.remove(); document.removeEventListener("keydown",key); }
+    function key(e){ if(e.key==="Escape") close(); }
+    document.addEventListener("keydown",key);
+    back.onclick=function(e){ if(e.target===back) close(); };
+    back.querySelector(".acc-cancel").onclick=close;
+    // the reason's example follows the tool ticked last
+    var why=$("accReason");
+    function example(slug){ why.placeholder="مثلاً: "+(ACC_EXAMPLE[slug]||"بدي استعمل هي الأداة بشغلي اليومي"); }
+    example(slug);
+    back.querySelector(".acc-list").onchange=function(e){
+      var on=[].filter.call(back.querySelectorAll(".acc-list input"),function(i){ return i.checked; });
+      example(e.target.checked?e.target.value:(on.length?on[on.length-1].value:""));
+    };
+    var send=back.querySelector(".acc-send"), st=back.querySelector(".acc-st");
+    send.onclick=async function(){
+      var slugs=[].map.call(back.querySelectorAll(".acc-list input:checked"),function(i){ return i.value; });
+      if(!slugs.length){ st.className="acc-st err"; st.textContent="اختر أداة وحدة على الأقل"; return; }
+      send.disabled=true; send.textContent="…جارٍ الإرسال"; st.textContent="";
+      var r=await Auth.accessRequest(slugs,$("accReason").value.trim());
+      if(!r.ok){ send.disabled=false; send.textContent="إرسال الطلب"; st.className="acc-st err"; st.textContent=r.error; return; }
+      cards().forEach(function(c){ if(slugs.indexOf(c.dataset.slug)>=0&&c.classList.contains("locked")) setPending(c); });
+      close();
+      toast("✓ تم إرسال طلبك بنجاح، بانتظار الموافقة أو الرفض");
+    };
+    var first=back.querySelector(".acc-list input:checked")||back.querySelector(".acc-list input"); if(first) first.focus();
+  };
+
+  /* Approvers: the number of waiting requests on every account photo and in the menu item. */
+  async function countWaiting(){
+    var r=await Auth.accessList(); if(!r.ok) return;
+    var n=r.requests.filter(function(q){ return q.status==="pending"; }).length;
+    [].forEach.call(document.querySelectorAll(".acct"),function(a){
+      var b=a.querySelector(".acc-count");
+      if(!n){ if(b) b.remove(); return; }
+      if(!b){ b=document.createElement("span"); b.className="acc-count"; a.appendChild(b); }
+      b.textContent=n>99?"99+":String(n);
+    });
+    [].forEach.call(document.querySelectorAll(".acct-menu"),function(m){
+      var it=m.querySelector(".acc-menu");
+      if(!it){ it=document.createElement("button"); it.type="button"; it.className="acc-menu"; it.onclick=function(){ openRequests(); }; m.insertBefore(it,m.querySelector(".arc-menu")||m.lastElementChild); }
+      it.textContent="طلبات الصلاحيات"+(n?" ("+n+")":"");
+    });
+  }
+
+  /* «طلبات الصلاحيات»: waiting ones first, each with its own approve and reject; then the last 30 days' decisions. */
+  var rows=[];
+  function openRequests(){
+    var pg=$("accPage");
+    if(!pg){
+      pg=document.createElement("div"); pg.id="accPage";
+      pg.innerHTML='<div class="arc-wrap"><div class="arc-top"><h1>طلبات الصلاحيات</h1><button type="button" class="arc-btn" id="accClose">← رجوع</button></div>'+
+        '<div class="arc-card"><table class="arc-t"><thead><tr><th>الإيميل</th><th>الأداة</th><th>السبب</th><th>التاريخ</th><th></th></tr></thead><tbody id="accBody"></tbody></table>'+
+        '<div class="arc-empty" id="accEmpty" hidden></div></div></div>';
+      document.body.appendChild(pg);
+      $("accClose").onclick=function(){ pg.classList.remove("on"); };
+      document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&pg.classList.contains("on")) pg.classList.remove("on"); });
+      $("accBody").onclick=onAction;
+    }
+    pg.classList.add("on"); load();
+  }
+  async function load(){
+    $("accEmpty").hidden=false; $("accEmpty").textContent="…جارٍ التحميل"; $("accBody").innerHTML="";
+    var r=await Auth.accessList();
+    if(!r.ok){ $("accEmpty").textContent=r.error; return; }
+    rows=r.requests; render(); countWaiting();
+  }
+  function render(){
+    $("accEmpty").hidden=rows.length>0; $("accEmpty").textContent="ما في طلبات";
+    $("accBody").innerHTML=rows.map(function(q,i){
+      var end=q.status==="pending"
+        ?'<div class="acts"><button type="button" class="ok" data-a="ok">موافقة</button><button type="button" class="del" data-a="no">رفض</button></div>'
+        :'<div class="acc-done '+(q.status==="approved"?"ok":"no")+'">'+(q.status==="approved"?"✓ تم إعطاء الصلاحية":q.status==="revoked"?"⊘ تم إيقاف الصلاحية":"✗ تم الرفض")+(q.note?" — "+esc(q.note):"")+'<small>'+esc(q.decided_by||"")+" · "+fmtDate(q.decided_at)+'</small></div>';
+      return '<tr data-i="'+i+'"><td class="em">'+esc(q.email)+'</td><td class="acc-tool">'+esc(q.name)+'</td><td class="acc-why">'+(q.reason?esc(q.reason):'<span style="color:#b6c0c7">—</span>')+'</td><td class="dt">'+fmtDate(q.created_at)+'<small class="acc-time">'+fmtTime(q.created_at)+'</small></td><td>'+end+'</td></tr>';
+    }).join("");
+  }
+  async function onAction(e){
+    var b=e.target.closest("button[data-a]"); if(!b) return;
+    var tr=b.closest("tr"), q=rows[+tr.dataset.i]; if(!q) return;
+    if(b.dataset.a==="no"){   // «رفض» only opens the note; «تأكيد الرفض» rejects
+      var open=tr.querySelector(".acc-note");
+      if(!open){
+        open=document.createElement("div"); open.className="acc-note";
+        open.innerHTML='<input type="text" maxlength="300" placeholder="ملاحظة لصاحب الطلب (اختياري)"><button type="button" data-a="reject">تأكيد الرفض</button>';
+        b.closest(".acts").insertAdjacentElement("afterend",open);
+      }
+      open.querySelector("input").focus(); return;
+    }
+    var note=tr.querySelector(".acc-note input"); [].forEach.call(tr.querySelectorAll("button"),function(x){ x.disabled=true; });
+    var r=await Auth.accessDecide(q.id,b.dataset.a==="ok",note&&b.dataset.a==="reject"?note.value.trim():"");
+    if(!r.ok){ alert(r.error); [].forEach.call(tr.querySelectorAll("button"),function(x){ x.disabled=false; }); return; }
+    load();
+  }
 })();
 </script>
 </body></html>

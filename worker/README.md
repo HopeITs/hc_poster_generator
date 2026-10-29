@@ -60,6 +60,11 @@ wrangler d1 export studyzone-db --remote --output backup.sql
 | POST | `/users/delete` | manage_users |
 | POST | `/users/set-projects` | manage_users |
 | POST | `/users/set-password` | manage_users |
+| GET | `/access/mine` | session |
+| POST | `/access/request` | session |
+| POST | `/access/seen` | session |
+| GET | `/access/requests` | owner / comms |
+| POST | `/access/decide` | owner / comms |
 | GET | `/projects` | session |
 | POST | `/projects/add` | owner |
 | POST | `/projects/update` | owner |
@@ -70,6 +75,28 @@ wrangler d1 export studyzone-db --remote --output backup.sql
 | POST | `/reels/moments` | `reels-gen` access |
 | POST | `/reels/critique` | `reels-gen` access |
 | POST | `/transcribe/images` | `text-transcription` access |
+
+The `/access/*` routes keep access requests in `access_requests`, one row per
+tool. A user asks for locked tools, with an optional reason; the Owner or the
+Comms Manager approves or rejects each one, and an approval adds the project to
+the user at once. The table:
+
+```sql
+CREATE TABLE IF NOT EXISTS access_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  project_id INTEGER NOT NULL,
+  reason TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
+  note TEXT,                                -- the decider's note
+  decided_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  decided_at TEXT,
+  seen INTEGER NOT NULL DEFAULT 0           -- 1 once the requester has seen the decision
+);
+CREATE INDEX IF NOT EXISTS access_requests_email ON access_requests (email);
+CREATE INDEX IF NOT EXISTS access_requests_status ON access_requests (status);
+```
 
 The Reels Gen routes log each call in `ai_usage` and cap it per user per 24 h.
 `/reels/script` and `/reels/moments` use `GEMINI_API_KEY`; `/reels/music` and `/reels/voice` use

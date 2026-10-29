@@ -39,6 +39,8 @@ const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مس�
 const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
 const MEETING_DAILY_MAX     = 30;               // أجزاء اجتماعات (10 دقائق لكل جزء) لكل مستخدم خلال 24 ساعة
 const MAGNIFIC_DAILY_MAX    = 15;               // صور «أسلوب DISC» (Magnific، رصيد مدفوع) لكل مستخدم خلال 24 ساعة
+// طلبات الصلاحيات: أدوات بالطلب الواحد، أدوات بالـ 24 ساعة، وأيام قبل إعادة طلب أداة انرفضت
+const ACCESS_MAX_PER_REQUEST = 12, ACCESS_DAILY_MAX = 20, ACCESS_RETRY_DAYS = 7;
 // الأرشيف: كل تصميم يُنزَّل من Poster Maker وThumbnail Gen، مع ملف مشروعه، في قاعدة ARCHIVE المنفصلة
 const ARCHIVE_PROJECTS = ["study-zone", "hope-center", "children-university", "leap", "disc", "thumbnail-gen"];
 const ARCHIVE_CHUNK = 700 * 1024;               // بايت لكل قطعة (base64 ≈ 0.93 MB، تحت حدّ السجل 2 MB)
@@ -692,10 +694,91 @@ export default {
           var spMine = await getUserProjectIds(env, spActor.email);
           for (var sj = 0; sj < spPids.length; sj++) if (spMine.indexOf(spPids[sj]) < 0) return json({ error: "لا صلاحية على أحد المشاريع" }, 403);
         }
+        var spOld = await getUserProjectIds(env, spEmail);
         await env.DB.prepare("DELETE FROM user_projects WHERE email=?1").bind(spEmail).run();
         for (var sk = 0; sk < spPids.length; sk++) await env.DB.prepare("INSERT OR IGNORE INTO user_projects (email,project_id) VALUES (?1,?2)").bind(spEmail, spPids[sk]).run();
+        // a tool taken away: a «revoked» line, so its owner is told once («تم إيقاف أداة … لديك»)
+        for (var sr = 0; sr < spOld.length; sr++) if (spPids.indexOf(spOld[sr]) < 0)
+          await env.DB.prepare("INSERT INTO access_requests (email, project_id, status, decided_by, decided_at) VALUES (?1, ?2, 'revoked', ?3, datetime('now'))").bind(spEmail, spOld[sr], spActor.email).run();
         await env.DB.prepare("UPDATE users SET project_id=?1 WHERE email=?2").bind(spPids[0], spEmail).run();
         return json({ ok: true });
+      }
+
+      /* ---- 7ج) طلبات الصلاحيات ----
+         المستخدم يطلب أداة أو أكثر من الأدوات المقفولة عنده (السبب اختياري)، والـ Owner أو
+         الـ Comms Manager يقرّر بكل أداة لحالها؛ الموافقة تضيف المشروع لحسابه مباشرة.
+         جدول access_requests: سطر لكل أداة، status = pending | approved | rejected | revoked
+         (revoked: أداة انشالت من الحساب بـ «إدارة المستخدمين»)، و seen = 1 بعد ما يشوف صاحب الطلب القرار. */
+      if (path.indexOf("/access/") === 0) {
+        var acU = await getSessionUser(env, request);
+        if (!acU) return json({ error: "غير مسجّل دخول" }, 401);
+
+        // طلبات المستخدم نفسه: آخر طلب لكل أداة (للقفل و«قيد المراجعة» والقرار الجديد)
+        if (request.method === "GET" && path === "/access/mine") {
+          var amRows = await env.DB.prepare(
+            "SELECT r.id, r.status, r.note, r.seen, r.created_at, r.decided_at, p.slug, p.name FROM access_requests r JOIN projects p ON p.id=r.project_id " +
+            "WHERE r.email=?1 AND r.id IN (SELECT MAX(id) FROM access_requests WHERE email=?1 GROUP BY project_id)").bind(acU.email).all();
+          return json({ ok: true, requests: amRows.results || [] });
+        }
+
+        if (request.method === "POST" && path === "/access/request") {
+          if (isGlobalRole(acU.role)) return json({ error: "حسابك بيوصل لكل الأدوات" }, 400);
+          var arIn = await request.json().catch(function () { return null; });
+          var arSlugs = (arIn && Array.isArray(arIn.slugs) ? arIn.slugs : []).map(function (x) { return String(x); }).slice(0, ACCESS_MAX_PER_REQUEST);
+          var arReason = String(arIn && arIn.reason || "").trim().slice(0, 500) || null;
+          if (!arSlugs.length) return json({ error: "اختر أداة وحدة على الأقل" }, 400);
+          var arToday = await env.DB.prepare("SELECT COUNT(*) AS c FROM access_requests WHERE email=?1 AND created_at>datetime('now','-1 day')").bind(acU.email).first();
+          if (((arToday && arToday.c) || 0) + arSlugs.length > ACCESS_DAILY_MAX) return json({ error: "وصلت للحد اليومي لطلبات الصلاحيات. جرّب بكرا." }, 429);
+          var arMine = await getUserProjectIds(env, acU.email), arAdded = [];
+          for (var ai = 0; ai < arSlugs.length; ai++) {
+            var arP = await env.DB.prepare("SELECT id, name FROM projects WHERE slug=?1 AND status='ready'").bind(arSlugs[ai]).first();
+            if (!arP) return json({ error: "أداة غير موجودة" }, 404);
+            if (arMine.indexOf(arP.id) >= 0) continue;   // already has it
+            var arLast = await env.DB.prepare("SELECT status, decided_at FROM access_requests WHERE email=?1 AND project_id=?2 ORDER BY id DESC LIMIT 1").bind(acU.email, arP.id).first();
+            if (arLast && arLast.status === "pending") continue;   // one open request per tool
+            if (arLast && arLast.status === "rejected" && arLast.decided_at > new Date(Date.now() - ACCESS_RETRY_DAYS * 86400000).toISOString().replace("T", " ").slice(0, 19))
+              return json({ error: "طلب " + arP.name + " انرفض مؤخراً، فيك تطلبه مرة تانية بعد " + ACCESS_RETRY_DAYS + " أيام من الرفض" }, 409);
+            await env.DB.prepare("INSERT INTO access_requests (email, project_id, reason) VALUES (?1, ?2, ?3)").bind(acU.email, arP.id, arReason).run();
+            arAdded.push(arP.name);
+          }
+          return json({ ok: true, added: arAdded });
+        }
+
+        // صاحب الطلب شاف القرار: ما عاد يطلعلو
+        if (request.method === "POST" && path === "/access/seen") {
+          var asIn = await request.json().catch(function () { return null; });
+          var asIds = (asIn && Array.isArray(asIn.ids) ? asIn.ids : []).map(function (x) { return parseInt(x, 10); }).filter(function (x) { return !isNaN(x); }).slice(0, 50);
+          for (var sx = 0; sx < asIds.length; sx++) await env.DB.prepare("UPDATE access_requests SET seen=1 WHERE id=?1 AND email=?2 AND status<>'pending'").bind(asIds[sx], acU.email).run();
+          return json({ ok: true });
+        }
+
+        // من هون: للـ Owner والـ Comms Manager بس
+        if (!isGlobalRole(acU.role)) return json({ error: "لا صلاحية" }, 403);
+
+        if (request.method === "GET" && path === "/access/requests") {
+          var alRows = await env.DB.prepare(
+            "SELECT r.id, r.email, r.reason, r.status, r.note, r.decided_by, r.created_at, r.decided_at, p.slug, p.name FROM access_requests r JOIN projects p ON p.id=r.project_id " +
+            "WHERE r.status='pending' OR r.decided_at>datetime('now','-30 days') ORDER BY (r.status='pending') DESC, r.id DESC LIMIT 200").all();
+          return json({ ok: true, requests: alRows.results || [] });
+        }
+
+        if (request.method === "POST" && path === "/access/decide") {
+          var adIn = await request.json().catch(function () { return null; });
+          var adId = parseInt(adIn && adIn.id, 10), adOk = !!(adIn && adIn.approve), adNote = String(adIn && adIn.note || "").trim().slice(0, 300) || null;
+          var adR = await env.DB.prepare("SELECT id, email, project_id, status FROM access_requests WHERE id=?1").bind(adId).first();
+          if (!adR) return json({ error: "الطلب غير موجود" }, 404);
+          if (adR.status !== "pending") return json({ error: "انقرّر بهالطلب من قبل" }, 409);
+          var adUser = await env.DB.prepare("SELECT email, role FROM users WHERE email=?1").bind(adR.email).first();
+          if (!adUser) return json({ error: "صاحب الطلب ما عاد موجود" }, 404);
+          if (adOk) {
+            await env.DB.prepare("INSERT OR IGNORE INTO user_projects (email, project_id) VALUES (?1, ?2)").bind(adR.email, adR.project_id).run();
+            await env.DB.prepare("UPDATE users SET project_id=?1 WHERE email=?2 AND project_id IS NULL").bind(adR.project_id, adR.email).run();
+          }
+          await env.DB.prepare("UPDATE access_requests SET status=?1, note=?2, decided_by=?3, decided_at=datetime('now') WHERE id=?4")
+            .bind(adOk ? "approved" : "rejected", adNote, acU.email, adId).run();
+          return json({ ok: true });
+        }
+        return json({ error: "غير موجود" }, 404);
       }
 
       /* ---- 7b) تعيين كلمة سر لمستخدم ---- */
