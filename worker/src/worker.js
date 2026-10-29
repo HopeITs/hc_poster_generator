@@ -727,7 +727,7 @@ export default {
           return json({ ok: true, requests: amRows.results || [] });
         }
 
-        // كل طلبات المستخدم وقراراتها، لصفحته «طلبات الصلاحيات» — بلا اسم مين قرّر
+        // كل طلبات المستخدم وقراراتها، لصفحته «سجل الصلاحيات» — بلا اسم مين قرّر
         if (request.method === "GET" && path === "/access/history") {
           var ahRows = await env.DB.prepare(
             "SELECT r.id, r.status, r.reason, r.note, r.seen, r.created_at, r.decided_at, p.slug, p.name FROM access_requests r JOIN projects p ON p.id=r.project_id " +

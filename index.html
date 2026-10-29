@@ -4303,8 +4303,8 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
    locked ones to add, and an optional reason. A tool asked for shows ⏳ until
    the Owner or the Comms Manager decides. A decision, or a tool given or taken
    away in «إدارة المستخدمين», adds to a number on the person's photo and shows
-   on their own «طلبات الصلاحيات». The approvers see the waiting requests'
-   number there, and decide each tool on their «طلبات الصلاحيات». */
+   on their own «سجل الصلاحيات». The approvers see the waiting requests'
+   number there, and decide each tool on their «سجل الصلاحيات». */
 (function(){
   var $=function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -4344,7 +4344,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     });
     showCount(unseen);
   };
-  /* The number on every account photo and in the menu item «طلبات الصلاحيات»: waiting
+  /* The number on every account photo and in the menu item «سجل الصلاحيات»: waiting
      requests for the approvers, decisions not yet seen for everyone else. */
   function showCount(n){
     [].forEach.call(document.querySelectorAll(".acct"),function(a){
@@ -4356,7 +4356,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     [].forEach.call(document.querySelectorAll(".acct-menu"),function(m){
       var it=m.querySelector(".acc-menu");
       if(!it){ it=document.createElement("button"); it.type="button"; it.className="acc-menu"; it.onclick=function(){ openRequests(); }; m.insertBefore(it,m.querySelector(".arc-menu")||m.lastElementChild); }
-      it.textContent="طلبات الصلاحيات"+(n?" ("+n+")":"");
+      it.textContent="سجل الصلاحيات"+(n?" ("+n+")":"");
     });
   }
 
@@ -4427,7 +4427,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     showCount(r.requests.filter(function(q){ return q.status==="pending"; }).length);
   }
 
-  /* «طلبات الصلاحيات». For the approvers: everyone's requests, waiting ones first,
+  /* «سجل الصلاحيات». For the approvers: everyone's requests, waiting ones first,
      each with its own approve and reject, then the last 30 days' decisions. For
      everyone else: their own requests and what became of them, without who
      decided; opening it marks the new decisions seen. */
@@ -4437,7 +4437,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     var pg=$("accPage");
     if(!pg){
       pg=document.createElement("div"); pg.id="accPage";
-      pg.innerHTML='<div class="arc-wrap"><div class="arc-top"><h1>طلبات الصلاحيات</h1><button type="button" class="arc-btn" id="accClose">← رجوع</button></div>'+
+      pg.innerHTML='<div class="arc-wrap"><div class="arc-top"><h1>سجل الصلاحيات</h1><button type="button" class="arc-btn" id="accClose">← رجوع</button></div>'+
         '<div class="arc-card"><table class="arc-t"><thead id="accHead"></thead><tbody id="accBody"></tbody></table>'+
         '<div class="arc-empty" id="accEmpty" hidden></div></div></div>';
       document.body.appendChild(pg);
