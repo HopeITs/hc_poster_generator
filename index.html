@@ -733,8 +733,8 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     </div>
     <div class="field"><label>النموذج</label>
       <select id="modelSel">
-        <option value="1" selected>نموذج 1</option>
-        <option value="2">نموذج 2</option>
+        <option value="1" selected>بوستر إعلان</option>
+        <option value="2">ستوري يوميّة</option>
       </select></div>
     <div id="model1Fields">
     <div class="field"><label>المقاس</label>
@@ -976,9 +976,9 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="panel-body">
       <div class="field"><label>النموذج</label>
         <select id="cuModelSel">
-          <option value="1">نموذج 1 — تسجيل</option>
-          <option value="2">نموذج 2 — دعوة تخرّج</option>
-          <option value="3">نموذج 3 — دعوة تخرّج (بدون صورة)</option>
+          <option value="1">فتح باب التسجيل</option>
+          <option value="2">دعوة تخرّج</option>
+          <option value="3">دعوة تخرّج (بدون صورة)</option>
         </select></div>
       <div class="field"><label>المحافظة</label>
         <select id="cuCity">
@@ -3958,9 +3958,11 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   window.openArchive=function(){ build(); $("arcPage").classList.add("on"); load(true); };
   function fmtDate(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return s; function p(n){ return (n<10?"0":"")+n; } return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
   function mb(b){ return (b/1048576).toFixed(b<10485760?1:0)+" MB"; }
-  // DISC's templates have names, not numbers; the archive keeps the number it was saved with
-  var DC_TPL={"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)","نموذج 3":"فتح باب التسجيل"};
-  function tplName(f){ return f.project==="disc"&&DC_TPL[f.template]||f.template||""; }
+  // the templates have names, not numbers; the archive keeps the number it was saved with
+  var TPL_NAMES={"disc":{"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)","نموذج 3":"فتح باب التسجيل"},
+                 "study-zone":{"نموذج 1":"بوستر إعلان","نموذج 2":"ستوري يوميّة"},
+                 "children-university":{"نموذج 1":"فتح باب التسجيل","نموذج 2":"دعوة تخرّج","نموذج 3":"دعوة تخرّج (بدون صورة)"}};
+  function tplName(f){ return TPL_NAMES[f.project]&&TPL_NAMES[f.project][f.template]||f.template||""; }
   function load(reset){
     if(reset){ A.offset=0; A.files=[]; }
     var seq=A.seq=(A.seq||0)+1;   // a newer filter or search replaces this one
