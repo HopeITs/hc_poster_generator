@@ -1440,6 +1440,7 @@ var Auth = (function(){
           /* Access requests: a user asks for locked tools; the Owner or the Comms Manager decides each one. */
           accessMine:async function(){ try{ var r=await api("/access/mine","GET"); return r.ok?{ok:true,requests:r.data.requests||[]}:{ok:false,error:(r.data&&r.data.error)||""}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
           accessRequest:async function(slugs,reason){ try{ var r=await api("/access/request","POST",{slugs:slugs,reason:reason}); return r.ok?{ok:true,added:r.data.added||[]}:{ok:false,error:(r.data&&r.data.error)||"فشل إرسال الطلب"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          accessHistory:async function(){ try{ var r=await api("/access/history","GET"); return r.ok?{ok:true,requests:r.data.requests||[]}:{ok:false,error:(r.data&&r.data.error)||"تعذّر تحميل الطلبات"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
           accessSeen:async function(ids){ try{ await api("/access/seen","POST",{ids:ids}); }catch(e){} },
           accessList:async function(){ try{ var r=await api("/access/requests","GET"); return r.ok?{ok:true,requests:r.data.requests||[]}:{ok:false,error:(r.data&&r.data.error)||"تعذّر تحميل الطلبات"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
           accessDecide:async function(id,approve,note){ try{ var r=await api("/access/decide","POST",{id:id,approve:approve,note:note}); return r.ok?{ok:true}:{ok:false,error:(r.data&&r.data.error)||"فشل الحفظ"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
@@ -4285,7 +4286,8 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
 #accPage .acc-time{display:block;color:#9aa8b2;font-size:11px;margin-top:2px;}
 #accPage .acc-why{color:#58595b;font-size:12.5px;max-width:280px;}
 #accPage .acc-done{font-size:12px;font-weight:700;white-space:nowrap;}
-#accPage .acc-done.ok{color:#1a8a4a;} #accPage .acc-done.no{color:#c0392b;}
+#accPage .acc-done.ok{color:#1a8a4a;} #accPage .acc-done.no{color:#c0392b;} #accPage .acc-done.wait{color:#8697a3;}
+#accPage .acc-new{display:inline-block;margin-inline-start:6px;padding:1px 7px;border-radius:999px;background:#be1f24;color:#fff;font-size:10px;font-weight:800;vertical-align:1px;}
 #accPage .acc-done small{display:block;font-weight:600;color:#9aa8b2;direction:ltr;text-align:right;}
 #accPage .acts .ok{color:#1a8a4a;} #accPage .acts .ok:hover{border-color:#1a8a4a;color:#1a8a4a;}
 #accPage .acc-note{display:flex;gap:6px;margin-top:6px;}
@@ -4299,9 +4301,10 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
 /* ===== طلبات الصلاحيات =====
    On the tools list, a locked tool opens «طلب صلاحية»: the tool, the other
    locked ones to add, and an optional reason. A tool asked for shows ⏳ until
-   the Owner or the Comms Manager decides; a new decision shows once, as a
-   toast, as does a tool taken away in «إدارة المستخدمين». They see the waiting requests' number on their photo, and decide
-   each tool on «طلبات الصلاحيات», from the account menu. */
+   the Owner or the Comms Manager decides. A decision, or a tool given or taken
+   away in «إدارة المستخدمين», adds to a number on the person's photo and shows
+   on their own «طلبات الصلاحيات». The approvers see the waiting requests'
+   number there, and decide each tool on their «طلبات الصلاحيات». */
 (function(){
   var $=function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -4314,7 +4317,9 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
 
   /* A note in the brand red, high enough to clear the page's footer line. */
   function toast(msg){
-    var t=document.createElement("div"); t.className="acc-toast"; t.textContent=msg; document.body.appendChild(t);
+    var t=document.createElement("div"); t.className="acc-toast"; t.textContent=msg;
+    t.style.bottom=(64+52*document.querySelectorAll(".acc-toast").length)+"px";   // several at once stack upward
+    document.body.appendChild(t);
     setTimeout(function(){ t.classList.add("out"); setTimeout(function(){ t.remove(); },400); },4000);
   }
   /* A card asked for: ⏳ in place of the lock, and it waits. */
@@ -4325,23 +4330,35 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     c.onclick=function(e){ e.preventDefault(); };
   }
 
-  /* After the tools list draws: this account's requests on its cards, decisions it has not seen, and for the approvers, the count. */
+  /* After the tools list draws: this account's requests on its cards and the number of decisions it has not seen; for the approvers, the waiting count. */
   window.accApply=async function(){
     if(global()){ countWaiting(); return; }
     var r=await Auth.accessMine(); if(!r.ok) return;
-    var seen=[];
+    var unseen=0;
     r.requests.forEach(function(q){
       var c=cards().filter(function(x){ return x.dataset.slug===q.slug; })[0];
       if(q.status==="pending"&&c&&c.classList.contains("locked")) setPending(c);
       if(q.status==="rejected"&&c&&c.classList.contains("locked"))
         c.setAttribute("data-hint",(c.dataset.toolHint?c.dataset.toolHint+"\n":"")+"انرفض طلبك"+(q.note?": "+q.note:"")+". فيك تطلبها مرة تانية بعد 7 أيام من الرفض");
-      if(q.status!=="pending"&&!q.seen){
-        seen.push(q.id);
-        toast(q.status==="approved"?"✓ انفتحتلك أداة "+q.name:q.status==="revoked"?"تم إيقاف أداة "+q.name+" لديك":"انرفض طلب "+q.name+(q.note?": "+q.note:""));
-      }
+      if(q.status!=="pending"&&!q.seen) unseen++;
     });
-    if(seen.length) Auth.accessSeen(seen);
+    showCount(unseen);
   };
+  /* The number on every account photo and in the menu item «طلبات الصلاحيات»: waiting
+     requests for the approvers, decisions not yet seen for everyone else. */
+  function showCount(n){
+    [].forEach.call(document.querySelectorAll(".acct"),function(a){
+      var b=a.querySelector(".acc-count");
+      if(!n){ if(b) b.remove(); return; }
+      if(!b){ b=document.createElement("span"); b.className="acc-count"; a.appendChild(b); }
+      b.textContent=n>99?"99+":String(n);
+    });
+    [].forEach.call(document.querySelectorAll(".acct-menu"),function(m){
+      var it=m.querySelector(".acc-menu");
+      if(!it){ it=document.createElement("button"); it.type="button"; it.className="acc-menu"; it.onclick=function(){ openRequests(); }; m.insertBefore(it,m.querySelector(".arc-menu")||m.lastElementChild); }
+      it.textContent="طلبات الصلاحيات"+(n?" ("+n+")":"");
+    });
+  }
 
   var ACC_EXAMPLE={"hope-center":"بدي اعمل بوستر لإعلان وظيفة بـ Hope Center","study-zone":"بدي اعمل بوستر لدورة جديدة بـ Study Zone",
     "children-university":"بدي اعمل دعوة تخرّج لدفعة الأطفال","disc":"بدي اعمل بوسترات لدورة الشهر الجاي بـ DISC",
@@ -4386,52 +4403,80 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     var first=back.querySelector(".acc-list input:checked")||back.querySelector(".acc-list input"); if(first) first.focus();
   };
 
-  /* Approvers: the number of waiting requests on every account photo and in the menu item. */
+  /* The number stays current while a page is open: every minute, and on coming
+     back to the tab. On the tools list, a tool given or taken away meanwhile
+     redraws the list, so it opens or locks there and then. */
+  async function tick(){
+    if(document.hidden||!(Auth.current&&Auth.current())) return;
+    if(global()){ countWaiting(); return; }
+    var r=await Auth.accessMine(); if(!r.ok) return;
+    var gate=$("projectGate"), onList=gate&&gate.style.display!=="none";
+    var stale=onList&&r.requests.some(function(q){
+      var c=cards().filter(function(x){ return x.dataset.slug===q.slug; })[0]; if(!c) return false;
+      return (q.status==="approved"&&!q.seen&&c.classList.contains("locked"))||(q.status==="revoked"&&!q.seen&&!c.classList.contains("locked")&&!c.classList.contains("pending"));
+    });
+    if(stale){ showProjectPicker(); return; }
+    showCount(r.requests.filter(function(q){ return q.status!=="pending"&&!q.seen; }).length);
+  }
+  setInterval(tick,60000);
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) tick(); });
+
+  /* Approvers: the number of waiting requests. */
   async function countWaiting(){
     var r=await Auth.accessList(); if(!r.ok) return;
-    var n=r.requests.filter(function(q){ return q.status==="pending"; }).length;
-    [].forEach.call(document.querySelectorAll(".acct"),function(a){
-      var b=a.querySelector(".acc-count");
-      if(!n){ if(b) b.remove(); return; }
-      if(!b){ b=document.createElement("span"); b.className="acc-count"; a.appendChild(b); }
-      b.textContent=n>99?"99+":String(n);
-    });
-    [].forEach.call(document.querySelectorAll(".acct-menu"),function(m){
-      var it=m.querySelector(".acc-menu");
-      if(!it){ it=document.createElement("button"); it.type="button"; it.className="acc-menu"; it.onclick=function(){ openRequests(); }; m.insertBefore(it,m.querySelector(".arc-menu")||m.lastElementChild); }
-      it.textContent="طلبات الصلاحيات"+(n?" ("+n+")":"");
-    });
+    showCount(r.requests.filter(function(q){ return q.status==="pending"; }).length);
   }
 
-  /* «طلبات الصلاحيات»: waiting ones first, each with its own approve and reject; then the last 30 days' decisions. */
-  var rows=[];
+  /* «طلبات الصلاحيات». For the approvers: everyone's requests, waiting ones first,
+     each with its own approve and reject, then the last 30 days' decisions. For
+     everyone else: their own requests and what became of them, without who
+     decided; opening it marks the new decisions seen. */
+  var rows=[], mineView=false;
   function openRequests(){
+    mineView=!global();
     var pg=$("accPage");
     if(!pg){
       pg=document.createElement("div"); pg.id="accPage";
       pg.innerHTML='<div class="arc-wrap"><div class="arc-top"><h1>طلبات الصلاحيات</h1><button type="button" class="arc-btn" id="accClose">← رجوع</button></div>'+
-        '<div class="arc-card"><table class="arc-t"><thead><tr><th>الإيميل</th><th>الأداة</th><th>السبب</th><th>التاريخ</th><th></th></tr></thead><tbody id="accBody"></tbody></table>'+
+        '<div class="arc-card"><table class="arc-t"><thead id="accHead"></thead><tbody id="accBody"></tbody></table>'+
         '<div class="arc-empty" id="accEmpty" hidden></div></div></div>';
       document.body.appendChild(pg);
       $("accClose").onclick=function(){ pg.classList.remove("on"); };
       document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&pg.classList.contains("on")) pg.classList.remove("on"); });
       $("accBody").onclick=onAction;
     }
+    $("accHead").innerHTML=mineView?'<tr><th>الأداة</th><th>السبب</th><th>تاريخ الطلب</th><th>الحالة</th></tr>'
+                                   :'<tr><th>الإيميل</th><th>الأداة</th><th>السبب</th><th>التاريخ</th><th></th></tr>';
     pg.classList.add("on"); load();
   }
   async function load(){
     $("accEmpty").hidden=false; $("accEmpty").textContent="…جارٍ التحميل"; $("accBody").innerHTML="";
-    var r=await Auth.accessList();
+    var r=mineView?await Auth.accessHistory():await Auth.accessList();
     if(!r.ok){ $("accEmpty").textContent=r.error; return; }
-    rows=r.requests; render(); countWaiting();
+    rows=r.requests; render();
+    if(!mineView){ countWaiting(); return; }
+    var fresh=rows.filter(function(q){ return q.status!=="pending"&&!q.seen; }).map(function(q){ return q.id; });
+    if(fresh.length){ Auth.accessSeen(fresh); showCount(0); }
+  }
+  function when(s){ return fmtDate(s)+'<small class="acc-time">'+fmtTime(s)+'</small>'; }
+  /* A tool given or taken away in «إدارة المستخدمين», not asked for: written with the
+     decision, so it has no request date of its own (a revocation is never asked for). */
+  function noRequest(q){ return q.status==="revoked"||(q.status==="approved"&&!q.reason&&q.created_at===q.decided_at); }
+  function asked(q){ return noRequest(q)?'<span style="color:#b6c0c7">—</span>':when(q.created_at); }
+  function why(q){ return '<td class="acc-why">'+(q.reason?esc(q.reason):'<span style="color:#b6c0c7">—</span>')+'</td>'; }
+  function outcome(q,who){
+    if(q.status==="pending") return '<div class="acc-done wait">⏳ قيد المراجعة</div>';
+    return '<div class="acc-done '+(q.status==="approved"?"ok":"no")+'">'+(q.status==="approved"?(noRequest(q)?"✓ تم إعطاء صلاحية":"✓ تمت الموافقة على إعطاء الصلاحية"):q.status==="revoked"?"⊘ تم إيقاف الصلاحية":"✗ تم الرفض")+(q.note?" — "+esc(q.note):"")+
+      (!who&&!q.seen?'<span class="acc-new">جديد</span>':'')+'<small>'+(who?esc(q.decided_by||"")+" · ":"")+fmtDate(q.decided_at)+" "+fmtTime(q.decided_at)+'</small></div>';
   }
   function render(){
-    $("accEmpty").hidden=rows.length>0; $("accEmpty").textContent="ما في طلبات";
+    $("accEmpty").hidden=rows.length>0; $("accEmpty").textContent=mineView?"ما طلبت أي صلاحية لسا":"ما في طلبات";
     $("accBody").innerHTML=rows.map(function(q,i){
+      if(mineView) return '<tr data-i="'+i+'"><td class="acc-tool">'+esc(q.name)+'</td>'+why(q)+'<td class="dt">'+asked(q)+'</td><td>'+outcome(q,false)+'</td></tr>';
       var end=q.status==="pending"
         ?'<div class="acts"><button type="button" class="ok" data-a="ok">موافقة</button><button type="button" class="del" data-a="no">رفض</button></div>'
-        :'<div class="acc-done '+(q.status==="approved"?"ok":"no")+'">'+(q.status==="approved"?"✓ تم إعطاء الصلاحية":q.status==="revoked"?"⊘ تم إيقاف الصلاحية":"✗ تم الرفض")+(q.note?" — "+esc(q.note):"")+'<small>'+esc(q.decided_by||"")+" · "+fmtDate(q.decided_at)+'</small></div>';
-      return '<tr data-i="'+i+'"><td class="em">'+esc(q.email)+'</td><td class="acc-tool">'+esc(q.name)+'</td><td class="acc-why">'+(q.reason?esc(q.reason):'<span style="color:#b6c0c7">—</span>')+'</td><td class="dt">'+fmtDate(q.created_at)+'<small class="acc-time">'+fmtTime(q.created_at)+'</small></td><td>'+end+'</td></tr>';
+        :outcome(q,true);
+      return '<tr data-i="'+i+'"><td class="em">'+esc(q.email)+'</td><td class="acc-tool">'+esc(q.name)+'</td>'+why(q)+'<td class="dt">'+asked(q)+'</td><td>'+end+'</td></tr>';
     }).join("");
   }
   async function onAction(e){

@@ -61,6 +61,7 @@ wrangler d1 export studyzone-db --remote --output backup.sql
 | POST | `/users/set-projects` | manage_users |
 | POST | `/users/set-password` | manage_users |
 | GET | `/access/mine` | session |
+| GET | `/access/history` | session |
 | POST | `/access/request` | session |
 | POST | `/access/seen` | session |
 | GET | `/access/requests` | owner / comms |

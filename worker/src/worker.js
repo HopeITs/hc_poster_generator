@@ -700,6 +700,12 @@ export default {
         // a tool taken away: a «revoked» line, so its owner is told once («تم إيقاف أداة … لديك»)
         for (var sr = 0; sr < spOld.length; sr++) if (spPids.indexOf(spOld[sr]) < 0)
           await env.DB.prepare("INSERT INTO access_requests (email, project_id, status, decided_by, decided_at) VALUES (?1, ?2, 'revoked', ?3, datetime('now'))").bind(spEmail, spOld[sr], spActor.email).run();
+        // a tool given: an «approved» line («انفتحتلك أداة …»); a waiting request for it is the one approved
+        for (var sg = 0; sg < spPids.length; sg++) if (spOld.indexOf(spPids[sg]) < 0) {
+          var sgOpen = await env.DB.prepare("SELECT id FROM access_requests WHERE email=?1 AND project_id=?2 AND status='pending' ORDER BY id DESC LIMIT 1").bind(spEmail, spPids[sg]).first();
+          if (sgOpen) await env.DB.prepare("UPDATE access_requests SET status='approved', decided_by=?1, decided_at=datetime('now') WHERE id=?2").bind(spActor.email, sgOpen.id).run();
+          else await env.DB.prepare("INSERT INTO access_requests (email, project_id, status, decided_by, decided_at) VALUES (?1, ?2, 'approved', ?3, datetime('now'))").bind(spEmail, spPids[sg], spActor.email).run();
+        }
         await env.DB.prepare("UPDATE users SET project_id=?1 WHERE email=?2").bind(spPids[0], spEmail).run();
         return json({ ok: true });
       }
@@ -708,7 +714,7 @@ export default {
          المستخدم يطلب أداة أو أكثر من الأدوات المقفولة عنده (السبب اختياري)، والـ Owner أو
          الـ Comms Manager يقرّر بكل أداة لحالها؛ الموافقة تضيف المشروع لحسابه مباشرة.
          جدول access_requests: سطر لكل أداة، status = pending | approved | rejected | revoked
-         (revoked: أداة انشالت من الحساب بـ «إدارة المستخدمين»)، و seen = 1 بعد ما يشوف صاحب الطلب القرار. */
+         (revoked: أداة انشالت من الحساب بـ «إدارة المستخدمين»، وأداة انضافت هونيك بتنكتب approved)، و seen = 1 بعد ما يشوف صاحب الطلب القرار. */
       if (path.indexOf("/access/") === 0) {
         var acU = await getSessionUser(env, request);
         if (!acU) return json({ error: "غير مسجّل دخول" }, 401);
@@ -719,6 +725,14 @@ export default {
             "SELECT r.id, r.status, r.note, r.seen, r.created_at, r.decided_at, p.slug, p.name FROM access_requests r JOIN projects p ON p.id=r.project_id " +
             "WHERE r.email=?1 AND r.id IN (SELECT MAX(id) FROM access_requests WHERE email=?1 GROUP BY project_id)").bind(acU.email).all();
           return json({ ok: true, requests: amRows.results || [] });
+        }
+
+        // كل طلبات المستخدم وقراراتها، لصفحته «طلبات الصلاحيات» — بلا اسم مين قرّر
+        if (request.method === "GET" && path === "/access/history") {
+          var ahRows = await env.DB.prepare(
+            "SELECT r.id, r.status, r.reason, r.note, r.seen, r.created_at, r.decided_at, p.slug, p.name FROM access_requests r JOIN projects p ON p.id=r.project_id " +
+            "WHERE r.email=?1 ORDER BY r.id DESC LIMIT 100").bind(acU.email).all();
+          return json({ ok: true, requests: ahRows.results || [] });
         }
 
         if (request.method === "POST" && path === "/access/request") {
