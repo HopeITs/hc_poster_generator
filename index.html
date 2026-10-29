@@ -476,6 +476,11 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .proj-card:hover:not(:disabled){border-color:var(--pc-hover,#003c54);background:var(--pc-hover,#003c54);color:#fff;}
 .proj-card:hover:not(:disabled) .proj-go{color:#fff;}
 .proj-card.soon{cursor:not-allowed;opacity:.6;background:#f4f6f8;color:#8697a3;}
+/* A tool this account has no access to: shown with a lock, and it does not open. */
+.proj-card.locked,.proj-card.locked:hover{cursor:not-allowed;border-color:#d8e0e5;background:#f4f6f8;color:#9aa8b2;}
+.pg-ga .proj-card.locked:hover .proj-badge.new{background:#be1f24;color:#fff;}
+.proj-card.locked .proj-badge{opacity:.55;}
+.proj-lock{display:inline-block;width:13px;height:13px;margin-right:8px;vertical-align:-1px;fill:currentColor;}
 .proj-name{flex:1;text-align:center;}
 .proj-go{font-size:13px;color:#58595b;font-weight:700;white-space:nowrap;}
 .proj-badge{font-size:11px;font-weight:700;color:#5a7282;white-space:nowrap;}
@@ -2345,16 +2350,9 @@ function startApp(){
   render(); fitStage();
   document.fonts.ready.then(function(){render();fitStage();});
 }
-async function afterAuth(){
-  var u=Auth.current();
-  if(u && (u.role==="owner"||u.role==="comms")){ showProjectPicker(); return; }
-  try{
-    var r=await Auth.projects(); var ps=(r&&r.ok?r.projects:[])||[];
-    if(ps.length===1){ openProject(ps[0]); }
-    else if(ps.length>1){ showProjectPicker(); }
-    else { startApp(); }
-  }catch(e){ startApp(); }
-}
+/* After signing in, everyone lands on the tools list — even with one tool —
+   and picks it there; the tools they lack show locked. */
+function afterAuth(){ showProjectPicker(); }
 var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription", MEETTR_SLUG="meeting-transcription";
 var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/","meeting-transcription":"meeting-transcription/"};   // standalone tool pages
 function openProject(p){
@@ -2381,29 +2379,50 @@ async function showProjectPicker(){
   var res=await Auth.projects();
   if(!res.ok){ grid.innerHTML='<div class="proj-msg">تعذّر تحميل المشاريع: '+esc(res.error||"")+'</div>'; return; }
   grid.innerHTML="";
+  // Every tool shows for everyone; one this account does not have (the server lists only its
+  // own) carries a lock and does not open. The pages and the Worker check access on their own.
+  var mine={}; (res.projects||[]).forEach(function(p){ mine[p.slug]=p; });
   // Thumbnail Gen, Reels Gen, Text and Meeting Transcription are projects for access control,
   // but they live in the tools box under Guidelines Assistant rather than in the project list.
   [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"]].forEach(function(t){
-    var p=(res.projects||[]).filter(function(x){ return x.slug===t[0]; })[0];
-    if($(t[1])) $(t[1]).style.display=(p&&p.status==="ready")?"":"none";
+    var a=$(t[1]), p=mine[t[0]]; if(!a) return;
+    a.style.display="";
+    setLocked(a,!(p&&p.status==="ready"));
   });
-  // The order the Poster Maker box shows; a project not listed here goes last, in the server's order.
+  // The Poster Maker box: these five in this order, then any other project of this account.
   var PROJ_ORDER=["hope-center","study-zone","children-university","disc","leap"];
+  var PROJ_NAME={"hope-center":"Hope Center","study-zone":"Study Zone","children-university":"Children University","disc":"DISC","leap":"LEAP"};
   var PROJ_HINT={"hope-center":"قوالب خاصة بــ Hope Center","study-zone":"قوالب خاصة بــ Study Zone",
                  "children-university":"قوالب خاصة بــ Children University","disc":"قوالب خاصة بــ DISC","leap":"قوالب خاصة بــ LEAP"};
-  function projRank(p){ var i=PROJ_ORDER.indexOf(p.slug); return i<0?PROJ_ORDER.length:i; }
-  (res.projects||[]).filter(function(p){ return TOOL_PAGES[p.slug]===undefined; }).sort(function(a,b){ return projRank(a)-projRank(b); }).forEach(function(p){
-    var ready=(p.status==="ready");
+  var list=PROJ_ORDER.map(function(slug){ return mine[slug]||{slug:slug,name:PROJ_NAME[slug],locked:true}; })
+    .concat((res.projects||[]).filter(function(p){ return TOOL_PAGES[p.slug]===undefined&&PROJ_ORDER.indexOf(p.slug)<0; }));
+  list.forEach(function(p){
+    var ready=!p.locked&&p.status==="ready";
     var card=document.createElement("button");
     card.type="button";
-    card.className="proj-card"+(ready?"":" soon");
-    card.disabled=!ready;
-    if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); if(PROJ_HINT[p.slug]) card.setAttribute("data-hint",PROJ_HINT[p.slug]); }
-    var h='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
-    card.innerHTML=h;
-    if(ready){ card.onclick=function(){ selectProject(p); }; }
+    card.className="proj-card"+(p.locked||ready?"":" soon");
+    card.disabled=!p.locked&&!ready;   // a locked card stays enabled, so its hint shows on hover
+    card.innerHTML='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
+    if(PROJ_HINT[p.slug]) card.setAttribute("data-hint",PROJ_HINT[p.slug]);
+    if(p.locked) setLocked(card,true);
+    else if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); card.onclick=function(){ selectProject(p); }; }
     grid.appendChild(card);
   });
+}
+var LOCK_SVG='<svg class="proj-lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2h.5A1.5 1.5 0 0 1 13.5 8.5v5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 4 7zm1.6 0h3.8V5a1.9 1.9 0 0 0-3.8 0z"/></svg>';
+/* A tool card with or without its lock: the hint then says why it does not open. */
+function setLocked(el,on){
+  if(el.dataset.toolHint===undefined) el.dataset.toolHint=el.getAttribute("data-hint")||"";
+  el.classList.toggle("locked",on);
+  el.setAttribute("aria-disabled",on?"true":"false");
+  if(el.tagName==="A") el.tabIndex=on?-1:0;
+  var name=el.querySelector(".proj-name"), lk=name&&name.querySelector(".proj-lock");
+  // always left of the name: first in an English (LTR) name, last in an RTL one
+  if(on&&name&&!lk) name.insertAdjacentHTML(getComputedStyle(name).direction==="ltr"?"afterbegin":"beforeend",LOCK_SVG);
+  if(!on&&lk) lk.remove();
+  if(on) el.setAttribute("data-hint","ما عندك صلاحية على هالأداة — اطلبها من الـ Owner");
+  else if(el.dataset.toolHint) el.setAttribute("data-hint",el.dataset.toolHint);
+  el.onclick=on?function(e){ e.preventDefault(); }:(el.tagName==="A"?null:el.onclick);
 }
 function selectProject(p){
   $("projectGate").style.display="none";
