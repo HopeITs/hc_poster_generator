@@ -495,7 +495,7 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .proj-card[data-hint]{position:relative;}
 .proj-card[data-hint]::after{content:attr(data-hint);position:absolute;left:calc(100% + 47px);top:50%;transform:translate(-6px,-50%);
   width:max-content;max-width:230px;padding:9px 13px;border-radius:10px;background:rgba(62,64,68,.92);color:#fff;
-  font-family:'Somar Sans';font-size:12.5px;font-weight:600;line-height:1.5;text-align:right;direction:rtl;white-space:normal;
+  font-family:'Somar Sans';font-size:12.5px;font-weight:600;line-height:1.5;text-align:right;direction:rtl;white-space:pre-line;
   box-shadow:0 8px 22px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:5;}
 .proj-card[data-hint]::before{content:"";position:absolute;left:calc(100% + 41px);top:50%;transform:translate(-6px,-50%);
   border:6px solid transparent;border-right-color:rgba(62,64,68,.92);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:5;}
@@ -2420,7 +2420,9 @@ function setLocked(el,on){
   // always left of the name: first in an English (LTR) name, last in an RTL one
   if(on&&name&&!lk) name.insertAdjacentHTML(getComputedStyle(name).direction==="ltr"?"afterbegin":"beforeend",LOCK_SVG);
   if(!on&&lk) lk.remove();
-  if(on) el.setAttribute("data-hint","ما عندك صلاحية على هالأداة — اطلبها من الـ Owner");
+  // what the tool does, then why it does not open (the hint keeps line breaks)
+  var why="ما عندك صلاحية على هي الأداة، تواصل مع مديرك لو محتاج تستخدمها";
+  if(on) el.setAttribute("data-hint",(el.dataset.toolHint?el.dataset.toolHint+"\n":"")+why);
   else if(el.dataset.toolHint) el.setAttribute("data-hint",el.dataset.toolHint);
   el.onclick=on?function(e){ e.preventDefault(); }:(el.tagName==="A"?null:el.onclick);
 }
