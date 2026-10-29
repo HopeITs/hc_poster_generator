@@ -60,7 +60,7 @@ const DISC_STYLE_PROMPT =
 "LIGHTING: soft diffused studio lighting from top-left, gentle ambient occlusion, soft contact shadows, smooth gradients, no harsh shadows.\n\n" +
 "COMPOSITION: isolated object centered, slight three-quarter view, clean silhouette, plain pure white background (or transparent), no environment, no floor texture.\n\n" +
 "RENDER: Blender / Cinema 4D, Octane render quality, ultra-clean, high detail, 4K.";
-// DISC نموذج 3 («برنامج تدريبي»): الشخصية الثابتة كما كتبها فريق التصميم، والمستخدم يكتب المشهد فقط
+// DISC نموذج 3 («فتح باب التسجيل»): الشخصية الثابتة كما كتبها فريق التصميم، والمستخدم يكتب المشهد فقط
 const DISC_T3_CHARACTER =
 "Visual Style: High-quality, clean, studio-rendered 3D animation style, similar to Pixar or illumination (not hand-drawn, but rendered CGI).\n" +
 "Character Profile: A young male student, approximately 27 years old, with a warm, friendly, and approachable expression. His skin is detailed with subtle, realistic facial hair stubble and faint pores. His most defining features are his very large, distinctive round black-rimmed glasses (like a modern Harry Potter style), large expressive brown eyes, and thick, wavy, dark-brown hair that is stylishly tousled and curly.\n" +

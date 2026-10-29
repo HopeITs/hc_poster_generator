@@ -1212,7 +1212,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
         <select id="dcTpl">
           <option value="1" selected>مسار تدريبي</option>
           <option value="2">شهادة (Testimony)</option>
-          <option value="3">برنامج تدريبي</option>
+          <option value="3">فتح باب التسجيل</option>
         </select></div>
       <div class="dc-t3" style="display:none">
       <div class="sec-divider">الإعلان</div>
@@ -3222,7 +3222,7 @@ $("hcExportBtn").onclick=hcExport;
     name:{x:642.11,y:1055.39,rot:-3.692,sz:24,w:600,fill:"#6d6e71",arW:195},
     sticker:36    // the photo's white edge, in its pixels (≈ 8.6 poster units)
   };
-  /* Template 3 — «برنامج تدريبي» ("final Option.pdf"): the header (logo and
+  /* Template 3 — «فتح باب التسجيل» ("final Option.pdf"): the header (logo and
      the English name) is a picture, the PDF at 2×; everything else is drawn,
      at the PDF's own places. The grey strip holds one picture, the scene — the
      character with his surroundings, made by «توليد الصورة» or uploaded; one
@@ -3959,7 +3959,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   function fmtDate(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return s; function p(n){ return (n<10?"0":"")+n; } return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
   function mb(b){ return (b/1048576).toFixed(b<10485760?1:0)+" MB"; }
   // DISC's templates have names, not numbers; the archive keeps the number it was saved with
-  var DC_TPL={"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)","نموذج 3":"برنامج تدريبي"};
+  var DC_TPL={"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)","نموذج 3":"فتح باب التسجيل"};
   function tplName(f){ return f.project==="disc"&&DC_TPL[f.template]||f.template||""; }
   function load(reset){
     if(reset){ A.offset=0; A.files=[]; }
