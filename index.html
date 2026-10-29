@@ -485,6 +485,21 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .pg-stack{display:flex;flex-direction:column;align-items:center;gap:15px;}
 .pg-ga{width:min(92vw,440px);background:#fff;border-radius:18px;padding:39px 33px 33px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.12);}
 .pg-ga .proj-card{text-decoration:none;}
+/* A short line on what each tool does, on hover: out to the right of the box,
+   or above the card when the screen is too narrow; none on touch screens. */
+.proj-card[data-hint]{position:relative;}
+.proj-card[data-hint]::after{content:attr(data-hint);position:absolute;left:calc(100% + 47px);top:50%;transform:translate(-6px,-50%);
+  width:max-content;max-width:230px;padding:9px 13px;border-radius:10px;background:rgba(62,64,68,.92);color:#fff;
+  font-family:'Somar Sans';font-size:12.5px;font-weight:600;line-height:1.5;text-align:right;direction:rtl;white-space:normal;
+  box-shadow:0 8px 22px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:5;}
+.proj-card[data-hint]::before{content:"";position:absolute;left:calc(100% + 41px);top:50%;transform:translate(-6px,-50%);
+  border:6px solid transparent;border-right-color:rgba(62,64,68,.92);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:5;}
+@media (hover:hover){ .proj-card[data-hint]:hover:not(:disabled)::after,.proj-card[data-hint]:hover:not(:disabled)::before{opacity:1;transform:translate(0,-50%);transition-delay:.25s;} }
+@media (max-width:1000px){
+  .proj-card[data-hint]::after{left:50%;top:auto;bottom:calc(100% + 10px);transform:translate(-50%,4px);text-align:center;}
+  .proj-card[data-hint]::before{left:50%;top:auto;bottom:calc(100% - 2px);transform:translate(-50%,4px);border-right-color:transparent;border-top-color:rgba(62,64,68,.92);}
+  .proj-card[data-hint]:hover:not(:disabled)::after,.proj-card[data-hint]:hover:not(:disabled)::before{transform:translate(-50%,0);}
+}
 .pg-ga .proj-card + .proj-card{margin-top:15px;}
 .pg-ga .proj-name{direction:ltr;}
 .proj-badge.new{display:inline-block;background:#be1f24;color:#fff;font-size:8.69px;font-weight:800;letter-spacing:.04em;padding:1.15px 4.6px;border-radius:999px;vertical-align:middle;margin-inline-start:4.5px;font-family:'Somar Sans',system-ui,sans-serif;}
@@ -498,20 +513,20 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
     </div>
     <div class="pg-ga">
       <div class="pg-title">Creative Tools</div>
-      <a class="proj-card" href="guideline-assistant/" style="--pc-hover:#be1f24">
+      <a class="proj-card" href="guideline-assistant/" data-hint="تدقيق المستندات الرسمية وتنسيقها على ترويسة المركز" style="--pc-hover:#be1f24">
         <span class="proj-name">Guidelines Assistant <span class="proj-badge new">NEW</span></span>
       </a>
       <!-- Shown by showProjectPicker() only when the user has the thumbnail-gen project. -->
-      <a class="proj-card" id="pgThumbGen" href="thumbnail-gen/" style="--pc-hover:#be1f24;display:none">
+      <a class="proj-card" id="pgThumbGen" href="thumbnail-gen/" data-hint="يولّد صور مصغّرة لفيديوهات اليوتيوب" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Thumbnail Gen <span class="proj-badge new">NEW</span></span>
       </a>
-      <a class="proj-card" id="pgReelsGen" href="reels-gen/" style="--pc-hover:#be1f24;display:none">
+      <a class="proj-card" id="pgReelsGen" href="reels-gen/" data-hint="ريلز عمودية من صورك ومقاطعك، أو ريل قصير من فيديو طويل" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Reels Gen <span class="proj-badge new">NEW</span></span>
       </a>
-      <a class="proj-card" id="pgTextTr" href="text-transcription/" style="--pc-hover:#be1f24;display:none">
+      <a class="proj-card" id="pgTextTr" href="text-transcription/" data-hint="تفريغ النص من الصور و PDF، والفواتير والبطاقات وتحويلها لنص وملف Excel منسّق" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Text Transcription <span class="proj-badge new">NEW</span></span>
       </a>
-      <a class="proj-card" id="pgMeetTr" href="meeting-transcription/" style="--pc-hover:#be1f24;display:none">
+      <a class="proj-card" id="pgMeetTr" href="meeting-transcription/" data-hint="تفريغ الاجتماعات وتلخيصها بمحضر منسّق" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Meeting Transcription <span class="proj-badge new">BETA</span></span>
       </a>
     </div>
@@ -2374,6 +2389,8 @@ async function showProjectPicker(){
   });
   // The order the Poster Maker box shows; a project not listed here goes last, in the server's order.
   var PROJ_ORDER=["hope-center","study-zone","children-university","disc","leap"];
+  var PROJ_HINT={"hope-center":"قوالب خاصة بــ Hope Center","study-zone":"قوالب خاصة بــ Study Zone",
+                 "children-university":"قوالب خاصة بــ Children University","disc":"قوالب خاصة بــ DISC","leap":"قوالب خاصة بــ LEAP"};
   function projRank(p){ var i=PROJ_ORDER.indexOf(p.slug); return i<0?PROJ_ORDER.length:i; }
   (res.projects||[]).filter(function(p){ return TOOL_PAGES[p.slug]===undefined; }).sort(function(a,b){ return projRank(a)-projRank(b); }).forEach(function(p){
     var ready=(p.status==="ready");
@@ -2381,7 +2398,7 @@ async function showProjectPicker(){
     card.type="button";
     card.className="proj-card"+(ready?"":" soon");
     card.disabled=!ready;
-    if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); }
+    if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); if(PROJ_HINT[p.slug]) card.setAttribute("data-hint",PROJ_HINT[p.slug]); }
     var h='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
     card.innerHTML=h;
     if(ready){ card.onclick=function(){ selectProject(p); }; }
