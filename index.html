@@ -1232,6 +1232,14 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
           <option value="2">شهادة (Testimony)</option>
           <option value="3">فتح باب التسجيل</option>
         </select></div>
+      <div class="dc-t3" style="display:none">
+      <div class="field"><label>المحافظة</label>
+        <select id="dcT3City">
+          <option value="حلب">حلب</option>
+          <option value="حمص">حمص</option>
+          <option value="دمشق" selected>دمشق</option>
+        </select></div>
+      </div>
       <div class="dc-t13">
       <div class="field"><label>المسار الرئيسي</label><select id="dcTrack"></select></div>
       <div class="field" id="dcSpecField"><label>المسار التخصصي</label><select id="dcSpec"></select></div>
@@ -3624,6 +3632,20 @@ $("hcExportBtn").onclick=hcExport;
     r.onload=function(){ dcSetScene(r.result); }; r.readAsDataURL(f); e.target.value="";
   });
   if($("dcT3ImgReset")) $("dcT3ImgReset").onclick=function(e){ e.preventDefault(); dcSetScene(null); };
+
+  /* Template 3's governorate: DISC's centre there, in the bottom bar, and its name in the announcement. */
+  var DC_CENTRES={"حلب":{addr:"حلب - الفيلات الشرقية",phone:"0993341390"},
+                  "حمص":{addr:"حمص - الحميدية - مقابل قصر جوليا",phone:"0950018467"},
+                  "دمشق":{addr:"دمشق - باب توما - حارة كنيسة اللاتين",phone:"0989162116"}};
+  function dcSetCity(city){
+    var c=DC_CENTRES[city]; if(!c) return;
+    if($("dcT3City")) $("dcT3City").value=city;
+    $("dcT3Addr").value="العنوان: "+c.addr;
+    $("dcT3Phone").value="للتواصل والاستفسار: "+c.phone;
+    var intro=$("dcT3Intro"); intro.value=intro.value.replace(/في (حلب|حمص|دمشق)/,"في "+city);
+    dcRender();
+  }
+  if($("dcT3City")) $("dcT3City").addEventListener("change",function(){ dcSetCity(this.value); });
   /* The character's reference for «توليد الصورة»: the young man in the default scene, its left 380 units. */
   function dcCharacterRef(){
     return new Promise(function(res,rej){
@@ -3724,7 +3746,7 @@ $("hcExportBtn").onclick=hcExport;
 
   var DC_FILE={1:"",2:"Testimony_",3:"Program_"};
   var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar",quote:"dcQuote",name:"dcName",
-                 t3Intro:"dcT3Intro",t3Scene:"dcT3Scene",t3Title:"dcT3Title",t3Tag:"dcT3Tag",t3TopicsHead:"dcT3TopicsHead",t3Topics:"dcT3Topics",t3Details:"dcT3Details",t3Addr:"dcT3Addr",t3Phone:"dcT3Phone"};
+                 t3City:"dcT3City",t3Intro:"dcT3Intro",t3Scene:"dcT3Scene",t3Title:"dcT3Title",t3Tag:"dcT3Tag",t3TopicsHead:"dcT3TopicsHead",t3Topics:"dcT3Topics",t3Details:"dcT3Details",t3Addr:"dcT3Addr",t3Phone:"dcT3Phone"};
   function dcCollect(){ var d={app:"disc",v:2,tpl:DC.tpl}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; d.photo=DC.photoUser||null; d.scene=DC.sceneUser||null;
     var st=dcTrackState(); if(st){ d.track=st.track; d.spec=st.spec||""; d.trackLabel=dcTrackLabel(); }
     return d; }
