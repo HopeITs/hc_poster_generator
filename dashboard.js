@@ -82,7 +82,7 @@
         '<div class="arc-card"><h2>المستخدمين</h2><table class="arc-t"><thead><tr><th>المستخدم</th><th>الحالة</th><th>أول دخول اليوم</th><th>آخر ظهور</th><th>الوقت اليوم</th></tr></thead><tbody id="dashUsers"></tbody></table></div>' +
         '<div class="arc-card"><h2>الأدوات <small id="dashR1"></small></h2><table class="arc-t"><thead><tr><th>الأداة</th><th>الزيارات</th><th>الوقت</th><th>أكتر واحد عم يستخدمها</th></tr></thead><tbody id="dashTools"></tbody></table></div>' +
         '<div class="arc-card"><h2>الأكتر وقتاً على الموقع <small id="dashR2"></small></h2><table class="arc-t"><thead><tr><th></th><th>المستخدم</th><th>الوقت</th><th style="width:40%"></th></tr></thead><tbody id="dashTop"></tbody></table></div>' +
-        '<div class="arc-card"><h2>طلبات الذكاء الاصطناعي <small id="dashR3"></small></h2><table class="arc-t"><thead><tr><th>الطلب</th><th>العدد</th><th>أكتر واحد</th></tr></thead><tbody id="dashAi"></tbody></table></div>' +
+        '<div class="arc-card"><h2>طلبات الذكاء الاصطناعي <small id="dashR3"></small></h2><table class="arc-t"><thead><tr><th>الطلب</th><th>العدد الكلي للطلبات</th><th>أكتر واحد</th></tr></thead><tbody id="dashAi"></tbody></table></div>' +
         '<div class="arc-empty" id="dashMsg" hidden></div></div>';
       document.body.appendChild(pg);
       $("dashClose").onclick = close;
