@@ -302,6 +302,10 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
      flip its menu to open downward. */
   .acct{top:calc(var(--acct-inset) - 0.19736 * var(--acct-box));bottom:auto;}
   .acct .acct-menu{top:calc(0.87659 * var(--acct-box) + 8px);bottom:auto;}
+  /* On the tools page the photo sits above the boxes and scrolls away with them,
+     instead of floating over the «Poster Maker» heading. */
+  #projectGate .acct{position:absolute;}
+  #projectGate .pg-stack{padding-top:112px;}
 }
 /* Phone: the login card is scaled 1.25x, which pushed it past a narrow viewport
    and clipped both sides. Trim its width so the scaled card fits with a margin. */
@@ -466,7 +470,9 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
   text-shadow:0 1px 3px rgba(0,0,0,.5);min-height:0;font-family:'Somar Sans';}
 </style>
 <style>
-.project-gate{position:fixed;inset:0;background:#d8d9da url(assets/ui/silver-bg.jpg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;z-index:50;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;}
+/* The page scrolls when the two boxes are taller than the screen (1366×768, phones);
+   the stack's auto margins keep it centred when it fits and unclipped when it does not. */
+.project-gate{position:fixed;inset:0;background:#d8d9da url(assets/ui/silver-bg.jpg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;z-index:50;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;overflow-y:auto;}
 .pg-wrap{width:min(92vw,440px);background:#fff;border-radius:18px;padding:39px 33px 33px;box-shadow:0 10px 40px rgba(0,0,0,.12);text-align:center;}
 .pg-title{font-size:22px;font-weight:800;color:#be1f24;margin-bottom:27px;}
 .pg-sub{font-size:13px;color:#5a7282;margin-bottom:18px;line-height:1.5;}
@@ -487,7 +493,7 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .pg-logout{margin-top:19.5px;background:none;border:none;color:#808285;font-family:'Somar Sans';font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;}
 .app-copyright{position:fixed;bottom:24px;left:0;right:0;z-index:-1;pointer-events:none;text-align:center;padding:0 12px;direction:ltr;font-family:'Somar Sans';font-weight:500;font-size:11px;color:#5b5b5b;}   /* fixed in place, behind the gate's own content */
 #projectGate .app-copyright{color:#848484;}
-.pg-stack{display:flex;flex-direction:column;align-items:center;gap:15px;}
+.pg-stack{display:flex;flex-direction:column;align-items:center;gap:15px;margin:auto;padding:24px 0;}
 .pg-ga{width:min(92vw,440px);background:#fff;border-radius:18px;padding:39px 33px 33px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.12);}
 .pg-ga .proj-card{text-decoration:none;}
 /* A short line on what each tool does, on hover: out to the right of the box,
