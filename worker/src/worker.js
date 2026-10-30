@@ -41,6 +41,9 @@ const MEETING_DAILY_MAX     = 30;               // أجزاء اجتماعات (
 const MAGNIFIC_DAILY_MAX    = 15;               // صور «أسلوب DISC» (Magnific، رصيد مدفوع) لكل مستخدم خلال 24 ساعة
 // طلبات الصلاحيات: أدوات بالطلب الواحد، أدوات بالـ 24 ساعة، وأيام قبل إعادة طلب أداة انرفضت
 const ACCESS_MAX_PER_REQUEST = 12, ACCESS_DAILY_MAX = 20, ACCESS_RETRY_DAYS = 7;
+// Pages that report presence (presence.js): the projects page, the five poster projects and the tools
+const PRESENCE_TOOLS = ["home", "hope-center", "study-zone", "children-university", "disc", "leap", "guideline-assistant", "thumbnail-gen",
+  "reels-gen", "text-transcription", "meeting-transcription", "booklet-maker", "flipbook"];
 // الأرشيف: كل تصميم يُنزَّل من Poster Maker وThumbnail Gen، مع ملف مشروعه، في قاعدة ARCHIVE المنفصلة
 const ARCHIVE_PROJECTS = ["study-zone", "hope-center", "children-university", "leap", "disc", "thumbnail-gen"];
 const ARCHIVE_CHUNK = 700 * 1024;               // بايت لكل قطعة (base64 ≈ 0.93 MB، تحت حدّ السجل 2 MB)
@@ -587,8 +590,67 @@ export default {
       /* ---- 4) تسجيل خروج ---- */
       if (request.method === "POST" && path === "/logout") {
         var me2 = await getSessionUser(env, request);
-        if (me2) await env.DB.prepare("DELETE FROM sessions WHERE token=?1").bind(me2.token).run();
+        if (me2) {
+          await env.DB.prepare("DELETE FROM sessions WHERE token=?1").bind(me2.token).run();
+          await env.DB.prepare("UPDATE presence SET ended=1 WHERE email=?1 AND ended=0").bind(me2.email).run();   // offline at once
+        }
         return json({ ok: true });
+      }
+
+      /* ---- 4ب) التواجد: مين فاتح الموقع وعلى أي أداة ----
+         presence.js بكل صفحة بيبعت نبضة كل دقيقة طالما التاب ظاهرة: {visit, tool}. الزيارة
+         سطر بجدول presence (من started_at لآخر نبضة last_seen)، وبتسكّر (ended=1) لما تنخفى
+         التاب أو تنسكّر أو عند تسجيل الخروج. التوكن ممكن ييجي بالجسم لأن sendBeacon ما بيبعت هيدر.
+         أونلاين = نبضة آخر دقيقتين بزيارة مفتوحة. */
+      if (request.method === "POST" && path === "/presence") {
+        var prIn = null;
+        try { prIn = JSON.parse(await request.text()); } catch (e) {}
+        if (!prIn) return json({ error: "طلب غير صالح" }, 400);
+        var prReq = prIn.token && !request.headers.get("Authorization")
+          ? new Request(request.url, { headers: { "Authorization": "Bearer " + String(prIn.token) } }) : request;
+        var prU = await getSessionUser(env, prReq);
+        if (!prU) return json({ error: "غير مسجّل دخول" }, 401);
+        var prVisit = String(prIn.visit || ""), prTool = String(prIn.tool || "");
+        if (!/^[a-f0-9]{16,40}$/.test(prVisit) || PRESENCE_TOOLS.indexOf(prTool) < 0) return json({ error: "طلب غير صالح" }, 400);
+        if (prIn.end) {
+          await env.DB.prepare("UPDATE presence SET ended=1, last_seen=datetime('now') WHERE visit=?1 AND email=?2").bind(prVisit, prU.email).run();
+        } else {
+          await env.DB.prepare(
+            "INSERT INTO presence (visit, email, tool, started_at, last_seen) VALUES (?1, ?2, ?3, datetime('now'), datetime('now')) " +
+            "ON CONFLICT(visit) DO UPDATE SET last_seen=datetime('now'), ended=0 WHERE presence.email=excluded.email").bind(prVisit, prU.email, prTool).run();
+        }
+        return json({ ok: true });
+      }
+
+      /* ---- 4ج) لوحة التحكم (Owner و Comms Manager) ----
+         ?range=day (من نص ليل اليوم بتوقيت سوريا) | week (آخر 7 أيام) | month (آخر 30 يوم).
+         الوقت = من بداية الزيارة (أو بداية الفترة) لآخر نبضة، ونص دقيقة للنبضة الأخيرة.
+         الأرقام الإجمالية بتنحسب بالواجهة من سطور (المستخدم، الأداة). */
+      if (request.method === "GET" && path === "/dashboard") {
+        var dbU = await getSessionUser(env, request);
+        if (!dbU) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!isGlobalRole(dbU.role)) return json({ error: "غير مصرّح" }, 403);
+        var dbRange = url.searchParams.get("range");
+        var dbSyria = new Date(Date.now() + 3 * 3600000);   // Syria is UTC+3 all year
+        var dbDay = new Date(Date.UTC(dbSyria.getUTCFullYear(), dbSyria.getUTCMonth(), dbSyria.getUTCDate()) - 3 * 3600000);
+        var dbSince = dbRange === "month" ? new Date(Date.now() - 30 * 86400000) : dbRange === "week" ? new Date(Date.now() - 7 * 86400000) : dbDay;
+        function sqlTime(d) { return d.toISOString().replace("T", " ").slice(0, 19); }
+        var dbS = sqlTime(dbSince), dbD = sqlTime(dbDay);
+        var SECS = "MAX(0, (julianday(last_seen) - julianday(MAX(started_at, ?1))) * 86400) + 30";
+        await env.DB.prepare("DELETE FROM presence WHERE last_seen < datetime('now','-90 days')").run();   // three months are kept
+        var dbUsers = await env.DB.prepare("SELECT email, role, photo FROM users ORDER BY email").all();
+        // where each one is: a visit still beating first (leaving one page for another
+        // ends the old visit in the same second the new one starts), else the latest
+        var dbNow = await env.DB.prepare(
+          "SELECT email, tool, last_seen, ended FROM (SELECT email, tool, last_seen, ended, ROW_NUMBER() OVER (PARTITION BY email " +
+          "ORDER BY (ended = 0 AND last_seen > datetime('now','-150 seconds')) DESC, last_seen DESC) AS rn FROM presence) WHERE rn = 1").all();
+        var dbToday = await env.DB.prepare(
+          "SELECT email, MIN(started_at) AS first_in, MAX(last_seen) AS last_seen, CAST(SUM(" + SECS + ") AS INTEGER) AS secs FROM presence WHERE last_seen > ?1 GROUP BY email").bind(dbD).all();
+        var dbUse = await env.DB.prepare(
+          "SELECT email, tool, COUNT(*) AS visits, CAST(SUM(" + SECS + ") AS INTEGER) AS secs FROM presence WHERE last_seen > ?1 GROUP BY email, tool").bind(dbS).all();
+        var dbAi = await env.DB.prepare("SELECT email, kind, COUNT(*) AS n FROM ai_usage WHERE at > ?1 GROUP BY email, kind").bind(dbS).all();
+        return json({ ok: true, now: sqlTime(new Date()), since: dbS,
+          users: dbUsers.results || [], live: dbNow.results || [], today: dbToday.results || [], use: dbUse.results || [], ai: dbAi.results || [] });
       }
 
       /* ---- 5) قائمة المستخدمين (مفلترة حسب الدور + المشروع) ---- */

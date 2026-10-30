@@ -121,6 +121,7 @@
   </div>
 
   <script src="app.js" defer></script>
+  <script src="../presence.js" data-tool="meeting-transcription" defer></script>
 
   <div class="foot">HC Generator, a project by Christian Hope Center. © <?= date('Y') ?> All Rights Reserved.</div>
 </body>

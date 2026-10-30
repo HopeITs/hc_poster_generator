@@ -152,6 +152,7 @@
   <script src="access.js" defer></script>
   <script src="vendor/pdf.min.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="../presence.js" data-tool="flipbook" defer></script>
 
   <div class="foot">HC Generator, a project by Christian Hope Center. © <?= date('Y') ?> All Rights Reserved.</div>
 </body>

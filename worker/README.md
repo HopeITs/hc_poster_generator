@@ -99,6 +99,28 @@ CREATE INDEX IF NOT EXISTS access_requests_email ON access_requests (email);
 CREATE INDEX IF NOT EXISTS access_requests_status ON access_requests (status);
 ```
 
+Presence and the dashboard: every page loads `presence.js`, which posts a beat
+to `POST /presence` (`{visit, tool}`) once a minute while the tab is shown, and
+`{visit, tool, end: true, token}` by `sendBeacon` when the tab is hidden or
+closed. `/logout` closes the user's visits. `GET /dashboard?range=day|week|month`
+(Owner and Comms Manager) returns the users, who is online and where, today's
+first sign-in, last seen and time, time and visits per user and tool, and the
+AI requests from `ai_usage`. Rows older than 90 days are deleted. The table:
+
+```sql
+CREATE TABLE IF NOT EXISTS presence (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  visit TEXT NOT NULL UNIQUE,               -- random id per page visit, from presence.js
+  email TEXT NOT NULL,
+  tool TEXT NOT NULL,                       -- one of PRESENCE_TOOLS
+  started_at TEXT NOT NULL,
+  last_seen TEXT NOT NULL,                  -- the last beat
+  ended INTEGER NOT NULL DEFAULT 0          -- 1 once the tab is hidden or closed, or on sign-out
+);
+CREATE INDEX IF NOT EXISTS presence_email ON presence (email, last_seen);
+CREATE INDEX IF NOT EXISTS presence_seen ON presence (last_seen);
+```
+
 The Reels Gen routes log each call in `ai_usage` and cap it per user per 24 h.
 `/reels/script` and `/reels/moments` use `GEMINI_API_KEY`; `/reels/music` and `/reels/voice` use
 `ELEVENLABS_API_KEY`. `/reels/voice` reads with the Mazen Lawand voice: set
