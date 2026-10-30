@@ -29,7 +29,7 @@
   .badge{background:var(--red);color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:999px;}
   .wrap{max-width:1240px;margin:0 auto;padding:14px 20px 40px;display:grid;gap:18px;}
   .card{background:var(--card);border-radius:18px;box-shadow:0 10px 40px rgba(0,0,0,.08);padding:22px 24px;min-width:0;}
-  .layout{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start;}
+  .layout{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:stretch;}
   @media(max-width:900px){.layout{grid-template-columns:1fr;}}
   .sec{font-size:13px;font-weight:800;color:var(--ink);margin:0 0 8px;}
   .field{margin-bottom:16px;}
@@ -52,6 +52,8 @@
   .tog{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;margin-bottom:10px;}
   .tog input{width:17px;height:17px;accent-color:var(--red);margin:0;}
   .tog span{font-weight:500;color:var(--muted);font-size:11px;}
+  .opts{display:flex;flex-direction:column;}
+  .opts .status{margin:auto 0 10px;}   /* the note above the button, both at the card's foot */
   .btn{width:100%;background:#f7941d;color:#fff;border:none;border-radius:12px;padding:13px 18px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;}
   .btn:hover{background:#e08a16;}
   .btn:disabled{opacity:.55;cursor:not-allowed;}
@@ -96,7 +98,7 @@
     <div class="card gate" id="bkGate"><p id="bkGateMsg">…جارٍ التحقّق من الصلاحية</p></div>
 
     <div class="layout" id="bkApp" hidden>
-      <div class="card">
+      <div class="card opts">
         <div class="field">
           <div class="sec">الملف</div>
           <label class="drop" id="bkDrop">
@@ -118,15 +120,11 @@
           </select>
         </div>
         <div class="field">
-          <div class="sec">هامش التجليد <span class="hint">بالمليمتر، بين الصفحتين عند الطيّ</span></div>
-          <input type="number" id="bkGutter" value="5" min="0" max="40" step="1">
-        </div>
-        <div class="field">
           <label class="tog"><input type="checkbox" id="bkNums">أرقام الصفحات <span>رقم صغير تحت كل صفحة</span></label>
           <label class="tog"><input type="checkbox" id="bkFold" checked>علامة الطيّ <span>خط قصير بنص الورقة فوق وتحت</span></label>
         </div>
-        <button type="button" class="btn" id="bkGo" disabled>DOWNLOAD</button>
         <div class="status" id="bkStatus"></div>
+        <button type="button" class="btn" id="bkGo" disabled>DOWNLOAD</button>
       </div>
 
       <div class="card">

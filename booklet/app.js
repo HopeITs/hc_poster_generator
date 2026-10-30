@@ -14,6 +14,7 @@
   var WORKER = "https://studyzone-auth.ct-aleppo3.workers.dev";
   var TOKEN_KEY = "sz_auth_token", SLUG = "booklet-maker";
   var MM = 72 / 25.4;                    // points per millimetre
+  var GUTTER_MM = 5;                     // between the two pages at the fold
   var MAX_BYTES = 200 * 1048576;
   var SHEETS = [["A3", 297, 420], ["A4", 210, 297], ["A5", 148, 210], ["A6", 105, 148], ["B4", 250, 353], ["B5", 176, 250],
                 ["Letter", 215.9, 279.4], ["Legal", 215.9, 355.6], ["Tabloid", 279.4, 431.8]];
@@ -121,7 +122,7 @@
     if (!S.file || S.busy) return;
     S.busy = true; render(); status("…جارٍ تجهيز الكتيّب");
     var rtl = $("bkBinding").value === "right";
-    var gutter = Math.max(0, Math.min(40, parseFloat($("bkGutter").value) || 0)) * MM;
+    var gutter = GUTTER_MM * MM;
     var withNums = $("bkNums").checked, withFold = $("bkFold").checked;
     var PL = PDFLib, slotW = S.w, slotH = S.h, sheetW = slotW * 2;
     Promise.all([PL.PDFDocument.load(S.bytes, { ignoreEncryption: true }), PL.PDFDocument.create()]).then(function (docs) {
