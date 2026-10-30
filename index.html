@@ -540,6 +540,9 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
       <a class="proj-card" id="pgMeetTr" href="meeting-transcription/" data-hint="تفريغ الاجتماعات وتلخيصها بمحضر منسّق" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Meeting Transcription <span class="proj-badge new">BETA</span></span>
       </a>
+      <a class="proj-card" id="pgBooklet" href="booklet/" style="--pc-hover:#be1f24;display:none" data-hint="تحويل ملفات PDF لكتيّب جاهز للطباعة">
+        <span class="proj-name">Booklet Maker <span class="proj-badge new">NEW</span></span>
+      </a>
     </div>
   </div>
   <div class="acct">
@@ -2378,8 +2381,8 @@ function startApp(){
 /* After signing in, everyone lands on the tools list — even with one tool —
    and picks it there; the tools they lack show locked. */
 function afterAuth(){ showProjectPicker(); }
-var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription", MEETTR_SLUG="meeting-transcription";
-var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/","meeting-transcription":"meeting-transcription/"};   // standalone tool pages
+var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription", MEETTR_SLUG="meeting-transcription", BOOKLET_SLUG="booklet-maker";
+var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/","meeting-transcription":"meeting-transcription/","booklet-maker":"booklet/"};   // standalone tool pages
 function openProject(p){
   if(p && TOOL_PAGES[p.slug]){ location.href=TOOL_PAGES[p.slug]; return; }
   if(p && p.template_type==="hopecenter_v1"){ openHopeCenter(p); }
@@ -2409,10 +2412,12 @@ async function showProjectPicker(){
   var mine={}; (res.projects||[]).forEach(function(p){ mine[p.slug]=p; });
   // Thumbnail Gen, Reels Gen, Text and Meeting Transcription are projects for access control,
   // but they live in the tools box under Guidelines Assistant rather than in the project list.
-  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"]].forEach(function(t){
+  // The Owner and the Comms Manager reach every tool, a new one too before it is a project.
+  var me=Auth.current&&Auth.current(), all=!!(me&&(me.role==="owner"||me.role==="comms"));
+  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"],[BOOKLET_SLUG,"pgBooklet"]].forEach(function(t){
     var a=$(t[1]), p=mine[t[0]]; if(!a) return;
     a.style.display=""; a.dataset.slug=t[0];
-    setLocked(a,!(p&&p.status==="ready"));
+    setLocked(a,!all&&!(p&&p.status==="ready"));
   });
   // The Poster Maker box: these five in this order, then any other project of this account.
   var PROJ_ORDER=["hope-center","study-zone","children-university","disc","leap"];
