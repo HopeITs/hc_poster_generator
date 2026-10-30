@@ -38,6 +38,41 @@ const CRITIQUE_DAILY_MAX = 90;                 // جولات نقد لكل مس�
 // Text Transcription — تفريغ الصور بـ Gemini (تفريغ الجهاز لا يمرّ من هنا)
 const TRANSCRIBE_DAILY_MAX  = 60;               // طلبات لكل مستخدم خلال 24 ساعة (حتى 6 صور لكل طلب)
 const MEETING_DAILY_MAX     = 30;               // أجزاء اجتماعات (10 دقائق لكل جزء) لكل مستخدم خلال 24 ساعة
+const MAGNIFIC_DAILY_MAX    = 15;               // صور «أسلوب DISC» (Magnific، رصيد مدفوع) لكل مستخدم خلال 24 ساعة
+// طلبات الصلاحيات: أدوات بالطلب الواحد، أدوات بالـ 24 ساعة، وأيام قبل إعادة طلب أداة انرفضت
+const ACCESS_MAX_PER_REQUEST = 12, ACCESS_DAILY_MAX = 20, ACCESS_RETRY_DAYS = 7;
+// الأرشيف: كل تصميم يُنزَّل من Poster Maker وThumbnail Gen، مع ملف مشروعه، في قاعدة ARCHIVE المنفصلة
+const ARCHIVE_PROJECTS = ["study-zone", "hope-center", "children-university", "leap", "disc", "thumbnail-gen"];
+const ARCHIVE_CHUNK = 700 * 1024;               // بايت لكل قطعة (base64 ≈ 0.93 MB، تحت حدّ السجل 2 MB)
+const ARCHIVE_MAX_FILE = 15 * 1048576, ARCHIVE_MAX_PROJECT = 25 * 1048576;
+const ARCHIVE_DB_LIMIT = 500 * 1048576;         // حجم قاعدة D1 بالخطة المجانية
+const MAGNIFIC_API = "https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro";
+// برومبت «أسلوب DISC» كما كتبه فريق التصميم — ثابت هنا، فلا يصلح المفتاح لتوليد أي شيء آخر
+const DISC_STYLE_PROMPT =
+"Transform the subject of the reference image into a clean, modern 3D illustration in the style of premium tech-brand 3D icons. Keep the main subject, composition and idea recognizable, but restyle everything into this look:\n\n" +
+"STYLE: stylized 3D render, simplified chunky shapes, thick rounded edges with large soft bevels, no sharp corners, minimal details, friendly and playful but professional. Any text, symbols, lines or icons become raised, extruded 3D elements attached to surfaces, like soft plastic pieces, never flat drawings.\n\n" +
+"CHARACTERS (if any): turn people or creatures into a cute rounded robot with a capsule-shaped segmented body, a dark screen-face with two glowing white vertical oval eyes, mechanical arms with visible rounded joints, and thin glowing white light strips on the body seams.\n\n" +
+"MATERIALS: soft matte plastic and smooth clay-like surfaces, very subtle satin sheen on the edges, no metallic chrome, no glossy reflections.\n\n" +
+"STRICT COLOR PALETTE (use only these):\n" +
+"- Primary dominant color: deep navy blue #023c54 — for large surfaces, boards, screens, frames, bases and structures.\n" +
+"- Secondary color: silver gray #848484 — for character bodies, devices, arms, joints and mechanical parts.\n" +
+"- Accent color: warm orange #f99d1c — used very sparingly, only on one or two tiny details (a small button, a light, a marker) when needed.\n" +
+"- White only for tiny highlights: eyes, raised text and thin light strips.\n" +
+"No other colors.\n\n" +
+"LIGHTING: soft diffused studio lighting from top-left, gentle ambient occlusion, soft contact shadows, smooth gradients, no harsh shadows.\n\n" +
+"COMPOSITION: isolated object centered, slight three-quarter view, clean silhouette, plain pure white background (or transparent), no environment, no floor texture.\n\n" +
+"RENDER: Blender / Cinema 4D, Octane render quality, ultra-clean, high detail, 4K.";
+// DISC نموذج 3 («فتح باب التسجيل»): الشخصية الثابتة كما كتبها فريق التصميم، والمستخدم يكتب المشهد فقط
+const DISC_T3_CHARACTER =
+"Visual Style: High-quality, clean, studio-rendered 3D animation style, similar to Pixar or illumination (not hand-drawn, but rendered CGI).\n" +
+"Character Profile: A young male student, approximately 27 years old, with a warm, friendly, and approachable expression. His skin is detailed with subtle, realistic facial hair stubble and faint pores. His most defining features are his very large, distinctive round black-rimmed glasses (like a modern Harry Potter style), large expressive brown eyes, and thick, wavy, dark-brown hair that is stylishly tousled and curly.\n" +
+"Lighting & Quality: Soft, professional studio lighting with a clean, light grey gradient background. Ultra-detailed textures, particularly on skin, hair strands, and clothing fabric.\n" +
+"The reference image shows this same young man: keep his face, hair and glasses, but ignore its photo style, clothes, pose and drawings.";
+const DISC_T3_LAYOUT =
+"Generate a scene with light gray background walls (#EBEBEB), softly lit and plain. Wide 4:3 frame. " +
+"The character and the scene's props fill the left two-thirds of the frame; the right third is calm, plain light gray, with nothing important in it, because text will cover it. " +
+"No text, letters, logos or watermarks anywhere in the image.";
+const DISC_SCENE_MAX = 800;                     // حروف وصف المشهد
 const TRANSCRIBE_MAX_IMAGES = 6;
 const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
 const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;
@@ -285,6 +320,56 @@ async function geminiStreamJSON(key, model, body, label) {
   }
   return { error: last || "تعذّر الاتصال بـ Gemini" };
 }
+
+/* Magnific (Nano Banana Pro، 1K): صورة من برومبت ثابت مع صورة مرجعية. المرجع يُحفظ مؤقتاً
+   (/tmp-img) لأن Magnific يقرأه من رابط عام فقط، ثم يُسأل عن المهمة حتى تكتمل.
+   يرجع {ok, image: data URL} أو {error}. */
+async function magnificRun(env, origin, email, prompt, mime, data, aspect) {
+  var H = { "Content-Type": "application/json", "x-magnific-api-key": String(env.MAGNIFIC_API_KEY).trim() };   // a pasted key often brings a newline along
+  await env.DB.prepare("DELETE FROM tmp_images WHERE at<datetime('now','-10 minutes')").run();
+  var rsId = makeToken();
+  await env.DB.prepare("INSERT INTO tmp_images (id, mime, data) VALUES (?1, ?2, ?3)").bind(rsId, mime, data).run();
+  function magErr(st, d) {
+    var msg = (d && (d.message || (d.error && (d.error.message || d.error)) || d.detail)) || "";
+    return st === 401 ? "مفتاح Magnific غير صالح" : st === 402 || /credit/i.test(String(msg)) ? "رصيد Magnific ما بيكفي" :
+           st === 429 ? "Magnific مضغوط حالياً — جرّب بعد دقيقة" : "Magnific: " + (String(msg).slice(0, 160) || "HTTP " + st);
+  }
+  try {
+    var st = await fetch(MAGNIFIC_API, { method: "POST", headers: H, body: JSON.stringify({
+      prompt: prompt, reference_images: [{ image: origin + "/tmp-img/" + rsId, mime_type: mime }], aspect_ratio: aspect, resolution: "1K" }) });
+    var sd = await st.json().catch(function () { return {}; });
+    console.log("magnific start " + st.status + " " + JSON.stringify(sd).slice(0, 600));
+    if (!st.ok) return { error: magErr(st.status, sd) };
+    var task = sd.data && sd.data.task_id;
+    if (!task) return { error: "Magnific ما رجّع رقم مهمة" };
+    await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'magnific', datetime('now'))").bind(email).run();
+    // The task runs on Magnific's side: ask every few seconds. Its own path first; the
+    // list of all tasks as a fallback (the docs only describe that one for sure).
+    var urls = null, t0 = Date.now(), last = "";
+    while (Date.now() - t0 < 180000) {
+      await new Promise(function (r) { setTimeout(r, 4000); });
+      var g = await fetch(MAGNIFIC_API + "/" + task, { headers: H }), gd = await g.json().catch(function () { return {}; });
+      var item = g.ok ? gd.data : null;
+      if (!g.ok && g.status === 404) {
+        var l = await fetch(MAGNIFIC_API, { headers: H }), ld = await l.json().catch(function () { return {}; });
+        item = (Array.isArray(ld.data) ? ld.data : []).filter(function (x) { return x && x.task_id === task; })[0] || null;
+      }
+      if (!item) { last = "HTTP " + g.status; continue; }
+      last = item.status;
+      if (item.status === "COMPLETED") { urls = item.generated || []; break; }
+      if (item.status === "FAILED") { console.log("magnific failed " + JSON.stringify(item).slice(0, 600)); return { error: "Magnific ما قدر يولّد الصورة" }; }
+    }
+    console.log("magnific " + task + " " + last + " after " + (Date.now() - t0) + "ms");
+    if (!urls) return { error: "Magnific طوّل كتير (" + last + ") — جرّب مرة تانية" };
+    if (!urls.length) return { error: "Magnific ما رجّع صورة" };
+    var im = await fetch(urls[0]);
+    if (!im.ok) return { error: "تعذّر تنزيل الصورة من Magnific" };
+    return { ok: true, image: "data:" + (im.headers.get("content-type") || "image/png").split(";")[0] + ";base64," + base64(await im.arrayBuffer()) };
+  } finally {
+    await env.DB.prepare("DELETE FROM tmp_images WHERE id=?1").bind(rsId).run();
+  }
+}
+
 /* A long answer (a minute or two of Gemini) as a stream: the response starts
    at once and a space goes out every few seconds until the JSON follows, so
    nothing on the way gives up on the request and sends it again (which would
@@ -609,10 +694,105 @@ export default {
           var spMine = await getUserProjectIds(env, spActor.email);
           for (var sj = 0; sj < spPids.length; sj++) if (spMine.indexOf(spPids[sj]) < 0) return json({ error: "لا صلاحية على أحد المشاريع" }, 403);
         }
+        var spOld = await getUserProjectIds(env, spEmail);
         await env.DB.prepare("DELETE FROM user_projects WHERE email=?1").bind(spEmail).run();
         for (var sk = 0; sk < spPids.length; sk++) await env.DB.prepare("INSERT OR IGNORE INTO user_projects (email,project_id) VALUES (?1,?2)").bind(spEmail, spPids[sk]).run();
+        // a tool taken away: a «revoked» line, so its owner is told once («تم إيقاف أداة … لديك»)
+        for (var sr = 0; sr < spOld.length; sr++) if (spPids.indexOf(spOld[sr]) < 0)
+          await env.DB.prepare("INSERT INTO access_requests (email, project_id, status, decided_by, decided_at) VALUES (?1, ?2, 'revoked', ?3, datetime('now'))").bind(spEmail, spOld[sr], spActor.email).run();
+        // a tool given: an «approved» line («انفتحتلك أداة …»); a waiting request for it is the one approved
+        for (var sg = 0; sg < spPids.length; sg++) if (spOld.indexOf(spPids[sg]) < 0) {
+          var sgOpen = await env.DB.prepare("SELECT id FROM access_requests WHERE email=?1 AND project_id=?2 AND status='pending' ORDER BY id DESC LIMIT 1").bind(spEmail, spPids[sg]).first();
+          if (sgOpen) await env.DB.prepare("UPDATE access_requests SET status='approved', decided_by=?1, decided_at=datetime('now') WHERE id=?2").bind(spActor.email, sgOpen.id).run();
+          else await env.DB.prepare("INSERT INTO access_requests (email, project_id, status, decided_by, decided_at) VALUES (?1, ?2, 'approved', ?3, datetime('now'))").bind(spEmail, spPids[sg], spActor.email).run();
+        }
         await env.DB.prepare("UPDATE users SET project_id=?1 WHERE email=?2").bind(spPids[0], spEmail).run();
         return json({ ok: true });
+      }
+
+      /* ---- 7ج) طلبات الصلاحيات ----
+         المستخدم يطلب أداة أو أكثر من الأدوات المقفولة عنده (السبب اختياري)، والـ Owner أو
+         الـ Comms Manager يقرّر بكل أداة لحالها؛ الموافقة تضيف المشروع لحسابه مباشرة.
+         جدول access_requests: سطر لكل أداة، status = pending | approved | rejected | revoked
+         (revoked: أداة انشالت من الحساب بـ «إدارة المستخدمين»، وأداة انضافت هونيك بتنكتب approved)، و seen = 1 بعد ما يشوف صاحب الطلب القرار. */
+      if (path.indexOf("/access/") === 0) {
+        var acU = await getSessionUser(env, request);
+        if (!acU) return json({ error: "غير مسجّل دخول" }, 401);
+
+        // طلبات المستخدم نفسه: آخر طلب لكل أداة (للقفل و«قيد المراجعة» والقرار الجديد)
+        if (request.method === "GET" && path === "/access/mine") {
+          var amRows = await env.DB.prepare(
+            "SELECT r.id, r.status, r.note, r.seen, r.created_at, r.decided_at, p.slug, p.name FROM access_requests r JOIN projects p ON p.id=r.project_id " +
+            "WHERE r.email=?1 AND r.id IN (SELECT MAX(id) FROM access_requests WHERE email=?1 GROUP BY project_id)").bind(acU.email).all();
+          return json({ ok: true, requests: amRows.results || [] });
+        }
+
+        // كل طلبات المستخدم وقراراتها، لصفحته «سجل الصلاحيات» — بلا اسم مين قرّر
+        if (request.method === "GET" && path === "/access/history") {
+          var ahRows = await env.DB.prepare(
+            "SELECT r.id, r.status, r.reason, r.note, r.seen, r.created_at, r.decided_at, p.slug, p.name FROM access_requests r JOIN projects p ON p.id=r.project_id " +
+            "WHERE r.email=?1 ORDER BY r.id DESC LIMIT 100").bind(acU.email).all();
+          return json({ ok: true, requests: ahRows.results || [] });
+        }
+
+        if (request.method === "POST" && path === "/access/request") {
+          if (isGlobalRole(acU.role)) return json({ error: "حسابك بيوصل لكل الأدوات" }, 400);
+          var arIn = await request.json().catch(function () { return null; });
+          var arSlugs = (arIn && Array.isArray(arIn.slugs) ? arIn.slugs : []).map(function (x) { return String(x); }).slice(0, ACCESS_MAX_PER_REQUEST);
+          var arReason = String(arIn && arIn.reason || "").trim().slice(0, 500) || null;
+          if (!arSlugs.length) return json({ error: "اختر أداة وحدة على الأقل" }, 400);
+          var arToday = await env.DB.prepare("SELECT COUNT(*) AS c FROM access_requests WHERE email=?1 AND created_at>datetime('now','-1 day')").bind(acU.email).first();
+          if (((arToday && arToday.c) || 0) + arSlugs.length > ACCESS_DAILY_MAX) return json({ error: "وصلت للحد اليومي لطلبات الصلاحيات. جرّب بكرا." }, 429);
+          var arMine = await getUserProjectIds(env, acU.email), arAdded = [];
+          for (var ai = 0; ai < arSlugs.length; ai++) {
+            var arP = await env.DB.prepare("SELECT id, name FROM projects WHERE slug=?1 AND status='ready'").bind(arSlugs[ai]).first();
+            if (!arP) return json({ error: "أداة غير موجودة" }, 404);
+            if (arMine.indexOf(arP.id) >= 0) continue;   // already has it
+            var arLast = await env.DB.prepare("SELECT status, decided_at FROM access_requests WHERE email=?1 AND project_id=?2 ORDER BY id DESC LIMIT 1").bind(acU.email, arP.id).first();
+            if (arLast && arLast.status === "pending") continue;   // one open request per tool
+            if (arLast && arLast.status === "rejected" && arLast.decided_at > new Date(Date.now() - ACCESS_RETRY_DAYS * 86400000).toISOString().replace("T", " ").slice(0, 19))
+              return json({ error: "طلب " + arP.name + " انرفض مؤخراً، فيك تطلبه مرة تانية بعد " + ACCESS_RETRY_DAYS + " أيام من الرفض" }, 409);
+            await env.DB.prepare("INSERT INTO access_requests (email, project_id, reason) VALUES (?1, ?2, ?3)").bind(acU.email, arP.id, arReason).run();
+            arAdded.push(arP.name);
+          }
+          return json({ ok: true, added: arAdded });
+        }
+
+        // صاحب الطلب شاف القرار: ما عاد يطلعلو
+        if (request.method === "POST" && path === "/access/seen") {
+          var asIn = await request.json().catch(function () { return null; });
+          var asIds = (asIn && Array.isArray(asIn.ids) ? asIn.ids : []).map(function (x) { return parseInt(x, 10); }).filter(function (x) { return !isNaN(x); }).slice(0, 50);
+          for (var sx = 0; sx < asIds.length; sx++) await env.DB.prepare("UPDATE access_requests SET seen=1 WHERE id=?1 AND email=?2 AND status<>'pending'").bind(asIds[sx], acU.email).run();
+          return json({ ok: true });
+        }
+
+        // من هون: للـ Owner والـ Comms Manager بس
+        if (!isGlobalRole(acU.role)) return json({ error: "لا صلاحية" }, 403);
+
+        if (request.method === "GET" && path === "/access/requests") {
+          var alRows = await env.DB.prepare(
+            "SELECT r.id, r.email, r.reason, r.status, r.note, r.decided_by, r.created_at, r.decided_at, p.slug, p.name FROM access_requests r JOIN projects p ON p.id=r.project_id " +
+            "WHERE r.status='pending' OR r.decided_at>datetime('now','-30 days') ORDER BY (r.status='pending') DESC, r.id DESC LIMIT 200").all();
+          return json({ ok: true, requests: alRows.results || [] });
+        }
+
+        if (request.method === "POST" && path === "/access/decide") {
+          var adIn = await request.json().catch(function () { return null; });
+          var adId = parseInt(adIn && adIn.id, 10), adOk = !!(adIn && adIn.approve), adNote = String(adIn && adIn.note || "").trim().slice(0, 300) || null;
+          var adR = await env.DB.prepare("SELECT id, email, project_id, status FROM access_requests WHERE id=?1").bind(adId).first();
+          if (!adR) return json({ error: "الطلب غير موجود" }, 404);
+          if (adR.status !== "pending") return json({ error: "انقرّر بهالطلب من قبل" }, 409);
+          var adUser = await env.DB.prepare("SELECT email, role FROM users WHERE email=?1").bind(adR.email).first();
+          if (!adUser) return json({ error: "صاحب الطلب ما عاد موجود" }, 404);
+          if (adOk) {
+            await env.DB.prepare("INSERT OR IGNORE INTO user_projects (email, project_id) VALUES (?1, ?2)").bind(adR.email, adR.project_id).run();
+            await env.DB.prepare("UPDATE users SET project_id=?1 WHERE email=?2 AND project_id IS NULL").bind(adR.project_id, adR.email).run();
+          }
+          await env.DB.prepare("UPDATE access_requests SET status=?1, note=?2, decided_by=?3, decided_at=datetime('now') WHERE id=?4")
+            .bind(adOk ? "approved" : "rejected", adNote, acU.email, adId).run();
+          return json({ ok: true });
+        }
+        return json({ error: "غير موجود" }, 404);
       }
 
       /* ---- 7b) تعيين كلمة سر لمستخدم ---- */
@@ -935,6 +1115,127 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
           var crNew = crE.error ? [] : momentsRuns(crE.data.moments, crSegs, crText);
           return { ok: true, critique: critique, moments: crNew.length ? crNew : null, plan: crE.error ? "" : String(crE.data.plan || "").slice(0, 1200) };
         });
+      }
+
+      /* ---- الأرشيف: Poster Maker وThumbnail Gen ----
+         كل DOWNLOAD يرسل مشروع التصميم (JSON، يفتحه للتعديل) ومعاينة صغيرة من صورته:
+         [4 بايت طول JSON][JSON {project, tool, template, filename, mime, fileSize, projSize, thumb}][الملف]
+         (أول السجلات حفظت الصورة ومشروعها معاً: projSize). يُحفظ في قاعدة ARCHIVE المنفصلة:
+         سطر في files (ومعه المعاينة data URL) والملف قطعاً في chunks.
+         يرى كل مستخدم ملفاته؛ الـ Owner والـ Comms يرون الكل؛ الـ Owner وحده يحذف. */
+      if (path === "/archive" || path.indexOf("/archive/") === 0) {
+        if (!env.ARCHIVE) return json({ error: "الأرشيف غير مضبوط" }, 500);
+        var arUser = await getSessionUser(env, request);
+        if (!arUser) return json({ error: "غير مسجّل دخول" }, 401);
+        var arAll = isGlobalRole(arUser.role);
+
+        if (request.method === "POST" && path === "/archive") {
+          var arIn = splitAudioBody(await request.arrayBuffer());
+          if (!arIn) return json({ error: "طلب غير صالح" }, 400);
+          var am = arIn.meta || {}, fSize = Math.floor(Number(am.fileSize) || 0), pSize = Math.floor(Number(am.projSize) || 0);
+          if (ARCHIVE_PROJECTS.indexOf(am.project) < 0) return json({ error: "مشروع غير معروف" }, 400);
+          if (!(await hasProjectSlug(env, arUser, am.project))) return json({ error: "لا صلاحية" }, 403);
+          if (fSize < 1 || fSize > ARCHIVE_MAX_FILE || pSize < 0 || pSize > ARCHIVE_MAX_PROJECT || fSize + pSize !== arIn.audio.byteLength) return json({ error: "حجم غير صالح" }, 400);
+          var used = await env.ARCHIVE.prepare("SELECT COALESCE(SUM(size + proj_size), 0) AS b FROM files").first();
+          if (used && used.b + fSize + pSize > ARCHIVE_DB_LIMIT * 0.95) return json({ error: "الأرشيف ممتلئ" }, 507);
+          var arId = makeToken().slice(0, 32), stmts = [];
+          stmts.push(env.ARCHIVE.prepare("INSERT INTO files (id, email, project, tool, template, filename, mime, size, proj_size, thumb) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)").bind(
+            arId, arUser.email, am.project, am.project === "thumbnail-gen" ? "thumbnail" : "poster", String(am.template || "").slice(0, 60),
+            String(am.filename || "design.png").replace(/[\\/:*?"<>|]/g, "").slice(0, 160), /^(image\/(png|jpeg|webp)|application\/json)$/.test(am.mime) ? am.mime : "image/png",
+            fSize, pSize, /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(am.thumb || "") && am.thumb.length < 120000 ? am.thumb : ""));
+          [["file", arIn.audio.slice(0, fSize)], ["project", arIn.audio.slice(fSize)]].forEach(function (p) {
+            for (var off = 0, seq = 0; off < p[1].byteLength; off += ARCHIVE_CHUNK, seq++)
+              stmts.push(env.ARCHIVE.prepare("INSERT INTO chunks (file_id, part, seq, data) VALUES (?1,?2,?3,?4)").bind(arId, p[0], seq, base64(p[1].slice(off, off + ARCHIVE_CHUNK))));
+          });
+          await env.ARCHIVE.batch(stmts);
+          return json({ ok: true, id: arId });
+        }
+
+        if (request.method === "GET" && path === "/archive/list") {
+          var q = url.searchParams, all = q.get("scope") === "all" && arAll, where = [], args = [];
+          if (!all) { where.push("email = ?"); args.push(arUser.email); }
+          if (ARCHIVE_PROJECTS.indexOf(q.get("project")) >= 0) { where.push("project = ?"); args.push(q.get("project")); }
+          if (q.get("q")) { where.push("(filename LIKE ? OR email LIKE ?)"); args.push("%" + q.get("q").slice(0, 80) + "%", "%" + q.get("q").slice(0, 80) + "%"); }
+          if (/^\d{4}-\d{2}-\d{2}$/.test(q.get("from") || "")) { where.push("created_at >= ?"); args.push(q.get("from")); }
+          if (/^\d{4}-\d{2}-\d{2}$/.test(q.get("to") || "")) { where.push("created_at < date(?, '+1 day')"); args.push(q.get("to")); }
+          var w = where.length ? " WHERE " + where.join(" AND ") : "", off2 = Math.max(0, Math.floor(Number(q.get("offset")) || 0));
+          function withArgs(st) { return args.length ? st.bind.apply(st, args) : st; }
+          var rows = await withArgs(env.ARCHIVE.prepare("SELECT id, email, project, tool, template, filename, mime, size, proj_size, thumb, created_at FROM files" + w + " ORDER BY created_at DESC LIMIT 30 OFFSET " + off2)).all();
+          var cnt = await withArgs(env.ARCHIVE.prepare("SELECT COUNT(*) AS c FROM files" + w)).first();
+          var out = { ok: true, scope: all ? "all" : "mine", canAll: arAll, canDelete: arUser.role === "owner", total: cnt ? cnt.c : 0, files: rows.results || [] };
+          if (arAll) { var u2 = await env.ARCHIVE.prepare("SELECT COALESCE(SUM(size + proj_size), 0) AS b FROM files").first(); out.usedBytes = u2 ? u2.b : 0; out.limitBytes = ARCHIVE_DB_LIMIT; }
+          return json(out);
+        }
+
+        if (request.method === "GET" && path === "/archive/blob") {
+          var bid = url.searchParams.get("id") || "", part = url.searchParams.get("part") === "project" ? "project" : "file";
+          var f = await env.ARCHIVE.prepare("SELECT email, filename, mime FROM files WHERE id = ?1").bind(bid).first();
+          if (!f || (!arAll && f.email !== arUser.email)) return json({ error: "غير موجود" }, 404);
+          var cs = await env.ARCHIVE.prepare("SELECT data FROM chunks WHERE file_id = ?1 AND part = ?2 ORDER BY seq").bind(bid, part).all();
+          var parts = (cs.results || []).map(function (r) { var b = atob(r.data), u8 = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u8[i] = b.charCodeAt(i); return u8; });
+          var headers = cors(); headers["Content-Type"] = part === "project" ? "application/json" : f.mime;
+          return new Response(new Blob(parts), { headers: headers });
+        }
+
+        if (request.method === "POST" && path === "/archive/delete") {
+          if (arUser.role !== "owner") return json({ error: "الحذف للـ Owner فقط" }, 403);
+          var did = String(((await request.json().catch(function () { return {}; })) || {}).id || "");
+          await env.ARCHIVE.batch([env.ARCHIVE.prepare("DELETE FROM chunks WHERE file_id = ?1").bind(did), env.ARCHIVE.prepare("DELETE FROM files WHERE id = ?1").bind(did)]);
+          return json({ ok: true });
+        }
+        return json({ error: "غير موجود" }, 404);
+      }
+
+      /* ---- DISC: صورة مرجعية مؤقتة ----
+         Magnific يقرأ الصورة المرجعية من رابط عام فقط، فتُحفظ هنا برقم عشوائي (64 خانة hex)
+         لعشر دقائق على الأكثر، وتُحذف حين ينتهي الطلب. لا يُعرض شيء غيرها. */
+      if (request.method === "GET" && path.indexOf("/tmp-img/") === 0) {
+        var tiId = path.slice(9);
+        if (!/^[a-f0-9]{64}$/.test(tiId)) return new Response("not found", { status: 404 });
+        var ti = await env.DB.prepare("SELECT mime, data FROM tmp_images WHERE id=?1 AND at>datetime('now','-10 minutes')").bind(tiId).first();
+        if (!ti) return new Response("not found", { status: 404 });
+        var tiBin = atob(ti.data), tiBytes = new Uint8Array(tiBin.length);
+        for (var tk = 0; tk < tiBin.length; tk++) tiBytes[tk] = tiBin.charCodeAt(tk);
+        return new Response(tiBytes, { headers: { "Content-Type": ti.mime, "Cache-Control": "no-store" } });
+      }
+
+      /* ---- DISC: «حوّل لأسلوب DISC» — Magnific API، Nano Banana Pro بدقة 1K ----
+         لمن يملك مشروع DISC. JSON {image: data URL (PNG/JPEG/WebP)}. الصورة تُحفظ مؤقتاً
+         (/tmp-img) ويُطلب من Magnific تحويلها بـ DISC_STYLE_PROMPT، ثم يُسأل عن المهمة حتى
+         تكتمل، وتُعاد الصورة الناتجة. رصيد Magnific مدفوع: حد يومي لكل مستخدم.
+         الرد يتدفّق (slowJSON): {ok, image: data URL} أو {error}. */
+      if (request.method === "POST" && path === "/disc/restyle") {
+        var rsUser = await getSessionUser(env, request);
+        if (!rsUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, rsUser, "disc"))) return json({ error: "لا صلاحية" }, 403);
+        if (!env.MAGNIFIC_API_KEY) return json({ error: "مفتاح Magnific غير مضبوط" }, 500);
+        if ((await usedToday(env, rsUser.email, "magnific")) >= MAGNIFIC_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتحويل الصور (" + MAGNIFIC_DAILY_MAX + "). جرّب بكرا." }, 429);
+        var rsIn = await request.json().catch(function () { return null; });
+        var rsM = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(rsIn && rsIn.image || "");
+        if (!rsM || rsM[2].length > 4 * 1024 * 1024) return json({ error: "صورة غير صالحة أو أكبر من المسموح" }, 400);
+        var rsOrigin = new URL(request.url).origin;
+        return slowJSON(function () { return magnificRun(env, rsOrigin, rsUser.email, DISC_STYLE_PROMPT, rsM[1], rsM[2], "4:3"); });
+      }
+
+      /* ---- DISC نموذج 3: «توليد الصورة» — نفس الطريق (Magnific، Nano Banana Pro 1K) ----
+         JSON {scene: وصف المشهد كما يكتبه المستخدم، ref: data URL لصورة الشخصية الافتراضية}.
+         البرومبت = DISC_T3_CHARACTER + المشهد + DISC_T3_LAYOUT، فالمفتاح ما بيولّد غير هالشخصية.
+         نفس الحد اليومي. الرد يتدفّق (slowJSON): {ok, image: data URL} أو {error}. */
+      if (request.method === "POST" && path === "/disc/scene") {
+        var scUser = await getSessionUser(env, request);
+        if (!scUser) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, scUser, "disc"))) return json({ error: "لا صلاحية" }, 403);
+        if (!env.MAGNIFIC_API_KEY) return json({ error: "مفتاح Magnific غير مضبوط" }, 500);
+        if ((await usedToday(env, scUser.email, "magnific")) >= MAGNIFIC_DAILY_MAX) return json({ error: "وصلت للحد اليومي لتوليد الصور (" + MAGNIFIC_DAILY_MAX + "). جرّب بكرا." }, 429);
+        var scIn = await request.json().catch(function () { return null; });
+        var scText = String(scIn && scIn.scene || "").trim();
+        if (!scText) return json({ error: "اكتب وصف المشهد" }, 400);
+        if (scText.length > DISC_SCENE_MAX) return json({ error: "وصف المشهد أطول من " + DISC_SCENE_MAX + " حرف" }, 400);
+        var scM = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(scIn && scIn.ref || "");
+        if (!scM || scM[2].length > 4 * 1024 * 1024) return json({ error: "صورة الشخصية غير صالحة" }, 400);
+        var scOrigin = new URL(request.url).origin;
+        var scPrompt = DISC_T3_CHARACTER + "\n\nFor this scene: " + scText + "\n\n" + DISC_T3_LAYOUT;
+        return slowJSON(function () { return magnificRun(env, scOrigin, scUser.email, scPrompt, scM[1], scM[2], "4:3"); });
       }
 
       /* ---- 7b6ب) Meeting Transcription: تفريغ الاجتماعات حرفياً (Gemini) ----

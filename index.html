@@ -302,6 +302,10 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
      flip its menu to open downward. */
   .acct{top:calc(var(--acct-inset) - 0.19736 * var(--acct-box));bottom:auto;}
   .acct .acct-menu{top:calc(0.87659 * var(--acct-box) + 8px);bottom:auto;}
+  /* On the tools page the photo sits above the boxes and scrolls away with them,
+     instead of floating over the «Poster Maker» heading. */
+  #projectGate .acct{position:absolute;}
+  #projectGate .pg-stack{padding-top:112px;}
 }
 /* Phone: the login card is scaled 1.25x, which pushed it past a narrow viewport
    and clipped both sides. Trim its width so the scaled card fits with a margin. */
@@ -397,19 +401,18 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
   bottom:calc(0.87659 * var(--acct-box) + 8px);   /* disc top (1 - 15.92/129) */
   left:calc(0.19504 * var(--acct-box));
   min-width:172px;
-  background:#fff;border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.24);padding:6px;z-index:1000;}
+  /* grey see-through glass with a silver rim; the glass and its tail at the
+     photo are one SVG shape (.acct-shape, drawn by acctShape on opening) */
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border-radius:24px;padding:10px 8px;z-index:1000;}
+.acct .acct-shape{position:absolute;left:0;z-index:-1;overflow:visible;pointer-events:none;filter:drop-shadow(0 14px 16px rgba(0,0,0,.26));}
+.acct .acct-shape path{fill:rgba(62,64,68,.72);stroke:rgba(205,214,224,.55);stroke-width:1.5;}
 .acct .acct-menu.on{display:block;}
 .acct .acct-menu button{display:block;width:100%;text-align:right;background:transparent;border:none;
-  border-radius:7px;padding:10px 11px;font-family:'Somar Sans';font-size:12.5px;font-weight:700;cursor:pointer;}
-/* The avatar artwork is a single fixed icon shared by both generators, so only
-   the menus carry per-project colours. */
-.acct .sz-acct-menu button{color:var(--brand-navy);}
-.acct .sz-acct-menu button:hover{background:#f4f8fa;}
-.acct .hc-acct-menu button{color:#414042;}
-/* Neutral silver, not a red tint: a pink hover is off-brand for Hope Center.
-   #ededee is the panel's existing silver (see .hc-preview) and matches the
-   lightness the previous #f6eaea had. */
-.acct .hc-acct-menu button:hover{background:#ededee;}
+  border-radius:14px;padding:10px 14px;font-family:'Somar Sans';font-size:12.5px;font-weight:700;cursor:pointer;color:#fff;}
+.acct .acct-menu button:hover{background:rgba(255,255,255,.08);}
+.acct .acct-menu button + button{position:relative;}
+.acct .acct-menu button + button::before{content:"";position:absolute;top:0;left:14px;right:14px;height:1px;background:rgba(255,255,255,.12);}
 .umgmt{border:1px solid #e2e8ec;border-radius:10px;margin:14px 0;overflow:hidden;}
 .umgmt-head{background:#f4f8fa;padding:10px 12px;font-size:12px;font-weight:700;color:var(--brand-navy);
   display:flex;justify-content:space-between;align-items:center;}
@@ -467,7 +470,9 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
   text-shadow:0 1px 3px rgba(0,0,0,.5);min-height:0;font-family:'Somar Sans';}
 </style>
 <style>
-.project-gate{position:fixed;inset:0;background:#eef1f3;display:flex;align-items:center;justify-content:center;z-index:50;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;}
+/* The page scrolls when the two boxes are taller than the screen (1366×768, phones);
+   the stack's auto margins keep it centred when it fits and unclipped when it does not. */
+.project-gate{position:fixed;inset:0;background:#d8d9da url(assets/ui/silver-bg.jpg) center/cover no-repeat;display:flex;align-items:center;justify-content:center;z-index:50;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;overflow-y:auto;}
 .pg-wrap{width:min(92vw,440px);background:#fff;border-radius:18px;padding:39px 33px 33px;box-shadow:0 10px 40px rgba(0,0,0,.12);text-align:center;}
 .pg-title{font-size:22px;font-weight:800;color:#be1f24;margin-bottom:27px;}
 .pg-sub{font-size:13px;color:#5a7282;margin-bottom:18px;line-height:1.5;}
@@ -477,15 +482,35 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
 .proj-card:hover:not(:disabled){border-color:var(--pc-hover,#003c54);background:var(--pc-hover,#003c54);color:#fff;}
 .proj-card:hover:not(:disabled) .proj-go{color:#fff;}
 .proj-card.soon{cursor:not-allowed;opacity:.6;background:#f4f6f8;color:#8697a3;}
+/* A tool this account has no access to: shown with a lock; a click asks for it. */
+.proj-card.locked,.proj-card.locked:hover{cursor:pointer;border-color:#d8e0e5;background:#f4f6f8;color:#9aa8b2;}
+.pg-ga .proj-card.locked:hover .proj-badge.new{background:#be1f24;color:#fff;}
+.proj-card.locked .proj-badge{opacity:.55;}
+.proj-lock{display:inline-block;width:13px;height:13px;margin-right:8px;vertical-align:-1px;fill:currentColor;}
 .proj-name{flex:1;text-align:center;}
 .proj-go{font-size:13px;color:#58595b;font-weight:700;white-space:nowrap;}
 .proj-badge{font-size:11px;font-weight:700;color:#5a7282;white-space:nowrap;}
 .pg-logout{margin-top:19.5px;background:none;border:none;color:#808285;font-family:'Somar Sans';font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;}
 .app-copyright{position:fixed;bottom:24px;left:0;right:0;z-index:-1;pointer-events:none;text-align:center;padding:0 12px;direction:ltr;font-family:'Somar Sans';font-weight:500;font-size:11px;color:#5b5b5b;}   /* fixed in place, behind the gate's own content */
 #projectGate .app-copyright{color:#848484;}
-.pg-stack{display:flex;flex-direction:column;align-items:center;gap:15px;}
+.pg-stack{display:flex;flex-direction:column;align-items:center;gap:15px;margin:auto;padding:24px 0;}
 .pg-ga{width:min(92vw,440px);background:#fff;border-radius:18px;padding:39px 33px 33px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.12);}
 .pg-ga .proj-card{text-decoration:none;}
+/* A short line on what each tool does, on hover: out to the right of the box,
+   or above the card when the screen is too narrow; none on touch screens. */
+.proj-card[data-hint]{position:relative;}
+.proj-card[data-hint]::after{content:attr(data-hint);position:absolute;left:calc(100% + 47px);top:50%;transform:translate(-6px,-50%);
+  width:max-content;max-width:230px;padding:9px 13px;border-radius:10px;background:rgba(62,64,68,.92);color:#fff;
+  font-family:'Somar Sans';font-size:12.5px;font-weight:600;line-height:1.5;text-align:right;direction:rtl;white-space:pre-line;
+  box-shadow:0 8px 22px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:5;}
+.proj-card[data-hint]::before{content:"";position:absolute;left:calc(100% + 41px);top:50%;transform:translate(-6px,-50%);
+  border:6px solid transparent;border-right-color:rgba(62,64,68,.92);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:5;}
+@media (hover:hover){ .proj-card[data-hint]:hover:not(:disabled)::after,.proj-card[data-hint]:hover:not(:disabled)::before{opacity:1;transform:translate(0,-50%);transition-delay:.25s;} }
+@media (max-width:1000px){
+  .proj-card[data-hint]::after{left:50%;top:auto;bottom:calc(100% + 10px);transform:translate(-50%,4px);text-align:center;}
+  .proj-card[data-hint]::before{left:50%;top:auto;bottom:calc(100% - 2px);transform:translate(-50%,4px);border-right-color:transparent;border-top-color:rgba(62,64,68,.92);}
+  .proj-card[data-hint]:hover:not(:disabled)::after,.proj-card[data-hint]:hover:not(:disabled)::before{transform:translate(-50%,0);}
+}
 .pg-ga .proj-card + .proj-card{margin-top:15px;}
 .pg-ga .proj-name{direction:ltr;}
 .proj-badge.new{display:inline-block;background:#be1f24;color:#fff;font-size:8.69px;font-weight:800;letter-spacing:.04em;padding:1.15px 4.6px;border-radius:999px;vertical-align:middle;margin-inline-start:4.5px;font-family:'Somar Sans',system-ui,sans-serif;}
@@ -499,21 +524,24 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
     </div>
     <div class="pg-ga">
       <div class="pg-title">Creative Tools</div>
-      <a class="proj-card" href="guideline-assistant/" style="--pc-hover:#be1f24">
+      <a class="proj-card" href="guideline-assistant/" data-hint="تدقيق المستندات الرسمية وتنسيقها بحسب الهوية البصرية" style="--pc-hover:#be1f24">
         <span class="proj-name">Guidelines Assistant <span class="proj-badge new">NEW</span></span>
       </a>
       <!-- Shown by showProjectPicker() only when the user has the thumbnail-gen project. -->
-      <a class="proj-card" id="pgThumbGen" href="thumbnail-gen/" style="--pc-hover:#be1f24;display:none">
+      <a class="proj-card" id="pgThumbGen" href="thumbnail-gen/" data-hint="يولّد صور مصغّرة لفيديوهات اليوتيوب" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Thumbnail Gen <span class="proj-badge new">NEW</span></span>
       </a>
-      <a class="proj-card" id="pgReelsGen" href="reels-gen/" style="--pc-hover:#be1f24;display:none">
+      <a class="proj-card" id="pgReelsGen" href="reels-gen/" data-hint="ريلز عمودية من صورك ومقاطعك، أو ريل قصير من فيديو طويل" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Reels Gen <span class="proj-badge new">NEW</span></span>
       </a>
-      <a class="proj-card" id="pgTextTr" href="text-transcription/" style="--pc-hover:#be1f24;display:none">
+      <a class="proj-card" id="pgTextTr" href="text-transcription/" data-hint="تفريغ النص من الصور و PDF، والفواتير والبطاقات وتحويلها لنص وملف Excel منسّق" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Text Transcription <span class="proj-badge new">NEW</span></span>
       </a>
-      <a class="proj-card" id="pgMeetTr" href="meeting-transcription/" style="--pc-hover:#be1f24;display:none">
+      <a class="proj-card" id="pgMeetTr" href="meeting-transcription/" data-hint="تفريغ الاجتماعات وتلخيصها بمحضر منسّق" style="--pc-hover:#be1f24;display:none">
         <span class="proj-name">Meeting Transcription <span class="proj-badge new">BETA</span></span>
+      </a>
+      <a class="proj-card" id="pgBooklet" href="booklet/" style="--pc-hover:#be1f24;display:none" data-hint="تحويل ملفات PDF لكتيّب جاهز للطباعة">
+        <span class="proj-name">Booklet Maker <span class="proj-badge new">NEW</span></span>
       </a>
     </div>
   </div>
@@ -707,7 +735,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 <div class="app" id="appRoot" style="display:none">
 <div class="panel">
   <div class="panel-head">
-    <h1><span class="wm"><span class="o">S</span>TUDY <span class="o">Z</span>ONE</span> &nbsp;Poster Generator</h1>
+    <h1><span class="wm"><span class="o">S</span>TUDY <span class="o">Z</span>ONE</span></h1>
     <p>ادخل المحتوى، التصميم مقفول بمعايير ثابتة</p>
   </div>
   <div class="user-bar">
@@ -732,8 +760,8 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     </div>
     <div class="field"><label>النموذج</label>
       <select id="modelSel">
-        <option value="1" selected>نموذج 1</option>
-        <option value="2">نموذج 2</option>
+        <option value="1" selected>بوستر إعلان</option>
+        <option value="2">ستوري يوميّة</option>
       </select></div>
     <div id="model1Fields">
     <div class="field"><label>المقاس</label>
@@ -975,9 +1003,9 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="panel-body">
       <div class="field"><label>النموذج</label>
         <select id="cuModelSel">
-          <option value="1">نموذج 1 — تسجيل</option>
-          <option value="2">نموذج 2 — دعوة تخرّج</option>
-          <option value="3">نموذج 3 — دعوة تخرّج (بدون صورة)</option>
+          <option value="1">فتح باب التسجيل</option>
+          <option value="2">دعوة تخرّج</option>
+          <option value="3">دعوة تخرّج (بدون صورة)</option>
         </select></div>
       <div class="field"><label>المحافظة</label>
         <select id="cuCity">
@@ -991,7 +1019,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 والذي يقدّم تجربة تعليمية مبتكرة مستوحاة من الجامعات،
 تهدف إلى تنمية الإبداع والتفكير، في بيئة آمنة داعمة.</textarea></div>
       <div class="field"><label>الصورة <span class="hint">PNG شفاف أفضل</span></label>
-        <label class="upload has" id="cuImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="cuImgFile"></label></div>
+        <label class="upload" id="cuImgUp">اضغط لرفع الصورة<input type="file" accept="image/*" id="cuImgFile"></label></div>
       <div class="field"><label>الاختصاصات المتاحة <span class="hint">سطر لكل صف</span></label>
         <textarea id="cuSpecs" rows="3">كيمياء، ريادة أعمال، علم الفضاء، تصميم وتصوير ومونتاج،
 صحافة وإعلام، مخترع التطبيقات(AI)، روبوتيك، هندسة، طب</textarea></div>
@@ -1023,7 +1051,7 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
         <div class="field"><label>العنوان الفرعي</label><input type="text" id="cu2VenueSub" value="كنيسة السيدة العذراء - الفيلات"></div>
         <div class="field" id="cu2CardsField"><label>عدد أشخاص البطاقة <span class="hint">Story فقط</span></label><input type="text" id="cu2Cards" value="3"></div>
         <div class="field"><label>صورة التخرّج <span class="hint">PNG شفاف أفضل</span></label>
-          <label class="upload has" id="cu2ImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="cu2ImgFile"></label></div>
+          <label class="upload" id="cu2ImgUp">اضغط لرفع الصورة<input type="file" accept="image/*" id="cu2ImgFile"></label></div>
       </div>
       <div id="cuM3Fields" style="display:none">
         <div class="sec-divider">الآية</div>
@@ -1119,6 +1147,11 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
 .dc-app .panel{display:flex;flex-direction:column;overflow:hidden;}
 .dc-app .panel-body{flex:1 1 auto;min-height:0;overflow-y:auto;}
 .dc-svg svg{display:block;}
+.dc-ai{width:100%;margin-top:8px;background:#023c54;color:#fff;border:none;border-radius:10px;padding:11px;font-family:'Somar Sans';font-weight:800;font-size:14px;cursor:pointer;transition:.15s;}
+.dc-ai:hover{filter:brightness(1.15);}
+.dc-ai:disabled{opacity:.6;cursor:default;}
+#dcAiSt{margin-top:6px;line-height:1.6;}
+#dcAiSt.err{color:#c0392b;font-weight:700;}
 .lp-row{display:flex;gap:6px;}
 .lp-row .field{flex:1;min-width:0;}
 .lp-reset{background:none;border:none;color:#6d6e71;font-family:'Somar Sans';font-weight:700;font-size:12px;cursor:pointer;padding:0 4px;text-decoration:underline;}
@@ -1151,13 +1184,13 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
  مهارات القيـادة الشخصية والروحية.</textarea></div>
       <div class="sec-divider">الصورة</div>
       <div class="field"><label>الصورة الوسطى <span class="hint">PNG شفاف أفضل</span> <button type="button" class="lp-reset" id="lpImgReset" style="display:none">استعادة الافتراضي</button></label>
-        <label class="upload has" id="lpImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="lpImgFile"></label></div>
+        <label class="upload" id="lpImgUp">اضغط لرفع الصورة<input type="file" accept="image/*" id="lpImgFile"></label></div>
       <div class="sec-divider">العبارة</div>
       <div class="field"><label>العنوان</label><input type="text" id="lpQuoteTitle" value="القادة الحقيقيون"></div>
       <div class="field"><label>النص</label><input type="text" id="lpQuote" value=" هم الذين يُظهرون القوة في الأوقات الصعبة"></div>
       <div class="sec-divider">التقديم</div>
       <div class="field"><label>رمز QR <span class="hint">صورة مربّعة</span> <button type="button" class="lp-reset" id="lpQrReset" style="display:none">استعادة الافتراضي</button></label>
-        <label class="upload has" id="lpQrUp">✓ رمز QR الافتراضي<input type="file" accept="image/*" id="lpQrFile"></label></div>
+        <label class="upload" id="lpQrUp">اضغط لتغيير الـ QR<input type="file" accept="image/*" id="lpQrFile"></label></div>
       <div class="lp-row">
         <div class="field"><label>الموعد النهائي</label><input type="text" id="lpDeadline" value="2025/3/25" dir="ltr"></div>
         <div class="field"><label>رقم التواصل</label><input type="text" id="lpPhone" value="0950018463" dir="ltr"></div>
@@ -1204,13 +1237,53 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
     <div class="panel-body">
       <div class="field"><label>النموذج</label>
         <select id="dcTpl">
-          <option value="1" selected>نموذج 1 — دورة</option>
-          <option value="2">نموذج 2 — شهادة (Testimony)</option>
+          <option value="1" selected>مسار تدريبي</option>
+          <option value="2">شهادة (Testimony)</option>
+          <option value="3">فتح باب التسجيل</option>
         </select></div>
+      <div class="dc-t3" style="display:none">
+      <div class="field"><label>المحافظة</label>
+        <select id="dcT3City">
+          <option value="حلب">حلب</option>
+          <option value="حمص">حمص</option>
+          <option value="دمشق" selected>دمشق</option>
+        </select></div>
+      </div>
+      <div class="dc-t13">
+      <div class="field"><label>المسار الرئيسي</label><select id="dcTrack"></select></div>
+      <div class="field" id="dcSpecField"><label>المسار التخصصي</label><select id="dcSpec"></select></div>
+      </div>
+      <div class="dc-t3" style="display:none">
+      <div class="sec-divider">الإعلان</div>
+      <div class="field"><label>السطر <span class="hint">بين نجمتين *هيك* = كحلي عريض</span></label><input type="text" id="dcT3Intro" value="يعلن *مركز التدريب والتكوين DISC* في دمشق عن فتح باب التسجيل في:" dir="auto"></div>
+      <div class="sec-divider">الصورة</div>
+      <div class="field"><label>وصف المشهد <span class="hint">الوضعية واللبس والمكان، بالإنكليزي أفضل</span></label>
+        <textarea id="dcT3Scene" rows="4" dir="auto" maxlength="800" placeholder="He is standing at a sleek desk in a bright office, wearing a navy blazer, holding a folder and smiling at the camera."></textarea>
+        <button type="button" class="dc-ai" id="dcT3GenBtn">توليد الصورة</button>
+        <div class="hint" id="dcT3GenSt"></div></div>
+      <div class="field"><label>أو ارفع صورة <span class="hint">خلفيتها رمادي فاتح، والشخص عاليسار</span> <button type="button" class="lp-reset" id="dcT3ImgReset" style="display:none">استعادة الافتراضي</button></label>
+        <label class="upload" id="dcT3ImgUp">اضغط لرفع الصورة<input type="file" accept="image/*" id="dcT3ImgFile"></label></div>
+      <div class="sec-divider">البرنامج</div>
+      <div class="field"><label>العنوان <span class="hint">سطرين</span></label><textarea id="dcT3Title" rows="2" dir="auto">البرنامج التدريبي للتأهيل في مجال
+الإدارة - Administration</textarea></div>
+      <div class="field"><label>الشريط البرتقالي</label><input type="text" id="dcT3Tag" value="طوّر مهاراتك، ابدأ مسيرتك المهنية" dir="auto"></div>
+      <div class="sec-divider">المحاور</div>
+      <div class="field"><label>العنوان</label><input type="text" id="dcT3TopicsHead" value="يتضمن البرنامج المحاور التالية:" dir="auto"></div>
+      <div class="field"><label>المحاور <span class="hint">سطر لكل محور، حتى 6</span></label><textarea id="dcT3Topics" rows="4" dir="auto">إدارة العمليات اليومية
+خدمة العملاء وإدارة السجلات
+تنظيم العمل والمهارات المكتبية
+التنسيق والمتابعة ودعم الإدارة</textarea></div>
+      <div class="sec-divider">التفاصيل</div>
+      <div class="field"><label>السطرين <span class="hint">بين نجمتين *هيك* = كحلي عريض</span></label><textarea id="dcT3Details" rows="2" dir="auto">*60 ساعة تدريبية* ويحصل المشاركين على *شهادة حضور* في ختام التدريب
+*التدريب مجاني* ويجمع بين المعرفة النظرية والتطبيق العملي</textarea></div>
+      <div class="sec-divider">الشريط السفلي</div>
+      <div class="field"><label>العنوان</label><input type="text" id="dcT3Addr" value="العنوان: دمشق - باب توما - حارة كنيسة اللاتين" dir="auto"></div>
+      <div class="field"><label>التواصل</label><input type="text" id="dcT3Phone" value="للتواصل والاستفسار: 0989162116" dir="auto"></div>
+      </div>
       <div class="dc-t2" style="display:none">
       <div class="sec-divider">الصورة الشخصية</div>
       <div class="field"><label>الصورة <span class="hint">PNG بدون خلفية أفضل — بيطلعلها إطار أبيض لحالها</span> <button type="button" class="lp-reset" id="dcPhotoReset" style="display:none">استعادة الافتراضي</button></label>
-        <label class="upload has" id="dcPhotoUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="dcPhotoFile"></label></div>
+        <label class="upload" id="dcPhotoUp">اضغط لرفع الصورة<input type="file" accept="image/*" id="dcPhotoFile"></label></div>
       <div class="sec-divider">الشهادة</div>
       <div class="field"><label>النص <span class="hint">سطر لكل صف</span></label>
         <textarea id="dcQuote" rows="6" dir="auto">Working with this team
@@ -1227,7 +1300,9 @@ what we needed.</textarea></div>
       <div class="field"><label>العنوان الفرعي</label><input type="text" id="dcSub" value="(دورة شاملة لتطوير مهاراتك الرقمية)"></div>
       <div class="sec-divider">الصورة</div>
       <div class="field"><label>الصورة الوسطى <span class="hint">PNG شفاف أفضل</span> <button type="button" class="lp-reset" id="dcImgReset" style="display:none">استعادة الافتراضي</button></label>
-        <label class="upload has" id="dcImgUp">✓ الصورة الافتراضية<input type="file" accept="image/*" id="dcImgFile"></label></div>
+        <label class="upload" id="dcImgUp">اضغط لرفع الصورة<input type="file" accept="image/*" id="dcImgFile"></label>
+        <button type="button" class="dc-ai" id="dcAiBtn">تحويل لستايل DISC</button>
+        <div class="hint" id="dcAiSt"></div></div>
       <div class="sec-divider">المحتوى</div>
       <div class="field"><label>السطر العريض</label><input type="text" id="dcLine1" value="تعلّم البرمجة، التصميم والبرامج المكتبية"></div>
       <div class="field"><label>سطر الوصف</label><input type="text" id="dcLine2" value="من الصفر إلى الاحتراف في ثلاث مهارات يطلبها كل سوق عمل"></div>
@@ -1353,11 +1428,6 @@ var Auth = (function(){
       return res.ok?null:((res.data&&res.data.error)||"فشل الحذف"); }
     catch(e){ return "تعذّر الاتصال"; }
   }
-  async function notify(attachments,title,projectName){
-    try{ var res=await api("/notify","POST",{attachments:attachments,title:title,project_name:projectName});
-      return res.ok?{ok:true,data:res.data}:{ok:false,error:(res.data&&res.data.error)||"فشل إرسال الإشعار"}; }
-    catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
-  }
   return {restore:restore, login:login, logout:logout, can:can, current:function(){return current;},
           projects:async function(){ try{ var r=await api("/projects","GET"); return r.ok?{ok:true,projects:r.data.projects||[]}:{ok:false,error:(r.data&&r.data.error)||"تعذّر الجلب",projects:[]}; }catch(e){ return {ok:false,error:"تعذّر الاتصال",projects:[]}; } },
           applyBrand:applyBrand,
@@ -1382,7 +1452,26 @@ var Auth = (function(){
                  return res.ok?{ok:true,fields:res.data.fields||[]}:{ok:false,error:(res.data&&res.data.error)||"فشل التدقيق"}; }
             catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
           },
-          listUsers:listUsers, addUser:addUser, deleteUser:deleteUser, notify:notify};
+          /* DISC: the picture in DISC's 3D style (Magnific, through the Worker). Takes a data URL, gives one back. */
+          discRestyle:async function(image){
+            try{ var res=await api("/disc/restyle","POST",{image:image});
+                 return (res.ok&&res.data&&res.data.image)?{ok:true,image:res.data.image}:{ok:false,error:(res.data&&res.data.error)||"فشل التحويل"}; }
+            catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
+          },
+          /* Access requests: a user asks for locked tools; the Owner or the Comms Manager decides each one. */
+          accessMine:async function(){ try{ var r=await api("/access/mine","GET"); return r.ok?{ok:true,requests:r.data.requests||[]}:{ok:false,error:(r.data&&r.data.error)||""}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          accessRequest:async function(slugs,reason){ try{ var r=await api("/access/request","POST",{slugs:slugs,reason:reason}); return r.ok?{ok:true,added:r.data.added||[]}:{ok:false,error:(r.data&&r.data.error)||"فشل إرسال الطلب"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          accessHistory:async function(){ try{ var r=await api("/access/history","GET"); return r.ok?{ok:true,requests:r.data.requests||[]}:{ok:false,error:(r.data&&r.data.error)||"تعذّر تحميل الطلبات"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          accessSeen:async function(ids){ try{ await api("/access/seen","POST",{ids:ids}); }catch(e){} },
+          accessList:async function(){ try{ var r=await api("/access/requests","GET"); return r.ok?{ok:true,requests:r.data.requests||[]}:{ok:false,error:(r.data&&r.data.error)||"تعذّر تحميل الطلبات"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          accessDecide:async function(id,approve,note){ try{ var r=await api("/access/decide","POST",{id:id,approve:approve,note:note}); return r.ok?{ok:true}:{ok:false,error:(r.data&&r.data.error)||"فشل الحفظ"}; }catch(e){ return {ok:false,error:"تعذّر الاتصال"}; } },
+          /* DISC template 3: a scene with DISC's character, from its description and his reference picture. */
+          discScene:async function(scene,ref){
+            try{ var res=await api("/disc/scene","POST",{scene:scene,ref:ref});
+                 return (res.ok&&res.data&&res.data.image)?{ok:true,image:res.data.image}:{ok:false,error:(res.data&&res.data.error)||"فشل التوليد"}; }
+            catch(e){ return {ok:false,error:"تعذّر الاتصال"}; }
+          },
+          listUsers:listUsers, addUser:addUser, deleteUser:deleteUser};
 })();
 
 var heroIMG=null, origIMG=null, fmt="square";
@@ -1672,7 +1761,6 @@ $("exportBtn").onclick=function(){
   function capture(i){
     if(i>=targets.length){
       finish();
-      sendNotification(captured);
       return;
     }
     var t=targets[i],name=t[0],W=t[1],H=t[2];
@@ -1837,36 +1925,10 @@ function exportModel2(){
     var fn=fileName2();
     var a=document.createElement("a");a.download=fn;a.href=url;a.click();
     btn.disabled=false;btn.textContent="DOWNLOAD";
-    sendNotification2([{filename:fn, b64:url.split(",")[1]}]);
   }).catch(function(err){ alert("خطأ بالتصدير: "+(err&&err.message||err)); $("stage").style.transform=prevT; btn.disabled=false;btn.textContent="DOWNLOAD"; });
 }
-async function sendNotification2(captured){
-  try{
-    var code=CITY_CODE[$("city2").value]||$("city2").value;
-    var title=m2Title();
-    var safe=title.replace(/[\/\\:*?"<>|]/g,"").replace(/\s+/g," ")||"ستوري";
-    var jsonB64=btoa(unescape(encodeURIComponent(JSON.stringify(collectProject2(),null,2))));
-    var attachments=captured.slice();
-    attachments.push({filename:"006SZ_"+code+"_"+todayMMDDYYYY()+".json", b64:jsonB64});
-    var res=await Auth.notify(attachments, title);
-    if(res.ok){ showToast("✓ تم إرسال نسخة للإدارة بالإيميل"); }
-    else{ showToast("⚠ تعذّر إرسال الإشعار: "+(res.error||""), true); }
-  }catch(e){ showToast("⚠ تعذّر إرسال الإشعار", true); }
-}
-async function sendNotification(captured){
-  try{
-    var code=CITY_CODE[$("city").value]||$("city").value;
-    var rawTitle=($("title").value||"").trim();
-    var safe=rawTitle.replace(/[\/\\:*?"<>|]/g,"").replace(/\s+/g," ")||"مشروع";
-    var jsonStr=JSON.stringify(collectProject(),null,2);
-    var jsonB64=btoa(unescape(encodeURIComponent(jsonStr)));
-    var attachments=captured.slice();
-    attachments.push({filename:"006SZ_"+code+"_"+titleForName()+"_"+todayMMDDYYYY()+".json", b64:jsonB64});
-    var res=await Auth.notify(attachments, rawTitle);
-    if(res.ok){ showToast("✓ تم إرسال نسخة للإدارة بالإيميل"); }
-    else{ showToast("⚠ تعذّر إرسال الإشعار: "+(res.error||""), true); }
-  }catch(e){ showToast("⚠ تعذّر إرسال الإشعار", true); }
-}
+/* The email to the Owner and the Comms Manager after each download is gone: its relay was never
+   configured, so it only ever failed. The archive keeps every downloaded design instead. */
 function showToast(msg, isErr){
   var t=document.createElement("div");
   t.textContent=msg;
@@ -2018,13 +2080,31 @@ function closeAcctMenus(){
   var av=document.querySelectorAll(".acct-av");
   for(var j=0;j<av.length;j++) av[j].setAttribute("aria-expanded","false");
 }
+/* The menu's glass and its tail as one outline, at the menu's size and
+   pointing at the photo's centre: down when the menu opens above the photo,
+   up when it opens below (narrow screens). */
+function acctShape(m,a){
+  var w=m.offsetWidth, h=m.offsetHeight, R=24, T=8, HW=9, e=0.75;
+  var ar=a.getBoundingClientRect(), tx=ar.left+0.5347*ar.width-m.getBoundingClientRect().left;   // the disc's centre (68.97/129)
+  tx=Math.max(R+HW,Math.min(w-R-HW,tx));
+  var up=getComputedStyle(m).bottom==="auto", x0=e, y0=e, x1=w-e, y1=h-e;
+  var tip=up?"H"+(tx-HW)+"L"+(tx-2.2)+" "+(y0-T+1.8)+"Q"+tx+" "+(y0-T)+" "+(tx+2.2)+" "+(y0-T+1.8)+"L"+(tx+HW)+" "+y0:"";
+  var low=up?"":"H"+(tx+HW)+"L"+(tx+2.2)+" "+(y1+T-1.8)+"Q"+tx+" "+(y1+T)+" "+(tx-2.2)+" "+(y1+T-1.8)+"L"+(tx-HW)+" "+y1;
+  var d="M"+(x0+R)+" "+y0+tip+"H"+(x1-R)+"A"+R+" "+R+" 0 0 1 "+x1+" "+(y0+R)+"V"+(y1-R)+"A"+R+" "+R+" 0 0 1 "+(x1-R)+" "+y1+low+
+        "H"+(x0+R)+"A"+R+" "+R+" 0 0 1 "+x0+" "+(y1-R)+"V"+(y0+R)+"A"+R+" "+R+" 0 0 1 "+(x0+R)+" "+y0+"Z";
+  var svg=m.querySelector(".acct-shape");
+  if(!svg){ svg=document.createElementNS("http://www.w3.org/2000/svg","svg"); svg.setAttribute("class","acct-shape"); svg.setAttribute("aria-hidden","true");
+            svg.appendChild(document.createElementNS("http://www.w3.org/2000/svg","path")); m.insertBefore(svg,m.firstChild); }
+  svg.setAttribute("width",w); svg.setAttribute("height",h+T); svg.setAttribute("viewBox","0 "+(up?-T:0)+" "+w+" "+(h+T));
+  svg.style.top=(up?-T:0)+"px"; svg.firstChild.setAttribute("d",d);
+}
 function wireAcct(avId,menuId){
   var a=$(avId), m=$(menuId); if(!a||!m) return;
   a.onclick=function(e){
     e.stopPropagation();            // otherwise the document handler below
     var open=!m.classList.contains("on");  // closes it in the same click
     closeAcctMenus();
-    if(open){ m.classList.add("on"); a.setAttribute("aria-expanded","true"); }
+    if(open){ m.classList.add("on"); a.setAttribute("aria-expanded","true"); acctShape(m,a); }
   };
 }
 // Menu item clicks are allowed to bubble, so this closes the menu after them.
@@ -2298,18 +2378,11 @@ function startApp(){
   render(); fitStage();
   document.fonts.ready.then(function(){render();fitStage();});
 }
-async function afterAuth(){
-  var u=Auth.current();
-  if(u && (u.role==="owner"||u.role==="comms")){ showProjectPicker(); return; }
-  try{
-    var r=await Auth.projects(); var ps=(r&&r.ok?r.projects:[])||[];
-    if(ps.length===1){ openProject(ps[0]); }
-    else if(ps.length>1){ showProjectPicker(); }
-    else { startApp(); }
-  }catch(e){ startApp(); }
-}
-var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription", MEETTR_SLUG="meeting-transcription";
-var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/","meeting-transcription":"meeting-transcription/"};   // standalone tool pages
+/* After signing in, everyone lands on the tools list — even with one tool —
+   and picks it there; the tools they lack show locked. */
+function afterAuth(){ showProjectPicker(); }
+var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription", MEETTR_SLUG="meeting-transcription", BOOKLET_SLUG="booklet-maker";
+var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/","meeting-transcription":"meeting-transcription/","booklet-maker":"booklet/"};   // standalone tool pages
 function openProject(p){
   if(p && TOOL_PAGES[p.slug]){ location.href=TOOL_PAGES[p.slug]; return; }
   if(p && p.template_type==="hopecenter_v1"){ openHopeCenter(p); }
@@ -2334,27 +2407,55 @@ async function showProjectPicker(){
   var res=await Auth.projects();
   if(!res.ok){ grid.innerHTML='<div class="proj-msg">تعذّر تحميل المشاريع: '+esc(res.error||"")+'</div>'; return; }
   grid.innerHTML="";
+  // Every tool shows for everyone; one this account does not have (the server lists only its
+  // own) carries a lock and does not open. The pages and the Worker check access on their own.
+  var mine={}; (res.projects||[]).forEach(function(p){ mine[p.slug]=p; });
   // Thumbnail Gen, Reels Gen, Text and Meeting Transcription are projects for access control,
   // but they live in the tools box under Guidelines Assistant rather than in the project list.
-  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"]].forEach(function(t){
-    var p=(res.projects||[]).filter(function(x){ return x.slug===t[0]; })[0];
-    if($(t[1])) $(t[1]).style.display=(p&&p.status==="ready")?"":"none";
+  // The Owner and the Comms Manager reach every tool, a new one too before it is a project.
+  var me=Auth.current&&Auth.current(), all=!!(me&&(me.role==="owner"||me.role==="comms"));
+  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"],[BOOKLET_SLUG,"pgBooklet"]].forEach(function(t){
+    var a=$(t[1]), p=mine[t[0]]; if(!a) return;
+    a.style.display=""; a.dataset.slug=t[0];
+    setLocked(a,!all&&!(p&&p.status==="ready"));
   });
-  // The order the Poster Maker box shows; a project not listed here goes last, in the server's order.
+  // The Poster Maker box: these five in this order, then any other project of this account.
   var PROJ_ORDER=["hope-center","study-zone","children-university","disc","leap"];
-  function projRank(p){ var i=PROJ_ORDER.indexOf(p.slug); return i<0?PROJ_ORDER.length:i; }
-  (res.projects||[]).filter(function(p){ return TOOL_PAGES[p.slug]===undefined; }).sort(function(a,b){ return projRank(a)-projRank(b); }).forEach(function(p){
-    var ready=(p.status==="ready");
+  var PROJ_NAME={"hope-center":"Hope Center","study-zone":"Study Zone","children-university":"Children University","disc":"DISC","leap":"LEAP"};
+  var PROJ_HINT={"hope-center":"قوالب خاصة بــ Hope Center","study-zone":"قوالب خاصة بــ Study Zone",
+                 "children-university":"قوالب خاصة بــ Children University","disc":"قوالب خاصة بــ DISC","leap":"قوالب خاصة بــ LEAP"};
+  var list=PROJ_ORDER.map(function(slug){ return mine[slug]||{slug:slug,name:PROJ_NAME[slug],locked:true}; })
+    .concat((res.projects||[]).filter(function(p){ return TOOL_PAGES[p.slug]===undefined&&PROJ_ORDER.indexOf(p.slug)<0; }));
+  list.forEach(function(p){
+    var ready=!p.locked&&p.status==="ready";
     var card=document.createElement("button");
     card.type="button";
-    card.className="proj-card"+(ready?"":" soon");
-    card.disabled=!ready;
-    if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); }
-    var h='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>';
-    card.innerHTML=h;
-    if(ready){ card.onclick=function(){ selectProject(p); }; }
+    card.className="proj-card"+(p.locked||ready?"":" soon");
+    card.disabled=!p.locked&&!ready;   // a locked card stays enabled, so its hint shows on hover
+    card.innerHTML='<span class="proj-name">'+esc(p.name||p.slug||"")+'</span>'; card.dataset.slug=p.slug;
+    if(PROJ_HINT[p.slug]) card.setAttribute("data-hint",PROJ_HINT[p.slug]);
+    if(p.locked) setLocked(card,true);
+    else if(ready){ card.style.setProperty("--pc-hover", PROJ_HOVER[p.slug]||"#003c54"); card.onclick=function(){ selectProject(p); }; }
     grid.appendChild(card);
   });
+  if(window.accApply) accApply();   // requests: ⏳ on asked-for tools, new decisions, the approvers' count
+}
+var LOCK_SVG='<svg class="proj-lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2h.5A1.5 1.5 0 0 1 13.5 8.5v5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 4 7zm1.6 0h3.8V5a1.9 1.9 0 0 0-3.8 0z"/></svg>';
+/* A tool card with or without its lock: the hint then says why it does not open. */
+function setLocked(el,on){
+  if(el.dataset.toolHint===undefined) el.dataset.toolHint=el.getAttribute("data-hint")||"";
+  el.classList.toggle("locked",on);
+  el.setAttribute("aria-disabled",on?"true":"false");
+  if(el.tagName==="A") el.tabIndex=on?-1:0;
+  var name=el.querySelector(".proj-name"), lk=name&&name.querySelector(".proj-lock");
+  // always left of the name: first in an English (LTR) name, last in an RTL one
+  if(on&&name&&!lk) name.insertAdjacentHTML(getComputedStyle(name).direction==="ltr"?"afterbegin":"beforeend",LOCK_SVG);
+  if(!on&&lk) lk.remove();
+  // what the tool does, then how to get it (the hint keeps line breaks)
+  var why="هي الأداة مو مفعّلة لحسابك، اكبس عليها لتطلب صلاحية";
+  if(on) el.setAttribute("data-hint",(el.dataset.toolHint?el.dataset.toolHint+"\n":"")+why);
+  else if(el.dataset.toolHint) el.setAttribute("data-hint",el.dataset.toolHint);
+  el.onclick=on?function(e){ e.preventDefault(); if(window.accOpenRequest) accOpenRequest(el.dataset.slug); }:(el.tagName==="A"?null:el.onclick);
 }
 function selectProject(p){
   $("projectGate").style.display="none";
@@ -2436,6 +2537,15 @@ function hcFitStage(){
 window.addEventListener("resize",hcFitStage);
 function hcRender(){ try{ $("hcStage").innerHTML=hcSVG(HC.format,false); hcFitStage(); }catch(e){} }
 function hcMsg(t,e){ var m=$("hcMsg"); if(m){ m.textContent=t; m.className="hc-msg "+(e?"err":"ok"); } }
+/* The archive keeps Hope Center's fields as its project (it has no project file of its own) and gives them back here. */
+window.ARC_REG=window.ARC_REG||{}; ARC_REG.hc={
+  collect:function(){ return {app:"hopecenter",v:1,city:$("hcCity").value,program:$("hcProgram").value,job:$("hcJob").value,format:HC.format}; },
+  load:function(d){
+    [["hcCity",d.city],["hcProgram",d.program],["hcJob",d.job]].forEach(function(f){ var e=$(f[0]); if(e&&typeof f[1]==="string"){ e.value=f[1]; e.dispatchEvent(new Event("change",{bubbles:true})); e.dispatchEvent(new Event("input",{bubbles:true})); } });
+    var fb=$(d.format==="poster"?"hcFmtPoster":"hcFmtStory"); if(fb) fb.click();
+    hcRender();
+  }
+};
 window.openHopeCenter=function(p){
   HC.project=p||HC.project;
   $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
@@ -2458,7 +2568,7 @@ function hcDate(){ var d=new Date(); var mm=("0"+(d.getMonth()+1)).slice(-2); va
 function hcClean(x){ return String(x||"").replace(new RegExp('[\\\\/:*?"<>|]','g'),"").trim(); }
 function hcExport(){
   var btn=$("hcExportBtn"); if(btn) btn.disabled=true;
-  hcMsg("جاري التحميل والإرسال…",false);
+  hcMsg("جاري التحميل…",false);
   var city=$("hcCity").value; var cc=HC_CITY_CODE[city]||city;
   var program=$("hcProgram").value;
   var job=($("hcJob").value||"Hiring").trim()||"Hiring";
@@ -2466,13 +2576,9 @@ function hcExport(){
   Promise.all([pngFromSVG("story"),pngFromSVG("poster")]).then(function(r){
     var a1=document.createElement("a"); a1.download=base+"_Story.png"; a1.href="data:image/png;base64,"+r[0]; a1.click();
     setTimeout(function(){ var a2=document.createElement("a"); a2.download=base+"_Poster.png"; a2.href="data:image/png;base64,"+r[1]; a2.click(); }, 500);
-    var proj={ template:"hopecenter_v1", city:city, project:program, job:job };
-    var jb64=btoa(unescape(encodeURIComponent(JSON.stringify(proj,null,2))));
-    return Auth.notify([{filename:base+"_Story.png",b64:r[0]},{filename:base+"_Poster.png",b64:r[1]},{filename:base+".json",b64:jb64}], "We’re Hiring — "+job, "Hope Center");
-  }).then(function(res){
+  }).then(function(){
     if(btn) btn.disabled=false;
-    if(res&&res.ok){ hcMsg("✓ تم التحميل والإرسال بالإيميل",false); }
-    else { hcMsg("تم التحميل ✓ — تعذّر الإرسال: "+((res&&res.error)||""),true); }
+    hcMsg("✓ تم التحميل",false);
   }).catch(function(e){ if(btn) btn.disabled=false; hcMsg("خطأ: "+(e&&e.message||e),true); });
 }
 // Mirrors showUserBar() for the Hope Center panel.
@@ -2616,7 +2722,7 @@ $("hcExportBtn").onclick=hcExport;
     $("cuBody").value=d.body||""; $("cuSpecs").value=d.specs||""; $("cuNote").value=d.note||""; $("cuFooter").value=d.footer||"";
     CU.hero=d.image||null;
     if(CU.hero){ $("cuImgUp").classList.add("has"); $("cuImgUp").childNodes[0].nodeValue="✓ تم رفع الصورة"; }
-    else { $("cuImgUp").childNodes[0].nodeValue="✓ الصورة الافتراضية"; }
+    else { $("cuImgUp").classList.remove("has"); $("cuImgUp").childNodes[0].nodeValue="اضغط لرفع الصورة"; }
     cuRender();
   }
   if($("cuProjFile")) $("cuProjFile").addEventListener("change",function(e){
@@ -2630,6 +2736,8 @@ $("hcExportBtn").onclick=hcExport;
   if($("cuPhotoBtn")) $("cuPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
   if($("cuMgmtToggle")&&typeof openUserMgmt==="function") $("cuMgmtToggle").onclick=openUserMgmt;
   if($("cuLogout")) $("cuLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("cuApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  // the archive takes this project with each download, and gives it back through cuLoad
+  window.ARC_REG=window.ARC_REG||{}; ARC_REG.cu={collect:cuCollect,load:cuLoad};
   window.openChildrenUniversity=function(p){
     CU.project=p||CU.project;
     $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
@@ -2766,7 +2874,7 @@ $("hcExportBtn").onclick=hcExport;
   }
   function cu2Collect(){ return {app:"childrenuniversity",v:1,model:2,fmt:CU2.fmt,city:$("cuCity")?$("cuCity").value:"",invite:cu2V("cu2Invite",""),batch:cu2V("cu2Batch",""),day:cu2V("cu2Day",""),month:cu2V("cu2Month",""),year:cu2V("cu2Year",""),weekday:cu2V("cu2Weekday",""),time:cu2V("cu2Time",""),venue:cu2V("cu2Venue",""),venueSub:cu2V("cu2VenueSub",""),cards:cu2V("cu2Cards",""),image:CU2.heroUser||null}; }
   function cu2Load(d){ if($("cuModelSel")) $("cuModelSel").value="2"; cuSetModel("2"); function set(id,v){ var e=$(id); if(e&&v!=null) e.value=v; } if(d.city&&$("cuCity")) $("cuCity").value=d.city;
-    CU2.heroUser=d.image||null; var up=$("cu2ImgUp"); if(up) up.childNodes[0].nodeValue=CU2.heroUser?"✓ تم رفع الصورة":"✓ الصورة الافتراضية"; set("cu2Invite",d.invite);set("cu2Batch",d.batch);set("cu2Day",d.day);set("cu2Month",d.month);set("cu2Year",d.year);set("cu2Weekday",d.weekday);set("cu2Time",d.time);set("cu2Venue",d.venue);set("cu2VenueSub",d.venueSub);set("cu2Cards",d.cards); if(d.fmt) cu2SetFmt(d.fmt); else cu2Render(); }
+    CU2.heroUser=d.image||null; var up=$("cu2ImgUp"); if(up){ up.childNodes[0].nodeValue=CU2.heroUser?"✓ تم رفع الصورة":"اضغط لرفع الصورة"; up.classList.toggle("has",!!CU2.heroUser); } set("cu2Invite",d.invite);set("cu2Batch",d.batch);set("cu2Day",d.day);set("cu2Month",d.month);set("cu2Year",d.year);set("cu2Weekday",d.weekday);set("cu2Time",d.time);set("cu2Venue",d.venue);set("cu2VenueSub",d.venueSub);set("cu2Cards",d.cards); if(d.fmt) cu2SetFmt(d.fmt); else cu2Render(); }
   /* ===== النموذج 3: دعوة تخرّج (بدون صورة) =====
      نسخة مستقلة عن النموذج 2 تبدأ مطابِقة له تمامًا، لتُعدَّل لاحقًا دون
      المساس بالنموذج 2. تعيد استخدام الدوال الصرفة المشتركة
@@ -3074,7 +3182,7 @@ $("hcExportBtn").onclick=hcExport;
 
   function lpSetQr(src){
     LP.qrUser=src||null;
-    var up=$("lpQrUp"); if(up) up.childNodes[0].nodeValue=src?"✓ تم رفع رمز QR":"✓ رمز QR الافتراضي";
+    var up=$("lpQrUp"); if(up){ up.childNodes[0].nodeValue=src?"✓ تم رفع رمز QR":"اضغط لتغيير الـ QR"; up.classList.toggle("has",!!src); }
     var rs=$("lpQrReset"); if(rs) rs.style.display=src?"":"none";
     lpRender();
   }
@@ -3085,7 +3193,7 @@ $("hcExportBtn").onclick=hcExport;
   if($("lpQrReset")) $("lpQrReset").onclick=function(e){ e.preventDefault(); lpSetQr(null); };
   function lpSetHero(src){
     LP.heroUser=src||null;
-    var up=$("lpImgUp"); if(up) up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"✓ الصورة الافتراضية";
+    var up=$("lpImgUp"); if(up){ up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"اضغط لرفع الصورة"; up.classList.toggle("has",!!src); }
     var rs=$("lpImgReset"); if(rs) rs.style.display=src?"":"none";
     lpRender();
   }
@@ -3137,6 +3245,7 @@ $("hcExportBtn").onclick=hcExport;
   if($("lpPhotoBtn")) $("lpPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
   if($("lpMgmtToggle")&&typeof openUserMgmt==="function") $("lpMgmtToggle").onclick=openUserMgmt;
   if($("lpLogout")) $("lpLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("lpApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  window.ARC_REG=window.ARC_REG||{}; ARC_REG.lp={collect:lpCollect,load:function(d){ lpLoad(d); if(d.qr&&typeof lpSetQr==="function") lpSetQr(d.qr); }};
   window.openLeap=function(p){
     LP.project=p||LP.project;
     $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
@@ -3198,11 +3307,48 @@ $("hcExportBtn").onclick=hcExport;
     name:{x:642.11,y:1055.39,rot:-3.692,sz:24,w:600,fill:"#6d6e71",arW:195},
     sticker:36    // the photo's white edge, in its pixels (≈ 8.6 poster units)
   };
-  var DC={project:null,assets:{},heroUser:null,photoUser:null,tpl:1};
+  /* Template 3 — «فتح باب التسجيل» ("final Option.pdf"): the header (logo and
+     the English name) is a picture, the PDF at 2×; everything else is drawn,
+     at the PDF's own places. The grey strip holds one picture, the scene — the
+     character with his surroundings, made by «توليد الصورة» or uploaded; one
+     narrower than the strip fades into its grey on the right, under the boxes.
+     Somar Sans Bold (SemiBold for the announcement), with Latin letters: its own two files. */
+  var DC_T3={
+    navy:"#003853", gray:"#6d6e71", orange:"#f99c25",
+    head:{h:150},
+    strip:{y:292,h:549,fill:"#ebebeb"},
+    intro:{cx:539,by:245.9,sz:30,maxW:980,wt:600},
+    box:{x:557.5,y:473.5,w:522.5,h:120},
+    title:{rx:1036.1,by:[513.4,561.8],sz:28.2,maxW:456},
+    tag:{x:505,y:594,w:395,h:66,rx:879.5,by:632.3,sz:23.93,maxW:354,ws:2.2},   // ws: the file's word spacing
+    topicsHead:{cx:543,by:932.7,sz:27.74,maxW:980},
+    topics:{cx:542,by:979.6,step:46.8,sz:27.74,r:4.5,dotDy:9.1,gapDot:9.8,gapItem:16.4,max:6,maxW:980},
+    details:{cx:540,by:1124.7,step:49.3,sz:27.74,maxW:980,max:2,wt:700},
+    foot:{y:1264.5,h:85.5,by:1312.2,sz:26.81,cx:542,maxW:990,pinW:15.75,pinH:20,gapPin:7.2,gapR:14.25,gapL:17.4,divY1:1288.5,divY2:1326}
+  };
+  var DC={project:null,assets:{},heroUser:null,photoUser:null,sceneUser:null,sceneAR:0,tpl:1};
   var DC_ASSETS={bg:"assets/disc/bg.png",hero:"assets/disc/hero.png",
-                 t2back:"assets/disc/t2-bg3.jpg",t2front:"assets/disc/t2-front2.png",t2person:"assets/disc/t2-person.png"};
-  var DC_TPL_ASSETS={1:["bg","hero"],2:["t2back","t2front","t2person"]};
+                 t2back:"assets/disc/t2-bg3.jpg",t2front:"assets/disc/t2-front2.png",t2person:"assets/disc/t2-person.png",
+                 t3head:"assets/disc/t3-head.png",t3scene:"assets/disc/t3-scene.jpg"};
+  var DC_TPL_ASSETS={1:["bg","hero"],2:["t2back","t2front","t2person"],3:["t3head","t3scene"]};
+  /* Templates 1 and 3 are for a track, and some tracks for a specialty in it. */
+  var DC_TRACKS=[
+    {id:"engineering",name:"المسار الهندسي",specs:[{id:"architecture",name:"مسار الهندسة المعمارية"},{id:"civil",name:"مسار الهندسة المدنية"},{id:"solar",name:"المسار المهني المتكامل في الطاقة الشمسية"}]},
+    {id:"computer-science",name:"مسار علوم الحاسوب",specs:[]},
+    {id:"digital-marketing",name:"مسار التسويق الرقمي",specs:[]},
+    {id:"business",name:"مسار إدارة الأعمال",specs:[{id:"hr",name:"مسار الموارد البشرية"}]},
+    {id:"training",name:"مسار التكوين",specs:[]}
+  ];
+  /* Each track's (or specialty's) own look, from its design file as it arrives:
+       bg1  template 1's background picture, its pattern included (else assets/disc/bg.png, Computer Science's)
+       pat3 template 3's pattern behind the scene, a picture over the grey strip (else none)
+       t1, t3  the text it starts with, by DC_FIELDS name (else the fields keep theirs)
+     A specialty without its own takes its track's; keyed "track" or "track/specialty". */
+  var DC_TRACK_LOOK={};
+  // template 1's design is Computer Science's, template 3's Business Administration's
+  DC.tracks={1:{track:"computer-science",spec:""},3:{track:"business",spec:""}};
   var DC_T2_FONTS=[{w:300,url:"assets/disc/SomarSans-Light.otf"},{w:600,url:"assets/disc/SomarSans-SemiBold.otf"}], DC_T2_FAM="DISC Somar";
+  var DC_T3_FONTS=[{w:600,url:"assets/disc/SomarSans-SemiBold.otf"},{w:700,url:"guideline-assistant/fonts/SomarSans-Bold.otf"}], DC_T3_FAM="DISC Somar3";
 
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
   function val(id){ var e=$(id); return e?String(e.value||""):""; }
@@ -3216,8 +3362,9 @@ $("hcExportBtn").onclick=hcExport;
   /* Pictures as data: URIs: an SVG drawn through <img> for the export cannot
      load files. Only the open template's pictures (template 2's are ~4 MB). */
   function dcLoadAssets(cb){
-    var keys=DC_TPL_ASSETS[DC.tpl].filter(function(k){ return !DC.assets[k]; }), todo=keys.length;
-    var fonts=DC.tpl===2?dcLoadT2Fonts():Promise.resolve();
+    var want=DC_TPL_ASSETS[DC.tpl].concat([dcTrackAsset(DC.tpl===1?"bg1":DC.tpl===3?"pat3":"")].filter(Boolean));
+    var keys=want.filter(function(k){ return !DC.assets[k]; }), todo=keys.length;
+    var fonts=DC.tpl===2?dcLoadT2Fonts():DC.tpl===3?dcFaces(DC_T3_FONTS,DC_T3_FAM):Promise.resolve();
     if(!todo){ fonts.then(function(){ cb&&cb(); }); return; }
     keys.forEach(function(k){
       dataURL(DC_ASSETS[k]).then(function(u){ DC.assets[k]=u; }, function(){ DC.assets[k]=DC_ASSETS[k]; })
@@ -3226,18 +3373,19 @@ $("hcExportBtn").onclick=hcExport;
   }
   /* Template 2's own Somar Light and SemiBold: in the page for the preview,
      and as data: URIs in the exported SVG. */
-  var _dcT2Fonts=null;
-  function dcLoadT2Fonts(){
-    if(_dcT2Fonts) return _dcT2Fonts;
-    _dcT2Fonts=Promise.all(DC_T2_FONTS.map(function(f){
+  function dcFaces(list,fam){
+    if(list.ready) return list.ready;
+    list.ready=Promise.all(list.map(function(f){
       return dataURL(f.url).then(function(u){
         f.data=u.replace(/^data:[^;,]*/,"data:font/otf");
-        var ff=new FontFace(DC_T2_FAM,"url("+f.data+")",{weight:String(f.w)}); document.fonts.add(ff); return ff.load();
+        var ff=new FontFace(fam,"url("+f.data+")",{weight:String(f.w)}); document.fonts.add(ff); return ff.load();
       });
     })).catch(function(){});
-    return _dcT2Fonts;
+    return list.ready;
   }
-  function dcT2FontCSS(){ return DC_T2_FONTS.filter(function(f){ return f.data; }).map(function(f){ return "@font-face{font-family:'"+DC_T2_FAM+"';font-weight:"+f.w+";src:url("+f.data+") format('opentype');}"; }).join(""); }
+  function dcFacesCSS(list,fam){ return list.filter(function(f){ return f.data; }).map(function(f){ return "@font-face{font-family:'"+fam+"';font-weight:"+f.w+";src:url("+f.data+") format('opentype');}"; }).join(""); }
+  function dcLoadT2Fonts(){ return dcFaces(DC_T2_FONTS,DC_T2_FAM); }
+  function dcT2FontCSS(){ return dcFacesCSS(DC_T2_FONTS,DC_T2_FAM); }
   /* Somar Sans SemiBold, Bold and ExtraBold from the page's own @font-face rules, for the export. */
   var _dcFonts=null;
   function dcFontCSS(){
@@ -3309,12 +3457,93 @@ $("hcExportBtn").onclick=hcExport;
     s+=t2Quote()+t2Name();
     return s+'</svg>';
   }
+  /* Template 3. «*…*» in a line: those words in navy Bold; the rest grey, in o.wt. */
+  function t3Runs(t){ return String(t).split("*").map(function(x,i){ return {t:x,hl:i%2===1}; }).filter(function(r){ return r.t!==""; }); }
+  function t3Width(runs,sz,wt){ return runs.reduce(function(n,r){ return n+width(r.t,r.hl?700:wt,sz,DC_T3_FAM); },0); }
+  function t3Rich(t,o,by){
+    var runs=t3Runs(t); if(!String(t).replace(/\*/g,"").trim()) return "";
+    var T=DC_T3, w=t3Width(runs,o.sz,o.wt), sz=w>o.maxW?o.sz*o.maxW/w:o.sz;
+    return '<text xml:space="preserve" x="'+o.cx+'" y="'+by+'" text-anchor="middle" direction="rtl" font-family="'+DC_T3_FAM+'" font-weight="'+o.wt+'" font-size="'+sz.toFixed(2)+'" fill="'+T.gray+'">'+
+      runs.map(function(r){ return r.hl?'<tspan font-weight="700" fill="'+T.navy+'">'+esc(r.t)+'</tspan>':esc(r.t); }).join("")+'</text>';
+  }
+  /* One RTL run, its right end at x. */
+  function t3Run(t,x,by,sz,wt,fill,ws){ return '<text xml:space="preserve" x="'+x.toFixed(2)+'" y="'+by+'" text-anchor="start" direction="rtl" font-family="'+DC_T3_FAM+'" font-weight="'+wt+'" font-size="'+sz.toFixed(2)+'"'+(ws?' word-spacing="'+ws+'"':'')+' fill="'+fill+'">'+esc(t)+'</text>'; }
+  function t3Fit(t,o,wt){ var w=width(t,wt,o.sz,DC_T3_FAM)+(o.ws||0)*(t.split(" ").length-1); return w>o.maxW?o.sz*o.maxW/w:o.sz; }
+  /* The topics, two to a row, the first on the right; each with its navy dot. */
+  function t3Topics(){
+    var O=DC_T3.topics, T=DC_T3, s="";
+    var ls=val("dcT3Topics").split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean).slice(0,O.max);
+    for(var i=0;i<ls.length;i+=2){
+      var row=ls.slice(i,i+2), ws=row.map(function(l){ return width(l,700,O.sz,DC_T3_FAM); });
+      var rowW=ws.reduce(function(n,w){ return n+2*O.r+O.gapDot+w; },0)+(row.length-1)*O.gapItem;
+      var k=Math.min(1,O.maxW/rowW), by=O.by+(i/2)*O.step, x=O.cx+rowW*k/2;
+      row.forEach(function(l,j){
+        s+='<circle cx="'+(x-O.r*k).toFixed(2)+'" cy="'+(by-O.dotDy*k).toFixed(2)+'" r="'+(O.r*k).toFixed(2)+'" fill="'+T.navy+'"/>';
+        x-=(2*O.r+O.gapDot)*k;
+        s+=t3Run(l,x,by,O.sz*k,700,T.gray);
+        x-=(ws[j]+O.gapItem)*k;
+      });
+    }
+    return s;
+  }
+  /* The bottom bar: pin, address, a thin line, contact — right to left, centred as one. */
+  function t3Foot(){
+    var F=DC_T3.foot, a=val("dcT3Addr").trim(), c=val("dcT3Phone").trim();
+    var s='<rect x="0" y="'+F.y+'" width="'+W+'" height="'+F.h+'" fill="'+DC_T3.navy+'"/>';
+    if(!a&&!c) return s;
+    var wa=a?width(a,700,F.sz,DC_T3_FAM):0, wc=c?width(c,700,F.sz,DC_T3_FAM):0;
+    var tot=F.pinW+F.gapPin+wa+(a&&c?F.gapR+F.gapL:0)+wc, k=Math.min(1,F.maxW/tot), x=F.cx+tot*k/2, sz=F.sz*k;
+    var r=F.pinW*k/2, cx=x-r, cy=F.by-F.pinH*k+r, tip=F.by;
+    // the pin: a circle drawn down to a point, with a hole
+    s+='<path fill="#fff" d="M'+cx.toFixed(2)+' '+tip+'C'+(cx-r*0.35).toFixed(2)+' '+(tip-r*0.6).toFixed(2)+' '+(cx-r).toFixed(2)+' '+(cy+r*0.75).toFixed(2)+' '+(cx-r).toFixed(2)+' '+cy.toFixed(2)+
+       'A'+r.toFixed(2)+' '+r.toFixed(2)+' 0 0 1 '+(cx+r).toFixed(2)+' '+cy.toFixed(2)+'C'+(cx+r).toFixed(2)+' '+(cy+r*0.75).toFixed(2)+' '+(cx+r*0.35).toFixed(2)+' '+(tip-r*0.6).toFixed(2)+' '+cx.toFixed(2)+' '+tip+'Z"/>'+
+       '<circle cx="'+cx.toFixed(2)+'" cy="'+cy.toFixed(2)+'" r="'+(r*0.42).toFixed(2)+'" fill="'+DC_T3.navy+'"/>';
+    x-=(F.pinW+F.gapPin)*k;
+    if(a){ s+=t3Run(a,x,F.by,sz,700,"#fff"); x-=wa*k; }
+    if(a&&c){ x-=F.gapR*k; s+='<rect x="'+(x-0.6).toFixed(2)+'" y="'+F.divY1+'" width="1.2" height="'+(F.divY2-F.divY1).toFixed(2)+'" fill="#fff"/>'; x-=F.gapL*k; }
+    if(c) s+=t3Run(c,x,F.by,sz,700,"#fff");
+    return s;
+  }
+  /* The scene, the strip's height: as wide as the strip it fills it; narrower, it fades out on the right. */
+  function t3Scene(){
+    var S=DC_T3.strip, A=DC.assets, src=DC.sceneUser||A.t3scene||DC_ASSETS.t3scene;
+    var ar=DC.sceneUser?(DC.sceneAR||4/3):2160/1098, w=S.h*ar;
+    var s='<defs><clipPath id="dcT3Strip"><rect x="0" y="'+S.y+'" width="'+W+'" height="'+S.h+'"/></clipPath>';
+    if(w>=W-1) return s+'</defs><g clip-path="url(#dcT3Strip)"><image href="'+src+'" xlink:href="'+src+'" x="0" y="'+S.y+'" width="'+W+'" height="'+S.h+'" preserveAspectRatio="xMinYMid slice"/></g>';
+    s+='<linearGradient id="dcT3FadeG" x1="0" x2="1" y1="0" y2="0"><stop offset=".62" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>'+
+       '<mask id="dcT3Fade" maskUnits="userSpaceOnUse" x="0" y="'+S.y+'" width="'+w.toFixed(2)+'" height="'+S.h+'"><rect x="0" y="'+S.y+'" width="'+w.toFixed(2)+'" height="'+S.h+'" fill="url(#dcT3FadeG)"/></mask></defs>';
+    return s+'<g clip-path="url(#dcT3Strip)"><image href="'+src+'" xlink:href="'+src+'" x="0" y="'+S.y+'" width="'+w.toFixed(2)+'" height="'+S.h+'" preserveAspectRatio="none" mask="url(#dcT3Fade)"/></g>';
+  }
+  function t3SVG(s){
+    var T=DC_T3, A=DC.assets, B=T.box, G=T.tag;
+    s+='<rect width="'+W+'" height="'+H+'" fill="#fff"/>';
+    s+=img(A.t3head||DC_ASSETS.t3head,{x:0,y:0,w:W,h:T.head.h});
+    s+=t3Rich(val("dcT3Intro"),T.intro,T.intro.by);
+    s+='<rect x="0" y="'+T.strip.y+'" width="'+W+'" height="'+T.strip.h+'" fill="'+T.strip.fill+'"/>';
+    var patK=dcTrackAsset("pat3"); if(patK) s+=img(A[patK]||DC_ASSETS[patK],{x:0,y:T.strip.y,w:W,h:T.strip.h});
+    s+=t3Scene();
+    s+='<rect x="'+B.x+'" y="'+B.y+'" width="'+B.w+'" height="'+B.h+'" fill="'+T.navy+'"/>';
+    var tl=val("dcT3Title").split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean).slice(0,2);
+    var ty=tl.length===1?[(T.title.by[0]+T.title.by[1])/2]:T.title.by;
+    tl.forEach(function(l,i){ s+=t3Run(l,T.title.rx,ty[i],t3Fit(l,T.title,700),700,"#fff",T.title.ws); });
+    var tg=val("dcT3Tag").trim();
+    s+='<rect x="'+G.x+'" y="'+G.y+'" width="'+G.w+'" height="'+G.h+'" fill="'+T.orange+'"/>';
+    if(tg) s+=t3Run(tg,G.rx,G.by,t3Fit(tg,G,700),700,"#fff",G.ws);
+    var th=val("dcT3TopicsHead").trim();
+    if(th) s+='<text xml:space="preserve" x="'+T.topicsHead.cx+'" y="'+T.topicsHead.by+'" text-anchor="middle" direction="rtl" font-family="'+DC_T3_FAM+'" font-weight="700" font-size="'+t3Fit(th,T.topicsHead,700).toFixed(2)+'" fill="'+T.navy+'">'+esc(th)+'</text>';
+    s+=t3Topics();
+    val("dcT3Details").split(/\r?\n/).filter(function(l){ return l.trim(); }).slice(0,T.details.max).forEach(function(l,i){ s+=t3Rich(l,T.details,T.details.by+i*T.details.step); });
+    s+=t3Foot();
+    return s+'</svg>';
+  }
   function dcSVG(withFonts){
     var L=DC_LAY, C=DC_COL, A=DC.assets;
     var s='<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 '+W+' '+H+'" width="'+W*(withFonts?OUT:1)+'" height="'+H*(withFonts?OUT:1)+'">';
-    if(withFonts) s+='<defs><style>'+(DC.tpl===2?dcT2FontCSS():dcFontCSS())+'</style></defs>';
+    if(withFonts) s+='<defs><style>'+(DC.tpl===2?dcT2FontCSS():DC.tpl===3?dcFacesCSS(DC_T3_FONTS,DC_T3_FAM):dcFontCSS())+'</style></defs>';
     if(DC.tpl===2) return t2SVG(s);
-    s+=img(A.bg||DC_ASSETS.bg,{x:0,y:0,w:W,h:H});
+    if(DC.tpl===3) return t3SVG(s);
+    var bgK=dcTrackAsset("bg1")||"bg";
+    s+=img(A[bgK]||DC_ASSETS[bgK],{x:0,y:0,w:W,h:H});
     s+=img(DC.heroUser||A.hero||DC_ASSETS.hero,L.hero);
     s+=line(L.title,val("dcTitle"),C.navy);
     s+=line(L.sub,val("dcSub"),C.gray);
@@ -3331,18 +3560,55 @@ $("hcExportBtn").onclick=hcExport;
   }
   function dcRender(){ var w=$("dcSvg"); if(!w) return; w.innerHTML=dcSVG(false); dcFit(); }
   window.addEventListener("resize",function(){ if($("dcApp")&&$("dcApp").classList.contains("on")) dcFit(); });
-  ["dcTitle","dcSub","dcLine1","dcLine2","dcReg","dcRegHl","dcBar","dcQuote","dcName"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",dcRender); });
+  ["dcTitle","dcSub","dcLine1","dcLine2","dcReg","dcRegHl","dcBar","dcQuote","dcName","dcT3Intro","dcT3Title","dcT3Tag","dcT3TopicsHead","dcT3Topics","dcT3Details","dcT3Addr","dcT3Phone"].forEach(function(id){ var e=$(id); if(e) e.addEventListener("input",dcRender); });
   /* النموذج: its own fields, pictures and fonts. */
   function dcSetTpl(n){
-    DC.tpl=n===2?2:1; if($("dcTpl")) $("dcTpl").value=String(DC.tpl);
-    [].forEach.call(document.querySelectorAll("#dcApp .dc-t1"),function(e){ e.style.display=DC.tpl===1?"":"none"; });
-    [].forEach.call(document.querySelectorAll("#dcApp .dc-t2"),function(e){ e.style.display=DC.tpl===2?"":"none"; });
+    DC.tpl=n===2||n===3?n:1; if($("dcTpl")) $("dcTpl").value=String(DC.tpl);
+    [1,2,3].forEach(function(t){ [].forEach.call(document.querySelectorAll("#dcApp .dc-t"+t),function(e){ e.style.display=DC.tpl===t?"":"none"; }); });
+    [].forEach.call(document.querySelectorAll("#dcApp .dc-t13"),function(e){ e.style.display=DC.tpl===2?"none":""; });
+    dcFillTracks();
     dcRender(); dcLoadAssets(dcRender);
   }
   if($("dcTpl")) $("dcTpl").addEventListener("change",function(){ dcSetTpl(+this.value); });
+
+  /* المسار الرئيسي and المسار التخصصي (templates 1 and 3; each keeps its own). */
+  function dcTrackState(){ return DC.tracks[DC.tpl]||null; }
+  function dcTrack(id){ return DC_TRACKS.filter(function(t){ return t.id===id; })[0]||DC_TRACKS[0]; }
+  function dcTrackLook(){ var st=dcTrackState(); if(!st) return {}; return (st.spec&&DC_TRACK_LOOK[st.track+"/"+st.spec])||DC_TRACK_LOOK[st.track]||{}; }
+  /* The asset key of this track's picture of a kind (bg1, pat3), registered on first use; "" when it has none. */
+  function dcTrackAsset(kind){
+    var url=kind&&dcTrackLook()[kind]; if(!url) return "";
+    var k=kind+":"+url; DC_ASSETS[k]=url; return k;
+  }
+  /* The track's label, for the archive and the file: the specialty's name, or the track's. */
+  function dcTrackLabel(){
+    var st=dcTrackState(); if(!st) return "";
+    var t=dcTrack(st.track), sp=t.specs.filter(function(x){ return x.id===st.spec; })[0];
+    return sp?sp.name:t.name;
+  }
+  function dcFillTracks(){
+    var st=dcTrackState(), tr=$("dcTrack"), sp=$("dcSpec"); if(!st||!tr||!sp) return;
+    tr.innerHTML=DC_TRACKS.map(function(t){ return '<option value="'+t.id+'">'+esc(t.name)+'</option>'; }).join("");
+    tr.value=st.track;
+    var t=dcTrack(st.track);
+    sp.innerHTML='<option value="">عام (بدون تخصص)</option>'+t.specs.map(function(x){ return '<option value="'+x.id+'">'+esc(x.name)+'</option>'; }).join("");
+    sp.value=st.spec||"";
+    $("dcSpecField").style.display=t.specs.length?"":"none";   // a track with no specialties: one list
+  }
+  /* A new track or specialty: its text in the fields, its pictures in the design. */
+  function dcSetTrack(track,spec){
+    var st=dcTrackState(); if(!st) return;
+    st.track=dcTrack(track).id; st.spec=dcTrack(st.track).specs.some(function(x){ return x.id===spec; })?spec:"";
+    dcFillTracks();
+    var text=dcTrackLook()["t"+DC.tpl]||{};
+    for(var k in text){ var e=$(DC_FIELDS[k]); if(e&&typeof text[k]==="string") e.value=text[k]; }
+    dcRender(); dcLoadAssets(dcRender);
+  }
+  if($("dcTrack")) $("dcTrack").addEventListener("change",function(){ dcSetTrack(this.value,""); });
+  if($("dcSpec")) $("dcSpec").addEventListener("change",function(){ var st=dcTrackState(); if(st) dcSetTrack(st.track,this.value); });
   function dcSetPhoto(src){
     DC.photoUser=src||null;
-    var up=$("dcPhotoUp"); if(up) up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"✓ الصورة الافتراضية";
+    var up=$("dcPhotoUp"); if(up){ up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"اضغط لرفع الصورة"; up.classList.toggle("has",!!src); }   // silver until a photo is chosen, as in Study Zone
     var rs=$("dcPhotoReset"); if(rs) rs.style.display=src?"":"none";
     dcRender();
   }
@@ -3354,7 +3620,7 @@ $("hcExportBtn").onclick=hcExport;
 
   function dcSetHero(src){
     DC.heroUser=src||null;
-    var up=$("dcImgUp"); if(up) up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"✓ الصورة الافتراضية";
+    var up=$("dcImgUp"); if(up){ up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"اضغط لرفع الصورة"; up.classList.toggle("has",!!src); }
     var rs=$("dcImgReset"); if(rs) rs.style.display=src?"":"none";
     dcRender();
   }
@@ -3363,6 +3629,112 @@ $("hcExportBtn").onclick=hcExport;
     r.onload=function(){ dcSetHero(r.result); }; r.readAsDataURL(f); e.target.value="";
   });
   if($("dcImgReset")) $("dcImgReset").onclick=function(e){ e.preventDefault(); dcSetHero(null); };
+
+  /* Template 3's scene: uploaded, or made by «توليد الصورة». Its proportions decide how it sits in the strip. */
+  function dcSetScene(src){
+    DC.sceneUser=src||null; DC.sceneAR=0;
+    var up=$("dcT3ImgUp"); if(up){ up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"اضغط لرفع الصورة"; up.classList.toggle("has",!!src); }
+    var rs=$("dcT3ImgReset"); if(rs) rs.style.display=src?"":"none";
+    if(!src){ dcRender(); return; }
+    var im=new Image(); im.onload=function(){ if(DC.sceneUser===src){ DC.sceneAR=im.naturalWidth/im.naturalHeight; dcRender(); } }; im.src=src;
+  }
+  if($("dcT3ImgFile")) $("dcT3ImgFile").addEventListener("change",function(e){
+    var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){ dcSetScene(r.result); }; r.readAsDataURL(f); e.target.value="";
+  });
+  if($("dcT3ImgReset")) $("dcT3ImgReset").onclick=function(e){ e.preventDefault(); dcSetScene(null); };
+
+  /* Template 3's governorate: DISC's centre there, in the bottom bar, and its name in the announcement. */
+  var DC_CENTRES={"حلب":{addr:"حلب - الفيلات الشرقية",phone:"0993341390"},
+                  "حمص":{addr:"حمص - الحميدية - مقابل قصر جوليا",phone:"0950018467"},
+                  "دمشق":{addr:"دمشق - باب توما - حارة كنيسة اللاتين",phone:"0989162116"}};
+  function dcSetCity(city){
+    var c=DC_CENTRES[city]; if(!c) return;
+    if($("dcT3City")) $("dcT3City").value=city;
+    $("dcT3Addr").value="العنوان: "+c.addr;
+    $("dcT3Phone").value="للتواصل والاستفسار: "+c.phone;
+    var intro=$("dcT3Intro"); intro.value=intro.value.replace(/في (حلب|حمص|دمشق)/,"في "+city);
+    dcRender();
+  }
+  if($("dcT3City")) $("dcT3City").addEventListener("change",function(){ dcSetCity(this.value); });
+  /* The character's reference for «توليد الصورة»: the young man in the default scene, its left 380 units. */
+  function dcCharacterRef(){
+    return new Promise(function(res,rej){
+      var im=new Image();
+      im.onload=function(){
+        var sw=Math.round(im.naturalWidth*380/W), sh=im.naturalHeight, k=Math.min(1,1024/Math.max(sw,sh)), c=document.createElement("canvas");
+        c.width=Math.round(sw*k); c.height=Math.round(sh*k); c.getContext("2d").drawImage(im,0,0,sw,sh,0,0,c.width,c.height);
+        res(c.toDataURL("image/jpeg",0.9));
+      };
+      im.onerror=function(){ rej(new Error("تعذّر تحميل صورة الشخصية")); }; im.src=DC.assets.t3scene||DC_ASSETS.t3scene;
+    });
+  }
+  if($("dcT3GenBtn")) $("dcT3GenBtn").onclick=async function(){
+    var btn=this, st=$("dcT3GenSt"), scene=val("dcT3Scene").trim();
+    if(!scene){ st.className="hint err"; st.textContent="اكتب وصف المشهد أولاً"; return; }
+    if(typeof Auth==="undefined"||!Auth.discScene){ st.className="hint err"; st.textContent="غير متاح"; return; }
+    btn.disabled=true; var lbl=btn.textContent; btn.textContent="…جارٍ التوليد (حتى دقيقة)"; st.className="hint"; st.textContent="";
+    try{
+      var res=await Auth.discScene(scene,await dcCharacterRef());
+      if(!res.ok){ st.className="hint err"; st.textContent=res.error; return; }
+      dcSetScene(res.image);
+      st.className="hint"; st.textContent="✓ تم التوليد — «استعادة الافتراضي» بترجّع الصورة الأصلية";
+    }catch(e){ st.className="hint err"; st.textContent=(e&&e.message)||"فشل التوليد"; }
+    finally{ btn.disabled=false; btn.textContent=lbl; }
+  };
+
+  /* «حوّل لأسلوب DISC»: the uploaded picture, as a reference, becomes a 3D
+     illustration in DISC's colours (Magnific, Nano Banana Pro 1K, through the
+     Worker). It comes back on white; the white touching the edges is taken
+     out (a flood from the border, so white inside the subject — eyes, light
+     strips — stays), and the result replaces the picture. */
+  function dcShrink(src,max){
+    return new Promise(function(res,rej){
+      var im=new Image();
+      im.onload=function(){
+        var k=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement("canvas");
+        c.width=Math.round(im.naturalWidth*k); c.height=Math.round(im.naturalHeight*k);
+        var g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height);
+        res(c.toDataURL("image/jpeg",0.9));
+      };
+      im.onerror=function(){ rej(new Error("تعذّر قراءة الصورة")); }; im.src=src;
+    });
+  }
+  function dcCutWhite(src){
+    return new Promise(function(res){
+      var im=new Image();
+      im.onload=function(){
+        var w=im.naturalWidth,h=im.naturalHeight,c=document.createElement("canvas"); c.width=w; c.height=h;
+        var g=c.getContext("2d"); g.drawImage(im,0,0); var d=g.getImageData(0,0,w,h), p=d.data;
+        var seen=new Uint8Array(w*h), stack=[], TH=232;
+        function white(i){ return p[i*4]>=TH&&p[i*4+1]>=TH&&p[i*4+2]>=TH; }
+        for(var x=0;x<w;x++){ stack.push(x,(h-1)*w+x); } for(var y=0;y<h;y++){ stack.push(y*w,y*w+w-1); }
+        while(stack.length){
+          var i=stack.pop(); if(seen[i]||!white(i)) continue; seen[i]=1; p[i*4+3]=0;
+          var cx=i%w, cy=(i-cx)/w;
+          if(cx>0) stack.push(i-1); if(cx<w-1) stack.push(i+1); if(cy>0) stack.push(i-w); if(cy<h-1) stack.push(i+w);
+        }
+        // soften the cut: a pixel next to the cleared area keeps part of its white as transparency
+        for(var j=0;j<w*h;j++){ if(seen[j]||p[j*4+3]===0) continue; var jx=j%w;
+          if((jx>0&&seen[j-1])||(jx<w-1&&seen[j+1])||(j>=w&&seen[j-w])||(j<w*h-w&&seen[j+w])){ var l=(p[j*4]+p[j*4+1]+p[j*4+2])/3; if(l>200) p[j*4+3]=Math.round(255*(255-l)/55); } }
+        g.putImageData(d,0,0); res(c.toDataURL("image/png"));
+      };
+      im.onerror=function(){ res(src); }; im.src=src;
+    });
+  }
+  if($("dcAiBtn")) $("dcAiBtn").onclick=async function(){
+    var btn=this, st=$("dcAiSt");
+    if(!DC.heroUser){ st.className="hint err"; st.textContent="ارفع صورة أولاً من «الصورة الوسطى»، وبعدين اضغط التحويل"; return; }
+    if(typeof Auth==="undefined"||!Auth.discRestyle){ st.className="hint err"; st.textContent="غير متاح"; return; }
+    btn.disabled=true; var lbl=btn.textContent; btn.textContent="…جارٍ التحويل (حتى دقيقة)"; st.className="hint"; st.textContent="الصورة بتنبعت لـ Magnific وبترجع رسمة ثلاثية الأبعاد";
+    try{
+      var res=await Auth.discRestyle(await dcShrink(DC.heroUser,1024));
+      if(!res.ok){ st.className="hint err"; st.textContent=res.error; return; }
+      dcSetHero(await dcCutWhite(res.image));
+      st.className="hint"; st.textContent="✓ تم التحويل — «استعادة الافتراضي» بترجّع صورة DISC الأصلية";
+    }catch(e){ st.className="hint err"; st.textContent=(e&&e.message)||"فشل التحويل"; }
+    finally{ btn.disabled=false; btn.textContent=lbl; }
+  };
 
   function dcExport(){
     var btn=$("dcExportBtn"); if(!btn) return; btn.disabled=true; btn.textContent="جاري التصدير...";
@@ -3373,7 +3745,7 @@ $("hcExportBtn").onclick=hcExport;
         var im=new Image();
         im.onload=function(){
           var c=document.createElement("canvas"); c.width=W*OUT; c.height=H*OUT; c.getContext("2d").drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url);
-          var a=document.createElement("a"); a.download="DISC_"+(DC.tpl===2?"Testimony_":"")+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
+          var a=document.createElement("a"); a.download="DISC_"+DC_FILE[DC.tpl]+todayMMDDYYYY()+".png"; a.href=c.toDataURL("image/png"); a.click();
           done();
         };
         im.onerror=function(){ URL.revokeObjectURL(url); alert("خطأ بالتصدير (SVG)"); done(); };
@@ -3383,18 +3755,25 @@ $("hcExportBtn").onclick=hcExport;
   }
   if($("dcExportBtn")) $("dcExportBtn").onclick=dcExport;
 
-  var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar",quote:"dcQuote",name:"dcName"};
-  function dcCollect(){ var d={app:"disc",v:2,tpl:DC.tpl}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; d.photo=DC.photoUser||null; return d; }
+  var DC_FILE={1:"",2:"Testimony_",3:"Program_"};
+  var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar",quote:"dcQuote",name:"dcName",
+                 t3City:"dcT3City",t3Intro:"dcT3Intro",t3Scene:"dcT3Scene",t3Title:"dcT3Title",t3Tag:"dcT3Tag",t3TopicsHead:"dcT3TopicsHead",t3Topics:"dcT3Topics",t3Details:"dcT3Details",t3Addr:"dcT3Addr",t3Phone:"dcT3Phone"};
+  function dcCollect(){ var d={app:"disc",v:2,tpl:DC.tpl}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; d.photo=DC.photoUser||null; d.scene=DC.sceneUser||null;
+    var st=dcTrackState(); if(st){ d.track=st.track; d.spec=st.spec||""; d.trackLabel=dcTrackLabel(); }
+    return d; }
   function dcLoad(d){
     if(!d||typeof d!=="object"||d.app!=="disc"){ alert("بنية غير صحيحة"); return; }
     for(var k in DC_FIELDS){ var e=$(DC_FIELDS[k]); if(e&&typeof d[k]==="string") e.value=d[k]; }
     DC.photoUser=d.photo||null; dcSetPhoto(DC.photoUser);
     dcSetHero(d.image||null);
-    dcSetTpl(d.tpl===2?2:1);   // v1 projects were template 1
+    dcSetScene(d.scene||null);
+    var t=d.tpl===2||d.tpl===3?d.tpl:1;   // v1 projects were template 1
+    if(d.track&&DC.tracks[t]){ DC.tracks[t].track=dcTrack(d.track).id; DC.tracks[t].spec=d.spec||""; }   // the saved text stays as saved
+    dcSetTpl(t);
   }
   if($("dcSaveBtn")) $("dcSaveBtn").onclick=function(){
     var blob=new Blob([JSON.stringify(dcCollect(),null,2)],{type:"application/json"});
-    var a=document.createElement("a"); a.download="DISC_"+(DC.tpl===2?"Testimony_":"")+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
+    var a=document.createElement("a"); a.download="DISC_"+DC_FILE[DC.tpl]+todayMMDDYYYY()+".json"; a.href=URL.createObjectURL(blob); a.click();
   };
   if($("dcProjFile")) $("dcProjFile").addEventListener("change",function(e){
     var f=e.target.files[0]; if(!f) return; var r=new FileReader();
@@ -3408,13 +3787,14 @@ $("hcExportBtn").onclick=hcExport;
   if($("dcPhotoBtn")) $("dcPhotoBtn").onclick=function(){ var fi=$("acctPhotoFile"); if(fi) fi.click(); };
   if($("dcMgmtToggle")&&typeof openUserMgmt==="function") $("dcMgmtToggle").onclick=openUserMgmt;
   if($("dcLogout")) $("dcLogout").onclick=async function(){ try{ await Auth.logout(); }catch(e){} $("dcApp").classList.remove("on"); $("loginGate").style.display="flex"; };
+  window.ARC_REG=window.ARC_REG||{}; ARC_REG.dc={collect:dcCollect,load:dcLoad};
   window.openDisc=function(p){
     DC.project=p||DC.project;
     $("loginGate").style.display="none"; $("projectGate").style.display="none"; $("appRoot").style.display="none";
     var um=$("userMgmtPage"); if(um) um.style.display="none";
     ["hcApp","cuApp","lpApp"].forEach(function(id){ var x=$(id); if(x) x.classList.remove("on"); });
     $("dcApp").classList.add("on");
-    dcShowUserBar();
+    dcShowUserBar(); dcFillTracks();
     try{ document.title="HC GENERATOR"; }catch(e){}
     dcRender();
     dcLoadAssets(dcRender);
@@ -3572,6 +3952,259 @@ $("hcExportBtn").onclick=hcExport;
 })();
 </script>
 <style>
+/* ===== الأرشيف: كل تصميم يُنزَّل، مع ملف مشروعه ===== */
+.arc-saved{position:fixed;z-index:8000;transform:translateX(-50%);background:#fff;color:#003c54;border:1.5px solid #003c54;border-radius:999px;padding:7px 16px;font-family:'Somar Sans',system-ui,sans-serif;font-size:13px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.12);white-space:nowrap;transition:opacity .45s;pointer-events:none;}
+.arc-saved.out{opacity:0;}
+.arc-note{font-size:11px;font-weight:600;color:#8a8a8d;text-align:center;margin-top:6px;font-family:'Somar Sans',system-ui,sans-serif;}
+#arcPage{position:fixed;inset:0;z-index:9000;background:#eef1f3;overflow:auto;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;display:none;}
+#arcPage.on{display:block;}
+.arc-wrap{max-width:1180px;margin:0 auto;padding:24px 20px 70px;}
+.arc-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.arc-top h1{margin:0;font-size:24px;font-weight:900;color:#be1f24;flex:1;}
+.arc-btn{background:#fff;border:1px solid #d3d3d5;border-radius:10px;padding:9px 14px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:#414042;}
+.arc-btn:hover{border-color:#be1f24;color:#be1f24;}
+.arc-tabs{display:flex;gap:6px;}
+.arc-tab{background:#fff;border:1px solid #d3d3d5;border-radius:999px;padding:7px 16px;font-family:inherit;font-weight:800;font-size:13px;cursor:pointer;color:#414042;}
+.arc-tab.on{background:#be1f24;border-color:#be1f24;color:#fff;}
+.arc-card{background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(0,0,0,.08);padding:16px 18px;}
+.arc-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:12px;color:#6f6e71;font-weight:700;}
+.arc-filters input,.arc-filters select{border:1px solid #d3d3d5;border-radius:9px;padding:8px 10px;font-family:inherit;font-size:13px;color:#414042;background:#fff;}
+.arc-filters #arcQ{flex:1;min-width:160px;}
+.arc-usage{font-size:12px;color:#6f6e71;font-weight:700;margin-bottom:12px;}
+.arc-bar{height:6px;background:#f0f0f1;border-radius:9px;overflow:hidden;margin-top:5px;} .arc-bar i{display:block;height:100%;background:#be1f24;}
+table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
+.arc-t th{text-align:right;color:#6f6e71;font-weight:800;font-size:12px;padding:8px;border-bottom:1px solid #e6e6e8;white-space:nowrap;}
+.arc-t td{padding:8px;border-bottom:1px solid #f0f0f1;vertical-align:middle;color:#414042;}
+.arc-t img{width:56px;height:56px;object-fit:cover;border-radius:8px;background:#f4f4f5;display:block;}
+.arc-t .nm{font-weight:700;direction:ltr;text-align:right;word-break:break-all;}
+.arc-t .em{direction:ltr;text-align:right;color:#6f6e71;font-size:12px;word-break:break-all;}
+.arc-t .dt{white-space:nowrap;direction:ltr;text-align:right;color:#6f6e71;font-size:12px;}
+.arc-t .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+.arc-t .acts button{background:#fff;border:1px solid #d3d3d5;border-radius:8px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:#414042;white-space:nowrap;}
+.arc-t .acts button:hover{border-color:#be1f24;color:#be1f24;}
+.arc-t .acts .del{color:#c0392b;} .arc-t .acts .del:hover{border-color:#c0392b;color:#c0392b;}
+.arc-t .acts button:disabled{opacity:.45;cursor:default;}
+.arc-empty{padding:34px;text-align:center;color:#6f6e71;font-weight:700;}
+.arc-more{display:block;margin:14px auto 0;}
+#arcPage [hidden]{display:none !important;}
+@media(max-width:760px){
+  .arc-t thead{display:none;}
+  .arc-t tr{display:grid;grid-template-columns:56px 1fr;gap:2px 12px;padding:10px 0;border-bottom:1px solid #eee;}
+  .arc-t td{border:none;padding:1px 0;} .arc-t td.th{grid-row:span 6;}
+  .arc-t .acts{justify-content:flex-start;margin-top:4px;}
+}
+</style>
+<script>
+/* ===== الأرشيف =====
+   Every design downloaded from Poster Maker (Study Zone, Hope Center,
+   Children University, LEAP, DISC) is also sent, in the background, to the
+   Worker's archive with its full project file and a small preview: the
+   download itself is untouched, and a failure only shows in the console.
+   Downloads are caught at the one place they all pass through, <a>.click()
+   (blob: links are remembered when created, since they may be revoked right
+   after). «الأرشيف» in the account menu lists one's own files; the Owner and
+   the Comms Manager also see everyone's, and only the Owner deletes — the
+   Worker checks all of it. «افتح للتعديل» opens the design in its generator. */
+(function(){
+  var WORKER="https://studyzone-auth.ct-aleppo3.workers.dev", TOKEN_KEY="sz_auth_token";
+  var $=function(id){return document.getElementById(id);};
+  function tok(){ try{ return localStorage.getItem(TOKEN_KEY)||sessionStorage.getItem(TOKEN_KEY); }catch(e){ return null; } }
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  var PROJ={"hope-center":"Hope Center","study-zone":"Study Zone","children-university":"Children University","disc":"DISC","leap":"LEAP","thumbnail-gen":"Thumbnail Gen"};
+  var KEY={"study-zone":"sz","hope-center":"hc","children-university":"cu","leap":"lp","disc":"dc"};
+
+  /* Study Zone lives in the page's global scope; the others register in ARC_REG from inside their own blocks. */
+  var REG={
+    sz:{collect:function(){ return model===2?collectProject2():collectProject(); },
+        load:function(d){ if(d.model===2) loadProject2(d); else loadProject(d); }}
+  };
+  function reg(key){ return (window.ARC_REG&&ARC_REG[key])||REG[key]; }
+  function openApp(){
+    var on=function(id){ var e=$(id); return e&&e.classList.contains("on"); };
+    if(on("dcApp")) return "disc"; if(on("lpApp")) return "leap"; if(on("cuApp")) return "children-university"; if(on("hcApp")) return "hope-center";
+    var r=$("appRoot"); if(r&&getComputedStyle(r).display!=="none") return "study-zone";
+    return null;
+  }
+
+  /* ----- catching downloads ----- */
+  var blobs=new Map(), mkURL=URL.createObjectURL;
+  URL.createObjectURL=function(o){ var u=mkURL.call(URL,o); if(o instanceof Blob&&/^image\//.test(o.type)){ blobs.set(u,o); if(blobs.size>12) blobs.delete(blobs.keys().next().value); } return u; };
+  var aclick=HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click=function(){
+    try{ if(this.download&&!this._noArchive&&/\.(png|jpe?g|webp)$/i.test(this.download)&&/^(data:image\/|blob:)/.test(this.href)) capture(this.download,this.href); }catch(e){ console.warn("archive",e); }
+    return aclick.apply(this,arguments);
+  };
+  function dataToBlob(d){ var m=/^data:([^;,]+);base64,(.*)$/.exec(d); if(!m) return null; var b=atob(m[2]), u=new Uint8Array(b.length); for(var i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new Blob([u],{type:m[1]}); }
+  /* What the archive keeps is the design's project (JSON), which reopens it
+     for editing; the downloaded picture only makes the small preview. One
+     project downloaded twice in a row (Hope Center's Story and Poster) is kept once. */
+  var lastSent={key:"",at:0};
+  function capture(name,href){
+    var slug=openApp(), r=slug&&reg(KEY[slug]); if(!r) return;
+    var proj=null; try{ proj=r.collect(); }catch(e){ console.warn("archive: project",e); }
+    if(!proj) return;
+    var text=JSON.stringify(proj), key=slug+"|"+text.length+"|"+text.slice(0,200);
+    if(key===lastSent.key&&Date.now()-lastSent.at<8000) return;
+    lastSent={key:key,at:Date.now()};
+    var img=href.indexOf("blob:")===0?blobs.get(href):dataToBlob(href);
+    var tpl=slug==="hope-center"?"Story + Poster":(proj.model||proj.tpl)?"نموذج "+(proj.model||proj.tpl):"";
+    if(tpl&&proj.trackLabel) tpl+=" · "+proj.trackLabel;   // DISC: the track too
+    send({project:slug,template:tpl,filename:name.replace(/(_Story|_Poster)?\.(png|jpe?g|webp)$/i,".json"),mime:"application/json"},new Blob([text],{type:"application/json"}),img);
+  }
+  function thumbOf(b){
+    return new Promise(function(res){
+      var u=mkURL.call(URL,b), im=new Image();
+      im.onload=function(){ var k=Math.min(1,320/Math.max(im.naturalWidth,im.naturalHeight)), c=document.createElement("canvas"); c.width=Math.max(1,Math.round(im.naturalWidth*k)); c.height=Math.max(1,Math.round(im.naturalHeight*k));
+        var g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg",0.72)); };
+      im.onerror=function(){ URL.revokeObjectURL(u); res(""); }; im.src=u;
+    });
+  }
+  function send(meta,file,preview){
+    if(!tok()) return Promise.resolve();
+    return (preview?thumbOf(preview):Promise.resolve("")).then(function(t){
+      meta.thumb=t; meta.fileSize=file.size; meta.projSize=0;
+      var m=new TextEncoder().encode(JSON.stringify(meta)), h=new Uint8Array(4); new DataView(h.buffer).setUint32(0,m.length);
+      return fetch(WORKER+"/archive",{method:"POST",headers:{"Authorization":"Bearer "+tok(),"Content-Type":"application/octet-stream"},body:new Blob([h,m,file])});
+    }).then(function(r){ if(r.ok) savedNote(meta.project); else console.warn("archive: HTTP "+r.status); }).catch(function(e){ console.warn("archive",e); });
+  }
+  /* «✓ تم الحفظ في الأرشيف» under the preview poster, once the Worker has the copy. */
+  var STAGE={"study-zone":"stage","hope-center":"hcStage","children-university":"cuStage","leap":"lpStage","disc":"dcStage"};
+  var SAVED_INK={"hope-center":"#be1f24","study-zone":"#003c54","children-university":"#003c54","leap":"#053c54","disc":"#023c54"};   // the project's own red or navy
+  var EXPORT_BTN={"study-zone":"exportBtn","hope-center":"hcExportBtn","children-university":"cuExportBtn","leap":"lpExportBtn","disc":"dcExportBtn"};
+  /* The archive often answers while the generator is still exporting (Study Zone
+     renders several sizes, the preview blown up meanwhile): wait for its DOWNLOAD
+     button to come back, so the note sits under the poster where it settles. */
+  function savedNote(slug,tries){
+    var eb=$(EXPORT_BTN[slug]);
+    if(eb&&eb.disabled&&(tries||0)<150){ setTimeout(function(){ savedNote(slug,(tries||0)+1); },200); return; }
+    setTimeout(function(){ showSaved(slug); },120);
+  }
+  function showSaved(slug){
+    var st=$(STAGE[slug]); if(!st||!st.offsetParent) return;
+    var old=document.querySelector(".arc-saved"); if(old) old.remove();
+    var r=st.getBoundingClientRect(), n=document.createElement("div"); n.className="arc-saved"; n.textContent="✓ تم الحفظ في الأرشيف";
+    n.style.color=n.style.borderColor=SAVED_INK[slug]||"#003c54";
+    document.body.appendChild(n);
+    // under the poster's visible part (a preview can run past the window, as Study Zone's does),
+    // or just inside its bottom edge when the window ends first
+    var bottom=Math.min(r.bottom,window.innerHeight), h=n.offsetHeight;
+    var top=bottom+10+h<=window.innerHeight-8?bottom+10:bottom-h-14;
+    var left=Math.max(r.left,0)+(Math.min(r.right,window.innerWidth)-Math.max(r.left,0))/2;
+    n.style.top=Math.max(8,top)+"px"; n.style.left=left+"px";
+    setTimeout(function(){ n.classList.add("out"); setTimeout(function(){ n.remove(); },500); },3500);
+  }
+
+  /* ----- the archive page ----- */
+  var A={scope:"mine",offset:0,total:0,canAll:false,canDelete:false,files:[]};
+  function api(path){ return fetch(WORKER+path,{headers:{"Authorization":"Bearer "+tok()}}); }
+  function build(){
+    if($("arcPage")) return;
+    var d=document.createElement("div"); d.id="arcPage";
+    d.innerHTML='<div class="arc-wrap"><div class="arc-top"><h1>الأرشيف</h1>'+
+      '<div class="arc-tabs" id="arcTabs" hidden><button type="button" class="arc-tab on" data-s="mine">ملفاتي</button><button type="button" class="arc-tab" data-s="all">كل الملفات</button></div>'+
+      '<button type="button" class="arc-btn" id="arcClose">← رجوع</button></div>'+
+      '<div class="arc-card"><div class="arc-usage" id="arcUsage" hidden></div>'+
+      '<div class="arc-filters"><select id="arcProj"><option value="">كل المشاريع</option>'+Object.keys(PROJ).map(function(k){ return '<option value="'+k+'">'+PROJ[k]+'</option>'; }).join("")+'</select>'+
+      '<input type="search" id="arcQ" placeholder="بحث باسم الملف أو الإيميل"><span>من</span><input type="date" id="arcFrom"><span>لـ</span><input type="date" id="arcTo"></div>'+
+      '<table class="arc-t"><thead><tr><th></th><th>اسم الملف</th><th>المشروع</th><th>النموذج</th><th>التاريخ</th><th id="arcWhoH">أنشأه</th><th></th></tr></thead><tbody id="arcBody"></tbody></table>'+
+      '<div class="arc-empty" id="arcEmpty" hidden></div><button type="button" class="arc-btn arc-more" id="arcMore" hidden>عرض المزيد</button></div></div>';
+    document.body.appendChild(d);
+    $("arcClose").onclick=function(){ d.classList.remove("on"); };
+    $("arcTabs").onclick=function(e){ var b=e.target.closest(".arc-tab"); if(!b) return; A.scope=b.dataset.s; [].forEach.call(this.children,function(x){ x.classList.toggle("on",x===b); }); load(true); };
+    var t=null; ["arcProj","arcFrom","arcTo"].forEach(function(id){ $(id).onchange=function(){ load(true); }; });
+    $("arcQ").oninput=function(){ clearTimeout(t); t=setTimeout(function(){ load(true); },350); };
+    $("arcMore").onclick=function(){ load(false); };
+    $("arcBody").onclick=onAction;
+    document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&d.classList.contains("on")&&!document.querySelector(".pf-hole")) d.classList.remove("on"); });
+  }
+  window.openArchive=function(){ build(); $("arcPage").classList.add("on"); load(true); };
+  function fmtDate(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return s; function p(n){ return (n<10?"0":"")+n; } return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" "+p(d.getHours())+":"+p(d.getMinutes()); }
+  function mb(b){ return (b/1048576).toFixed(b<10485760?1:0)+" MB"; }
+  // the templates have names, not numbers; the archive keeps the number it was saved with
+  var TPL_NAMES={"disc":{"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)","نموذج 3":"فتح باب التسجيل"},
+                 "study-zone":{"نموذج 1":"بوستر إعلان","نموذج 2":"ستوري يوميّة"},
+                 "children-university":{"نموذج 1":"فتح باب التسجيل","نموذج 2":"دعوة تخرّج","نموذج 3":"دعوة تخرّج (بدون صورة)"}};
+  function tplName(f){
+    var t=String(f.template||""), i=t.indexOf(" · "), base=i<0?t:t.slice(0,i), rest=i<0?"":t.slice(i);   // "نموذج 1 · مسار …"
+    return (TPL_NAMES[f.project]&&TPL_NAMES[f.project][base]||base)+rest;
+  }
+  function load(reset){
+    if(reset){ A.offset=0; A.files=[]; }
+    var seq=A.seq=(A.seq||0)+1;   // a newer filter or search replaces this one
+    var q="?scope="+A.scope+"&offset="+A.offset+"&project="+encodeURIComponent($("arcProj").value)+"&q="+encodeURIComponent($("arcQ").value.trim())+"&from="+$("arcFrom").value+"&to="+$("arcTo").value;
+    $("arcEmpty").hidden=false; if(reset) $("arcEmpty").textContent="…جارٍ التحميل";
+    api("/archive/list"+q).then(function(r){ return r.json(); }).then(function(d){
+      if(seq!==A.seq) return;
+      if(!d.ok){ $("arcEmpty").textContent=d.error||"تعذّر تحميل الأرشيف"; return; }
+      A.canAll=d.canAll; A.canDelete=d.canDelete; A.total=d.total; A.files=A.files.concat(d.files); A.offset=A.files.length;
+      $("arcTabs").hidden=!A.canAll; $("arcWhoH").hidden=A.scope!=="all";
+      // only the Owner and the Comms Manager get usedBytes from the Worker; the line stays hidden for everyone else
+      if(d.usedBytes!=null){ var pc=Math.min(100,100*d.usedBytes/d.limitBytes), pct=pc>0&&pc<0.1?"&lt;0.1%":pc.toFixed(1)+"%";
+        $("arcUsage").hidden=false;
+        $("arcUsage").innerHTML="المساحة المستعملة: <bdi dir=\"ltr\">"+mb(d.usedBytes)+"</bdi> من <bdi dir=\"ltr\">"+mb(d.limitBytes)+"</bdi> (<bdi dir=\"ltr\">"+pct+"</bdi>)<div class=\"arc-bar\"><i style=\"width:"+Math.max(pc,d.usedBytes?0.5:0)+"%\"></i></div>"; }
+      else $("arcUsage").hidden=true;
+      render();
+    }).catch(function(){ $("arcEmpty").textContent="تعذّر الاتصال"; });
+  }
+  function render(){
+    $("arcBody").innerHTML=A.files.map(function(f,i){
+      return '<tr data-i="'+i+'"><td class="th">'+(f.thumb?'<img src="'+esc(f.thumb)+'" alt="">':'<img alt="">')+'</td><td class="nm">'+esc(f.filename)+'</td><td>'+esc(PROJ[f.project]||f.project)+'</td><td>'+esc(tplName(f))+'</td><td class="dt">'+fmtDate(f.created_at)+'</td>'+
+        (A.scope==="all"?'<td class="em">'+esc(f.email)+'</td>':'')+
+        '<td><div class="acts"><button type="button" data-a="dl">تنزيل</button><button type="button" data-a="edit"'+(projPart(f)?'':' disabled')+'>افتح للتعديل</button>'+(A.canDelete?'<button type="button" class="del" data-a="del">حذف</button>':'')+'</div></td></tr>';
+    }).join("");
+    $("arcEmpty").hidden=A.files.length>0; if(!A.files.length) $("arcEmpty").textContent=$("arcQ").value||$("arcProj").value||$("arcFrom").value||$("arcTo").value?"ما في ملفات بهالبحث":"لسا ما في ملفات — كل تصميم بتنزّله بيتحفظ هون";
+    $("arcMore").hidden=A.files.length>=A.total;
+  }
+  // where an entry's project is: the entry itself (a JSON), or, in the first entries, beside the picture
+  function projPart(f){ return f.mime==="application/json"?"file":f.proj_size?"project":null; }
+  function blobOf(f,part){ return api("/archive/blob?id="+f.id+"&part="+part).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.blob(); }); }
+  function onAction(e){
+    var b=e.target.closest("button[data-a]"); if(!b) return;
+    var f=A.files[+b.closest("tr").dataset.i]; if(!f) return;
+    if(b.dataset.a==="dl"){
+      b.disabled=true;
+      blobOf(f,"file").then(function(x){ var a=document.createElement("a"); a._noArchive=true; a.download=f.filename; a.href=mkURL.call(URL,x); aclick.call(a); setTimeout(function(){ URL.revokeObjectURL(a.href); },2000); })
+        .catch(function(err){ alert("تعذّر التنزيل: "+err.message); }).then(function(){ b.disabled=false; });
+    } else if(b.dataset.a==="edit"){
+      b.disabled=true;
+      blobOf(f,projPart(f)).then(function(x){ return x.text(); }).then(function(t){ openForEdit(f.project,JSON.parse(t)); })
+        .catch(function(err){ alert("تعذّر فتح المشروع: "+err.message); }).then(function(){ b.disabled=false; });
+    } else if(b.dataset.a==="del"){
+      if(!b._sure){ b._sure=true; b.textContent="تأكيد الحذف"; setTimeout(function(){ b._sure=false; b.textContent="حذف"; },3000); return; }
+      b.disabled=true;
+      fetch(WORKER+"/archive/delete",{method:"POST",headers:{"Authorization":"Bearer "+tok(),"Content-Type":"application/json"},body:JSON.stringify({id:f.id})})
+        .then(function(r){ return r.json(); }).then(function(d){ if(!d.ok) throw new Error(d.error||""); A.files.splice(A.files.indexOf(f),1); A.total--; A.offset=A.files.length; render(); })
+        .catch(function(err){ alert("تعذّر الحذف: "+err.message); b.disabled=false; });
+    }
+  }
+  /* «افتح للتعديل»: the generator of that project, with the saved design in it. */
+  function openForEdit(slug,d){
+    if(slug==="thumbnail-gen"){ try{ sessionStorage.setItem("arcOpen",JSON.stringify(d)); }catch(e){} location.href="thumbnail-gen/"; return; }
+    Auth.projects().then(function(res){
+      var p=((res&&res.projects)||[]).filter(function(x){ return x.slug===slug; })[0];
+      if(!p){ alert("ما عندك صلاحية على مشروع "+(PROJ[slug]||slug)); return; }
+      $("arcPage").classList.remove("on");
+      openProject(p);
+      setTimeout(function(){ var r=reg(KEY[slug]); try{ r.load(d); }catch(err){ alert("تعذّر تحميل التصميم: "+err.message); } },400);
+    });
+  }
+
+  /* «الأرشيف» in every account menu, and a word under every DOWNLOAD. */
+  function decorate(){
+    [].forEach.call(document.querySelectorAll(".acct-menu"),function(m){
+      if(m.querySelector(".arc-menu")) return;
+      var b=document.createElement("button"); b.type="button"; b.className="arc-menu"; b.textContent="سجل الأرشيف"; b.onclick=function(){ window.openArchive(); };
+      m.insertBefore(b,m.lastElementChild);
+    });
+    ["exportBtn","hcExportBtn","cuExportBtn","lpExportBtn","dcExportBtn"].forEach(function(id){
+      var b=$(id); if(!b||b.parentNode.querySelector(".arc-note")) return;
+      var n=document.createElement("div"); n.className="arc-note"; n.textContent="نسخة من مشروع التصميم بتنحفظ بأرشيفك"; b.insertAdjacentElement("afterend",n);
+    });
+  }
+  if(document.readyState!=="loading") decorate(); else document.addEventListener("DOMContentLoaded",decorate);
+})();
+</script>
+<style>
 /* زر «تدقيق المحتوى» (Gemini) بعد آخر حقل في كل نموذج */
 .proof-wrap{margin:16px 0 2px;}
 .proof-btn{width:100%;background:#6d6e71;color:#fff;border:none;border-radius:10px;padding:12px;font-family:'Somar Sans';font-weight:800;font-size:14px;cursor:pointer;transition:.15s;}
@@ -3586,6 +4219,7 @@ $("hcExportBtn").onclick=hcExport;
 .pf-note{position:fixed;z-index:10000;color:#fff;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;text-align:center;width:260px;}
 .pf-note .pf-big{font-size:34px;font-weight:800;line-height:1.15;}
 .pf-note .pf-small{font-size:22px;font-weight:700;line-height:1.3;margin-top:2px;}
+.pf-note .pf-hint{font-size:14px;font-weight:600;opacity:.85;margin-top:4px;}
 .pf-note .pf-acts{display:flex;flex-direction:column;gap:8px;margin-top:16px;}
 .pf-note button{border:none;border-radius:10px;padding:11px 14px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;}
 .pf-note .pf-go{background:#fff;color:#222;}
@@ -3648,36 +4282,55 @@ $("hcExportBtn").onclick=hcExport;
   var pfOpen=null;
   function closeReminder(){ if(!pfOpen) return; pfOpen.forEach(function(e){ e.remove(); }); pfOpen=null; document.removeEventListener("keydown",pfKey); window.removeEventListener("resize",closeReminder); }
   function pfKey(e){ if(e.key==="Escape") closeReminder(); }
-  function remind(exportBtn,container){
-    var check=container.querySelector(".proof-btn"); if(!check) return;
-    check.scrollIntoView({block:"center"});
+  /* The page dimmed except `target`, a note with an arrow at it and two
+     choices: o.go (also a click on the target) and o.skip. */
+  function spotlight(target,o){
+    target.scrollIntoView({block:"center"});
     setTimeout(function(){   // after the scroll settles (a timer, not a frame: it runs even while the tab is not drawn)
-      var r=check.getBoundingClientRect(), pad=6;
+      var r=target.getBoundingClientRect(), pad=6;
       var mask=document.createElement("div"); mask.className="pf-mask";
-      var hole=document.createElement("div"); hole.className="pf-hole"; hole.title="دقّق المحتوى";
+      var hole=document.createElement("div"); hole.className="pf-hole"; hole.title=o.title;
       hole.style.left=(r.left-pad)+"px"; hole.style.top=(r.top-pad)+"px"; hole.style.width=(r.width+2*pad)+"px"; hole.style.height=(r.height+2*pad)+"px";
-      var NOTE_H=230, side=r.left>300;   // beside the button when there is room; on phones under it, or over it when the screen ends first
+      var NOTE_H=230, side=r.left>300;   // beside the target when there is room; on phones under it, or over it when the screen ends first
       var where=side?"side":(r.bottom+pad+52+NOTE_H<=window.innerHeight?"below":"above");
       var note=document.createElement("div");
       note.className="pf-note "+where;
       note.innerHTML='<svg class="pf-arrow" viewBox="0 0 64 40" aria-hidden="true"><path d="M4 36C18 34 36 26 54 8"/><path d="M42 7L55 7L53 20"/></svg>'+
-        '<div class="pf-big">لا تنسى</div><div class="pf-small">تدقّق المحتوى</div>'+
-        '<div class="pf-acts"><button type="button" class="pf-go">دقّق الآن</button><button type="button" class="pf-skip">نزّل بدون تدقيق</button></div>';
+        '<div class="pf-big">'+o.big+'</div><div class="pf-small">'+o.small+'</div>'+(o.hint?'<div class="pf-hint">'+o.hint+'</div>':'')+
+        '<div class="pf-acts"><button type="button" class="pf-go">'+o.goLabel+'</button><button type="button" class="pf-skip">'+o.skipLabel+'</button></div>';
       document.body.appendChild(mask); document.body.appendChild(hole); document.body.appendChild(note);
-      if(side){ note.style.left=Math.max(12,r.left-pad-24-260)+"px"; note.style.top=Math.max(12,r.top-10)+"px"; }
+      // beside: the arrow (over the note's corner, its tip 48 right of and 26 above the note) stops just short of the target's middle
+      if(side){ note.style.left=Math.max(12,r.left-pad-8-48-260)+"px"; note.style.top=Math.max(12,r.top+r.height/2+26)+"px"; }
       else {
         note.style.left=Math.max(12,Math.min(window.innerWidth-272,r.left+r.width/2-130))+"px";
         note.style.top=(where==="below"?r.bottom+pad+52:Math.max(12,r.top-pad-52-note.offsetHeight))+"px";
       }
       pfOpen=[mask,hole,note];
-      function checkNow(){ closeReminder(); check.click(); }
-      hole.onclick=checkNow; note.querySelector(".pf-go").onclick=checkNow;
-      note.querySelector(".pf-skip").onclick=function(){ closeReminder(); exportBtn._pfSkip=true; exportBtn.click(); };
+      function go(){ closeReminder(); o.go(); }
+      hole.onclick=go; note.querySelector(".pf-go").onclick=go;
+      note.querySelector(".pf-skip").onclick=function(){ closeReminder(); o.skip(); };
       mask.onclick=closeReminder;
       document.addEventListener("keydown",pfKey); window.addEventListener("resize",closeReminder);
       note.querySelector(".pf-go").focus();
     },60);
   }
+  function remind(exportBtn,container){
+    var check=container.querySelector(".proof-btn"); if(!check) return;
+    spotlight(check,{title:"دقّق المحتوى",big:"لا تنسى",small:"تدقّق المحتوى",goLabel:"دقّق الآن",skipLabel:"نزّل بدون تدقيق",
+      go:function(){ check.click(); }, skip:function(){ exportBtn._pfSkip=true; exportBtn.click(); }});
+  }
+  /* «لازم تكون الصورة مفرّغة»: choosing a photo for DISC's Testimony, which
+     gets its white edge from the picture's own transparency. The choice goes
+     on to the file picker, or stops there. */
+  var CUTOUT="#dcPhotoUp";
+  document.addEventListener("click",function(e){
+    var up=e.target.closest&&e.target.closest(CUTOUT); if(!up) return;
+    var input=up.querySelector("input[type=file]");
+    if(!input||input._pfPass) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    spotlight(up,{title:"اختر صورة مفرّغة",big:"لازم تكون",small:"الصورة مفرّغة",hint:"PNG بدون خلفية",goLabel:"اختر صورة مفرّغة",skipLabel:"إلغاء",
+      go:function(){ input._pfPass=true; input.click(); input._pfPass=false; }, skip:function(){}});
+  },true);
   // Capture phase: runs before the generator's own DOWNLOAD handler and can hold it back.
   document.addEventListener("click",function(e){
     var btn=e.target.closest&&e.target.closest(EXPORTS); if(!btn) return;
@@ -3697,6 +4350,255 @@ $("hcExportBtn").onclick=hcExport;
   }
   function scan(){ ["#cuApp .panel-body","#lpApp .panel-body","#dcApp .panel-body","#appRoot > .panel > .panel-body",".hc-pbody"].forEach(function(sel){ var c=document.querySelector(sel); if(c) addButton(c); }); }
   if(document.readyState!=="loading") scan(); else document.addEventListener("DOMContentLoaded",scan);
+})();
+</script>
+<style>
+/* ===== طلبات الصلاحيات ===== */
+.proj-card.pending,.proj-card.pending:hover{cursor:default;border-color:#d8e0e5;background:#f4f6f8;color:#9aa8b2;}
+.pg-ga .proj-card.pending:hover .proj-badge.new{background:#be1f24;color:#fff;}
+.proj-card.pending .proj-badge{opacity:.55;}
+/* The request window */
+.acc-back{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;}
+.acc-box{width:min(92vw,420px);max-height:90vh;overflow:auto;background:#fff;border-radius:16px;padding:24px 22px 20px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.acc-box h2{margin:0 0 4px;font-size:20px;font-weight:900;color:#be1f24;}
+.acc-box .acc-sub{margin:0 0 14px;font-size:12.5px;color:#6f6e71;line-height:1.6;}
+.acc-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.acc-list label{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid #e1e5e8;border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;color:#414042;}
+.acc-list label:has(input:checked){border-color:#be1f24;}
+.acc-list input{accent-color:#be1f24;width:16px;height:16px;margin:0;}
+.acc-list .acc-name{direction:ltr;}
+.acc-box textarea{width:100%;box-sizing:border-box;min-height:70px;border:1px solid #d8e0e5;border-radius:10px;padding:9px 11px;font-family:inherit;font-size:13px;resize:vertical;}
+.acc-box .acc-lbl{font-size:12.5px;font-weight:800;color:#414042;margin-bottom:6px;}
+.acc-box .acc-lbl span{font-weight:600;color:#9aa8b2;}
+.acc-acts{display:flex;gap:8px;margin-top:14px;}
+.acc-acts button{flex:1;border:none;border-radius:10px;padding:11px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;}
+.acc-send{background:#be1f24;color:#fff;} .acc-send:disabled{opacity:.6;cursor:default;}
+.acc-cancel{background:#f1f2f3;color:#414042;}
+.acc-st{font-size:12.5px;font-weight:700;margin-top:10px;min-height:16px;text-align:center;}
+.acc-st.err{color:#c0392b;}
+.acc-toast{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:9600;max-width:min(92vw,520px);background:#be1f24;color:#fff;padding:11px 20px;border-radius:10px;
+  font-family:'Somar Sans',system-ui,sans-serif;font-size:13px;font-weight:700;direction:rtl;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.25);transition:opacity .4s;}
+.acc-toast.out{opacity:0;}
+/* The number of waiting requests on the photo (Owner, Comms Manager) */
+.acct .acc-count{position:absolute;pointer-events:none;top:calc(0.1 * var(--acct-box));left:calc(0.72 * var(--acct-box));min-width:20px;height:20px;padding:0 5px;box-sizing:border-box;
+  border-radius:10px;background:#be1f24;color:#fff;font:800 11px/20px 'Somar Sans',system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #fff;}
+/* The requests page */
+#accPage{position:fixed;inset:0;z-index:9000;background:#eef1f3;overflow:auto;font-family:'Somar Sans',system-ui,sans-serif;direction:rtl;display:none;}
+#accPage.on{display:block;}
+#accPage .acc-tool{font-weight:800;direction:ltr;text-align:right;}
+#accPage .acc-time{display:block;color:#9aa8b2;font-size:11px;margin-top:2px;}
+#accPage .acc-why{color:#58595b;font-size:12.5px;max-width:280px;}
+#accPage .acc-done{font-size:12px;font-weight:700;white-space:nowrap;}
+#accPage .acc-done.ok{color:#1a8a4a;} #accPage .acc-done.no{color:#c0392b;} #accPage .acc-done.wait{color:#8697a3;}
+#accPage .acc-new{display:inline-block;margin-inline-start:6px;padding:1px 7px;border-radius:999px;background:#be1f24;color:#fff;font-size:10px;font-weight:800;vertical-align:1px;}
+#accPage .acc-done small{display:block;font-weight:600;color:#9aa8b2;direction:ltr;text-align:right;}
+#accPage .acts .ok{color:#1a8a4a;} #accPage .acts .ok:hover{border-color:#1a8a4a;color:#1a8a4a;}
+#accPage .acc-note{display:flex;gap:6px;margin-top:6px;}
+#accPage .acc-note input{flex:1;min-width:120px;border:1px solid #d8e0e5;border-radius:8px;padding:6px 8px;font-family:inherit;font-size:12px;}
+#accPage .acc-note button{background:#be1f24;border:1px solid #be1f24;border-radius:8px;padding:6px 12px;font-family:inherit;font-weight:700;font-size:12px;color:#fff;cursor:pointer;white-space:nowrap;}
+#accPage .acc-note button:hover{background:#a3191e;border-color:#a3191e;}
+#accPage .acc-note button:disabled{opacity:.45;cursor:default;}
+#accPage .acc-note input:focus{outline:none;border-color:#be1f24;}
+</style>
+<script>
+/* ===== طلبات الصلاحيات =====
+   On the tools list, a locked tool opens «طلب صلاحية»: the tool, the other
+   locked ones to add, and an optional reason. A tool asked for shows ⏳ until
+   the Owner or the Comms Manager decides. A decision, or a tool given or taken
+   away in «إدارة المستخدمين», adds to a number on the person's photo and shows
+   on their own «سجل الصلاحيات». The approvers see the waiting requests'
+   number there, and decide each tool on their «سجل الصلاحيات». */
+(function(){
+  var $=function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  var CLOCK='<svg class="proj-lock" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm0 1.6a4.9 4.9 0 1 0 0 9.8 4.9 4.9 0 0 0 0-9.8zM8.8 4.5v3.2l2.1 1.3-.8 1.3L7.2 8.6V4.5z"/></svg>';
+  function global(){ var u=Auth.current&&Auth.current(); return !!(u&&(u.role==="owner"||u.role==="comms")); }
+  function cards(){ return [].slice.call(document.querySelectorAll("#projectGate .proj-card[data-slug]")); }
+  function cardName(c){ var n=c.querySelector(".proj-name"); if(!n) return c.dataset.slug; n=n.cloneNode(true); [].forEach.call(n.querySelectorAll(".proj-badge,svg"),function(x){ x.remove(); }); return n.textContent.trim(); }
+  function fmtDate(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return s||""; function p(n){ return (n<10?"0":"")+n; } return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear(); }
+  function fmtTime(s){ var d=new Date(String(s).replace(" ","T")+"Z"); if(isNaN(d)) return ""; function p(n){ return (n<10?"0":"")+n; } return p(d.getHours())+":"+p(d.getMinutes()); }
+
+  /* A note in the brand red, high enough to clear the page's footer line. */
+  function toast(msg){
+    var t=document.createElement("div"); t.className="acc-toast"; t.textContent=msg;
+    t.style.bottom=(64+52*document.querySelectorAll(".acc-toast").length)+"px";   // several at once stack upward
+    document.body.appendChild(t);
+    setTimeout(function(){ t.classList.add("out"); setTimeout(function(){ t.remove(); },400); },4000);
+  }
+  /* A card asked for: ⏳ in place of the lock, and it waits. */
+  function setPending(c){
+    c.classList.remove("locked"); c.classList.add("pending");
+    var lk=c.querySelector(".proj-lock"); if(lk) lk.outerHTML=CLOCK;
+    c.setAttribute("data-hint",(c.dataset.toolHint?c.dataset.toolHint+"\n":"")+"طلبك قيد المراجعة، رح تنفتح الأداة أول ما ينوافق عليه");
+    c.onclick=function(e){ e.preventDefault(); };
+  }
+
+  /* After the tools list draws: this account's requests on its cards and the number of decisions it has not seen; for the approvers, the waiting count. */
+  window.accApply=async function(){
+    if(global()){ countWaiting(); return; }
+    var r=await Auth.accessMine(); if(!r.ok) return;
+    var unseen=0;
+    r.requests.forEach(function(q){
+      var c=cards().filter(function(x){ return x.dataset.slug===q.slug; })[0];
+      if(q.status==="pending"&&c&&c.classList.contains("locked")) setPending(c);
+      if(q.status==="rejected"&&c&&c.classList.contains("locked"))
+        c.setAttribute("data-hint",(c.dataset.toolHint?c.dataset.toolHint+"\n":"")+"انرفض طلبك"+(q.note?": "+q.note:"")+". فيك تطلبها مرة تانية بعد 7 أيام من الرفض");
+      if(q.status!=="pending"&&!q.seen) unseen++;
+    });
+    showCount(unseen);
+  };
+  /* The number on every account photo and in the menu item «سجل الصلاحيات»: waiting
+     requests for the approvers, decisions not yet seen for everyone else. */
+  function showCount(n){
+    [].forEach.call(document.querySelectorAll(".acct"),function(a){
+      var b=a.querySelector(".acc-count");
+      if(!n){ if(b) b.remove(); return; }
+      if(!b){ b=document.createElement("span"); b.className="acc-count"; a.appendChild(b); }
+      b.textContent=n>99?"99+":String(n);
+    });
+    [].forEach.call(document.querySelectorAll(".acct-menu"),function(m){
+      var it=m.querySelector(".acc-menu");
+      if(!it){ it=document.createElement("button"); it.type="button"; it.className="acc-menu"; it.onclick=function(){ openRequests(); }; m.insertBefore(it,m.querySelector(".arc-menu")||m.lastElementChild); }
+      it.textContent="سجل الصلاحيات"+(n?" ("+n+")":"");
+    });
+  }
+
+  var ACC_EXAMPLE={"hope-center":"بدي اعمل بوستر لإعلان وظيفة بـ Hope Center","study-zone":"بدي اعمل بوستر لدورة جديدة بـ Study Zone",
+    "children-university":"بدي اعمل دعوة تخرّج لدفعة الأطفال","disc":"بدي اعمل بوسترات لدورة الشهر الجاي بـ DISC",
+    "leap":"بدي اعمل بوستر لفتح باب التقديم على LEAP","thumbnail-gen":"بدي اعمل صور مصغّرة لفيديوهات القناة",
+    "reels-gen":"بدي اعمل ريلز لنشاطات المشروع","text-transcription":"بدي فرّغ فواتير الشهر بجدول",
+    "meeting-transcription":"بدي فرّغ اجتماعات الفريق الأسبوعية"};
+  /* «طلب صلاحية» */
+  window.accOpenRequest=function(slug){
+    var locked=cards().filter(function(c){ return c.classList.contains("locked"); });
+    if(!locked.length) return;
+    var back=document.createElement("div"); back.className="acc-back";
+    back.innerHTML='<div class="acc-box" role="dialog" aria-modal="true" aria-labelledby="accTitle"><h2 id="accTitle">طلب صلاحية</h2>'+
+      '<p class="acc-sub">اختر الأدوات اللي بدك صلاحية عليها من القائمة</p>'+
+      '<div class="acc-list">'+locked.map(function(c){ return '<label><input type="checkbox" value="'+esc(c.dataset.slug)+'"'+(c.dataset.slug===slug?' checked':'')+'><span class="acc-name">'+esc(cardName(c))+'</span></label>'; }).join("")+'</div>'+
+      '<div class="acc-lbl">ليش بدك ياها؟ <span>(اختياري)</span></div><textarea id="accReason" maxlength="500" dir="auto"></textarea>'+
+      '<div class="acc-acts"><button type="button" class="acc-send">إرسال الطلب</button><button type="button" class="acc-cancel">إلغاء</button></div><div class="acc-st"></div></div>';
+    document.body.appendChild(back);
+    function close(){ back.remove(); document.removeEventListener("keydown",key); }
+    function key(e){ if(e.key==="Escape") close(); }
+    document.addEventListener("keydown",key);
+    back.onclick=function(e){ if(e.target===back) close(); };
+    back.querySelector(".acc-cancel").onclick=close;
+    // the reason's example follows the tool ticked last
+    var why=$("accReason");
+    function example(slug){ why.placeholder="مثلاً: "+(ACC_EXAMPLE[slug]||"بدي استعمل هي الأداة بشغلي اليومي"); }
+    example(slug);
+    back.querySelector(".acc-list").onchange=function(e){
+      var on=[].filter.call(back.querySelectorAll(".acc-list input"),function(i){ return i.checked; });
+      example(e.target.checked?e.target.value:(on.length?on[on.length-1].value:""));
+    };
+    var send=back.querySelector(".acc-send"), st=back.querySelector(".acc-st");
+    send.onclick=async function(){
+      var slugs=[].map.call(back.querySelectorAll(".acc-list input:checked"),function(i){ return i.value; });
+      if(!slugs.length){ st.className="acc-st err"; st.textContent="اختر أداة وحدة على الأقل"; return; }
+      send.disabled=true; send.textContent="…جارٍ الإرسال"; st.textContent="";
+      var r=await Auth.accessRequest(slugs,$("accReason").value.trim());
+      if(!r.ok){ send.disabled=false; send.textContent="إرسال الطلب"; st.className="acc-st err"; st.textContent=r.error; return; }
+      cards().forEach(function(c){ if(slugs.indexOf(c.dataset.slug)>=0&&c.classList.contains("locked")) setPending(c); });
+      close();
+      toast("✓ تم إرسال طلبك بنجاح، بانتظار الموافقة أو الرفض");
+    };
+    var first=back.querySelector(".acc-list input:checked")||back.querySelector(".acc-list input"); if(first) first.focus();
+  };
+
+  /* The number stays current while a page is open: every minute, and on coming
+     back to the tab. On the tools list, a tool given or taken away meanwhile
+     redraws the list, so it opens or locks there and then. */
+  async function tick(){
+    if(document.hidden||!(Auth.current&&Auth.current())) return;
+    if(global()){ countWaiting(); return; }
+    var r=await Auth.accessMine(); if(!r.ok) return;
+    var gate=$("projectGate"), onList=gate&&gate.style.display!=="none";
+    var stale=onList&&r.requests.some(function(q){
+      var c=cards().filter(function(x){ return x.dataset.slug===q.slug; })[0]; if(!c) return false;
+      return (q.status==="approved"&&!q.seen&&c.classList.contains("locked"))||(q.status==="revoked"&&!q.seen&&!c.classList.contains("locked")&&!c.classList.contains("pending"));
+    });
+    if(stale){ showProjectPicker(); return; }
+    showCount(r.requests.filter(function(q){ return q.status!=="pending"&&!q.seen; }).length);
+  }
+  setInterval(tick,60000);
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) tick(); });
+
+  /* Approvers: the number of waiting requests. */
+  async function countWaiting(){
+    var r=await Auth.accessList(); if(!r.ok) return;
+    showCount(r.requests.filter(function(q){ return q.status==="pending"; }).length);
+  }
+
+  /* «سجل الصلاحيات». For the approvers: everyone's requests, waiting ones first,
+     each with its own approve and reject, then the last 30 days' decisions. For
+     everyone else: their own requests and what became of them, without who
+     decided; opening it marks the new decisions seen. */
+  var rows=[], mineView=false;
+  function openRequests(){
+    mineView=!global();
+    var pg=$("accPage");
+    if(!pg){
+      pg=document.createElement("div"); pg.id="accPage";
+      pg.innerHTML='<div class="arc-wrap"><div class="arc-top"><h1>سجل الصلاحيات</h1><button type="button" class="arc-btn" id="accClose">← رجوع</button></div>'+
+        '<div class="arc-card"><table class="arc-t"><thead id="accHead"></thead><tbody id="accBody"></tbody></table>'+
+        '<div class="arc-empty" id="accEmpty" hidden></div></div></div>';
+      document.body.appendChild(pg);
+      $("accClose").onclick=function(){ pg.classList.remove("on"); };
+      document.addEventListener("keydown",function(e){ if(e.key==="Escape"&&pg.classList.contains("on")) pg.classList.remove("on"); });
+      $("accBody").onclick=onAction;
+    }
+    $("accHead").innerHTML=mineView?'<tr><th>الأداة</th><th>السبب</th><th>تاريخ الطلب</th><th>الحالة</th></tr>'
+                                   :'<tr><th>الإيميل</th><th>الأداة</th><th>السبب</th><th>التاريخ</th><th></th></tr>';
+    pg.classList.add("on"); load();
+  }
+  async function load(){
+    $("accEmpty").hidden=false; $("accEmpty").textContent="…جارٍ التحميل"; $("accBody").innerHTML="";
+    var r=mineView?await Auth.accessHistory():await Auth.accessList();
+    if(!r.ok){ $("accEmpty").textContent=r.error; return; }
+    rows=r.requests; render();
+    if(!mineView){ countWaiting(); return; }
+    var fresh=rows.filter(function(q){ return q.status!=="pending"&&!q.seen; }).map(function(q){ return q.id; });
+    if(fresh.length){ Auth.accessSeen(fresh); showCount(0); }
+  }
+  function when(s){ return fmtDate(s)+'<small class="acc-time">'+fmtTime(s)+'</small>'; }
+  /* A tool given or taken away in «إدارة المستخدمين», not asked for: written with the
+     decision, so it has no request date of its own (a revocation is never asked for). */
+  function noRequest(q){ return q.status==="revoked"||(q.status==="approved"&&!q.reason&&q.created_at===q.decided_at); }
+  function asked(q){ return noRequest(q)?'<span style="color:#b6c0c7">—</span>':when(q.created_at); }
+  function why(q){ return '<td class="acc-why">'+(q.reason?esc(q.reason):'<span style="color:#b6c0c7">—</span>')+'</td>'; }
+  function outcome(q,who){
+    if(q.status==="pending") return '<div class="acc-done wait">⏳ قيد المراجعة</div>';
+    return '<div class="acc-done '+(q.status==="approved"?"ok":"no")+'">'+(q.status==="approved"?(noRequest(q)?"✓ تم إعطاء صلاحية":"✓ تمت الموافقة على إعطاء الصلاحية"):q.status==="revoked"?"⊘ تم إيقاف الصلاحية":"✗ تم الرفض")+(q.note?" — "+esc(q.note):"")+
+      (!who&&!q.seen?'<span class="acc-new">جديد</span>':'')+'<small>'+(who?esc(q.decided_by||"")+" · ":"")+fmtDate(q.decided_at)+" "+fmtTime(q.decided_at)+'</small></div>';
+  }
+  function render(){
+    $("accEmpty").hidden=rows.length>0; $("accEmpty").textContent=mineView?"ما طلبت أي صلاحية لسا":"ما في طلبات";
+    $("accBody").innerHTML=rows.map(function(q,i){
+      if(mineView) return '<tr data-i="'+i+'"><td class="acc-tool">'+esc(q.name)+'</td>'+why(q)+'<td class="dt">'+asked(q)+'</td><td>'+outcome(q,false)+'</td></tr>';
+      var end=q.status==="pending"
+        ?'<div class="acts"><button type="button" class="ok" data-a="ok">موافقة</button><button type="button" class="del" data-a="no">رفض</button></div>'
+        :outcome(q,true);
+      return '<tr data-i="'+i+'"><td class="em">'+esc(q.email)+'</td><td class="acc-tool">'+esc(q.name)+'</td>'+why(q)+'<td class="dt">'+asked(q)+'</td><td>'+end+'</td></tr>';
+    }).join("");
+  }
+  async function onAction(e){
+    var b=e.target.closest("button[data-a]"); if(!b) return;
+    var tr=b.closest("tr"), q=rows[+tr.dataset.i]; if(!q) return;
+    if(b.dataset.a==="no"){   // «رفض» only opens the note; «تأكيد الرفض» rejects
+      var open=tr.querySelector(".acc-note");
+      if(!open){
+        open=document.createElement("div"); open.className="acc-note";
+        open.innerHTML='<input type="text" maxlength="300" placeholder="ملاحظة لصاحب الطلب (اختياري)"><button type="button" data-a="reject">تأكيد الرفض</button>';
+        b.closest(".acts").insertAdjacentElement("afterend",open);
+      }
+      open.querySelector("input").focus(); return;
+    }
+    var note=tr.querySelector(".acc-note input"); [].forEach.call(tr.querySelectorAll("button"),function(x){ x.disabled=true; });
+    var r=await Auth.accessDecide(q.id,b.dataset.a==="ok",note&&b.dataset.a==="reject"?note.value.trim():"");
+    if(!r.ok){ alert(r.error); [].forEach.call(tr.querySelectorAll("button"),function(x){ x.disabled=false; }); return; }
+    load();
+  }
 })();
 </script>
 </body></html>

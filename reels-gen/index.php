@@ -91,7 +91,7 @@
   @media(max-width:900px){.pv{padding-top:22px;padding-bottom:22px;} .screen{flex:none;width:min(100%,360px,40.5vh);height:auto;min-height:0;}}   /* width first, so a narrow phone keeps 9:16 */
   .screen canvas{display:block;width:100%;height:100%;}
   .screen .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#aaa;font-size:14px;padding:30px;line-height:1.7;}
-  .transport{display:flex;flex-direction:row-reverse;align-items:center;gap:10px;width:var(--sw,360px);max-width:100%;}   /* as wide as .screen (--sw, kept by app.js); reversed in RTL: play on its left edge, time on its right */
+  .transport{display:flex;flex-direction:row-reverse;align-items:center;gap:10px;width:var(--sw,360px);max-width:100%;margin-top:10px;}   /* as wide as .screen (--sw, kept by app.js); reversed in RTL: play on its left edge, time on its right */
   .transport button{width:27px;height:27px;padding:0;border-radius:50%;border:none;background:var(--navy);color:#fff;font-size:11px;line-height:27px;cursor:pointer;flex:0 0 auto;}
   #rgPlay:not(.playing){padding-left:2px;}   /* nudges ▶ 1px right so it looks centred; ❚❚ stays put */
   /* Seek bar: a thin K50 grey line (K50 = #939598) running left to right from the
@@ -175,7 +175,7 @@
             </select>
           </div>
           <div class="field">
-            <div class="sec">اسم المشروع</div>
+            <div class="sec">لوغو المشروع</div>
             <select id="rgProject">
               <option value="sz">Study Zone</option>
               <option value="leap">LEAP</option>

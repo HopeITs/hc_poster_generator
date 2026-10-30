@@ -23,6 +23,12 @@
     {
       "binding": "DB",
       "database_id": "ff2b0d83-d443-4692-8955-2c6793808cd3"
+    },
+    {
+      // The archive of downloaded designs (Poster Maker, Thumbnail Gen): files in chunks, kept apart from the users' database
+      "binding": "ARCHIVE",
+      "database_name": "hc-archive",
+      "database_id": "a274c4e8-0b2b-4d2a-9d3d-a9f149ea7e2a"
     }
   ]
 }
