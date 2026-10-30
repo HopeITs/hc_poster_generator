@@ -78,9 +78,10 @@
         S.file = f; S.bytes = buf; S.pages = n; S.w = s.w; S.h = s.h; S.mixed = mixed;
         status(mixed ? "صفحات الملف مو كلها بنفس المقاس: كل صفحة رح تتصغّر لتساع مكان أول صفحة" : "");
         render();
+        BKMock.set(buf, n, $("bkBinding").value === "right");
       });
     }).catch(function (e) {
-      S.file = null; render();
+      S.file = null; render(); BKMock.clear();
       status(/encrypt/i.test(String(e && e.message)) ? "الملف محمي بكلمة سر، افتح الحماية عنه أول" : "تعذّر فتح الملف: " + ((e && e.message) || ""), true);
     });
   }
@@ -178,8 +179,8 @@
     ["dragenter", "dragover"].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
     ["dragleave", "drop"].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
     drop.addEventListener("drop", function (e) { load(e.dataTransfer.files[0]); });
-    $("bkRemove").addEventListener("click", function () { S.file = null; S.bytes = null; status(""); render(); });
-    $("bkBinding").addEventListener("change", render);
+    $("bkRemove").addEventListener("click", function () { S.file = null; S.bytes = null; status(""); render(); BKMock.clear(); });
+    $("bkBinding").addEventListener("change", function () { render(); BKMock.binding($("bkBinding").value === "right"); });
     $("bkGo").addEventListener("click", build);
     render();
   }

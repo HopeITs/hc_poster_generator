@@ -75,6 +75,14 @@
   .empty{padding:34px;text-align:center;color:var(--muted);font-size:14px;border:2px dashed var(--line);border-radius:14px;line-height:1.8;}
   .gate{max-width:520px;margin:60px auto;text-align:center;}
   .gate p{font-size:15px;font-weight:700;color:var(--ink);}
+  .mock{position:relative;border-radius:12px;overflow:hidden;background:#e9e9e9;aspect-ratio:2000/1404;}
+  .mock canvas{display:block;width:100%;height:100%;}
+  .mock-note{position:absolute;inset:auto 0 12px;text-align:center;font-size:12px;font-weight:700;color:var(--muted);pointer-events:none;}
+  .flip{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;}
+  .flip button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:18px;font-weight:800;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;}
+  .flip button:hover:not(:disabled){background:var(--red);border-color:var(--red);color:#fff;}
+  .flip button:disabled{opacity:.35;cursor:default;}
+  .flip span{min-width:190px;text-align:center;font-size:13px;font-weight:700;color:var(--ink);white-space:pre;}
   .foot{position:fixed;bottom:24px;left:0;right:0;z-index:-1;text-align:center;direction:ltr;font-size:11px;font-weight:500;color:#848484;padding:0 12px;pointer-events:none;}
 </style>
 </head>
@@ -131,9 +139,20 @@
         </div>
       </div>
     </div>
+
+    <div class="card" id="bkMock" hidden>
+      <div class="sec">المعاينة</div>
+      <div class="mock"><canvas id="bkCanvas" width="2000" height="1404"></canvas><div class="mock-note" id="bkMockNote"></div></div>
+      <div class="flip">
+        <button type="button" id="bkRight" aria-label="قلب الصفحات">→</button>
+        <span id="bkSpread"></span>
+        <button type="button" id="bkLeft" aria-label="قلب الصفحات">←</button>
+      </div>
+    </div>
   </div>
 
   <script src="../vendor/pdf-lib.min.js" defer></script>
+  <script src="mockup.js" defer></script>
   <script src="app.js" defer></script>
 
   <div class="foot">HC Generator, a project by Christian Hope Center. © <?= date('Y') ?> All Rights Reserved.</div>
