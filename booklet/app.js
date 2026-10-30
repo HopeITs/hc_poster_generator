@@ -14,7 +14,7 @@
   var WORKER = "https://studyzone-auth.ct-aleppo3.workers.dev";
   var TOKEN_KEY = "sz_auth_token", SLUG = "booklet-maker";
   var MM = 72 / 25.4;                    // points per millimetre
-  var GUTTER_MM = 5;                     // between the two pages at the fold
+  var GUTTER_MM = 0;                     // between the two pages at the fold: none, so each page fills its half edge to edge
   var MAX_BYTES = 200 * 1048576;
   var SHEETS = [["A3", 297, 420], ["A4", 210, 297], ["A5", 148, 210], ["A6", 105, 148], ["B4", 250, 353], ["B5", 176, 250],
                 ["Letter", 215.9, 279.4], ["Legal", 215.9, 355.6], ["Tabloid", 279.4, 431.8]];
@@ -147,8 +147,8 @@
             });
           });
           return out.save();
-          /* One page into its half: as large as fits once the gutter is
-             taken on the fold side, pushed to the outer edge, centred in height. */
+          /* One page into its half: as large as fits (a page the shape of
+             the first fills it exactly), against the fold, centred in height. */
           function place(sheet, num, x0, isLeft) {
             if (num > n) return;
             var p = src.getPage(num - 1), sz = pageSize(p), g = gutter / 2;
