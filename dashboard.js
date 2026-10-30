@@ -38,6 +38,8 @@
     var h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
     return h ? h + " س" + (m ? " " + m + " د" : "") : m + " د";
   }
+  /* The top user of a tool or a request, with their share beside the name: «hekmat… · 61 طلب». */
+  function topOf(u, what) { return '<span class="dash-top">' + who(u) + '<span class="dash-of">' + what + "</span></span>"; }
   function who(u) { return '<span class="dash-who">' + (u && u.photo ? '<img src="' + esc(u.photo) + '" alt="">' : '<i></i>') + '<bdi>' + esc(u ? u.email : "") + '</bdi></span>'; }
 
   /* ---------- the menu item ---------- */
@@ -67,6 +69,7 @@
         ".dash-who bdi{direction:ltr;font-weight:700;word-break:break-all;}" +
         ".dash-st{white-space:nowrap;font-weight:700;font-size:12px;} .dash-st b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-inline-end:6px;background:#c3cad0;vertical-align:0;}" +
         ".dash-st.on{color:#1a8a4a;} .dash-st.on b{background:#22b35e;box-shadow:0 0 0 3px rgba(34,179,94,.18);} .dash-st small{display:block;font-weight:600;color:#6f6e71;margin-top:2px;direction:ltr;text-align:right;}" +
+        ".dash-top{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;} .dash-of{white-space:nowrap;font-size:12px;font-weight:700;color:#6f6e71;background:#f1f2f3;border-radius:999px;padding:2px 9px;}" +
         ".dash-n{white-space:nowrap;font-weight:700;} .dash-rank{color:#9aa8b2;font-weight:800;width:24px;}" +
         ".dash-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px;} @media(max-width:760px){.dash-sum{grid-template-columns:repeat(2,minmax(0,1fr));}}" +
         ".dash-sum div{background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.06);padding:12px 14px;} .dash-sum span{display:block;font-size:12px;font-weight:700;color:#6f6e71;} .dash-sum b{font-size:20px;font-weight:900;color:#414042;}";
@@ -133,7 +136,7 @@
     $("dashTools").innerHTML = tl.length ? tl.map(function (k) {
       var t = tools[k], b = top(t.by);
       return '<tr><td class="acc-tool" style="font-weight:800">' + esc(TOOL[k] || k) + '</td><td class="dash-n">' + t.visits + '</td><td class="dash-n">' + dur(t.secs) + "</td><td>" +
-        (b ? who(byEmail[b] || { email: b }) + ' <span class="dt">· ' + dur(t.by[b]) + "</span>" : "—") + "</td></tr>";
+        (b ? topOf(byEmail[b] || { email: b }, dur(t.by[b])) : "—") + "</td></tr>";
     }).join("") : '<tr><td colspan="4" class="arc-empty">ما في استخدام بهالفترة</td></tr>';
 
     var pl = Object.keys(people).sort(function (a, b) { return people[b] - people[a]; }), max = pl.length ? people[pl[0]] : 1;
@@ -147,7 +150,7 @@
     var al = Object.keys(ai).sort(function (a, b) { return ai[b].n - ai[a].n; });
     $("dashAi").innerHTML = al.length ? al.map(function (k) {
       var a = ai[k], b = top(a.by);
-      return "<tr><td style=\"font-weight:800\">" + esc(AI[k] || k) + '</td><td class="dash-n">' + a.n + "</td><td>" + who(byEmail[b] || { email: b }) + ' <span class="dt">· ' + a.by[b] + "</span></td></tr>";
+      return "<tr><td style=\"font-weight:800\">" + esc(AI[k] || k) + '</td><td class="dash-n">' + a.n + "</td><td>" + topOf(byEmail[b] || { email: b }, a.by[b] + (a.by[b] === 1 ? " طلب" : a.by[b] <= 10 ? " طلبات" : " طلب")) + "</td></tr>";
     }).join("") : '<tr><td colspan="3" class="arc-empty">ما في طلبات بهالفترة</td></tr>';
 
     // the summary on top
