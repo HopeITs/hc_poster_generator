@@ -33,8 +33,10 @@
     }));
   }
 
-  /* One page as a texture the shape of a half: white, the page centred in
-     it as large as fits. A page past the end of the file stays white. */
+  /* One page as a texture the shape of a half: the page fills it edge to
+     edge (centred, the overflow cut), so no white strip is left at the spine
+     when the page's shape differs from the mockup's. A page past the end of
+     the file stays white. */
   function texture(n) {
     if (M.cache[n]) return M.cache[n];
     var c = document.createElement("canvas");
@@ -43,7 +45,7 @@
     if (n > M.pages || !M.doc) return (M.cache[n] = Promise.resolve(c));
     var doc = M.doc;
     return (M.cache[n] = doc.getPage(n).then(function (p) {
-      var v1 = p.getViewport({ scale: 1 }), s = Math.min(c.width / v1.width, c.height / v1.height);
+      var v1 = p.getViewport({ scale: 1 }), s = Math.max(c.width / v1.width, c.height / v1.height);
       var vp = p.getViewport({ scale: s }), t = document.createElement("canvas");
       t.width = Math.round(vp.width); t.height = Math.round(vp.height);
       var tg = t.getContext("2d"); tg.fillStyle = "#fff"; tg.fillRect(0, 0, t.width, t.height);
@@ -139,12 +141,12 @@
       if (cv.width !== W) { cv.width = W; cv.height = H; }
       var paper = document.createElement("canvas"); paper.width = W; paper.height = H;
       var p = paper.getContext("2d"), shape = new Path2D();
+      // all the paper first, then the pages: a half's white must not cover
+      // the edge of its neighbour's page at the spine
+      A.mesh.cards.forEach(function (card) { card.halves.forEach(function (half) { outline(shape, half); }); });
+      p.fillStyle = "#fff"; p.fill(shape);
       A.mesh.cards.forEach(function (card) {
-        card.halves.forEach(function (half, h) {
-          var one = new Path2D(); outline(one, half); shape.addPath(one);
-          p.fillStyle = "#fff"; p.fill(one);
-          warp(p, tex[card.name][h], grid(half));
-        });
+        card.halves.forEach(function (half, h) { warp(p, tex[card.name][h], grid(half)); });
       });
       p.globalCompositeOperation = "color-burn"; p.drawImage(A.contrast, 0, 0);
       p.globalCompositeOperation = "multiply"; p.drawImage(A.darks, 0, 0);
