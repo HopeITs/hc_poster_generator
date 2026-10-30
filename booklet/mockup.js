@@ -153,13 +153,39 @@
       p.globalCompositeOperation = "screen"; p.drawImage(A.lights, 0, 0);
       p.globalCompositeOperation = "destination-in"; p.fillStyle = "#000"; p.fill(shape);
       var g = cv.getContext("2d");
-      g.drawImage(A.base, 0, 0); g.drawImage(paper, 0, 0);
+      g.drawImage(A.base, 0, 0); edges(g, A.mesh); g.drawImage(paper, 0, 0);
       // the staples: always on the cover, inside only at the middle spread
       A.mesh.cards.forEach(function (card) {
         if (card.name === "closed" || M.spread === middle()) staples(g, card.halves[0], card.name === "open");
       });
       $("bkMockNote").textContent = "";
     }).catch(function () { if (run === M.run) $("bkMockNote").textContent = "تعذّر تجهيز المعاينة"; });
+  }
+
+  /* The leaves under each half, seen as their edges below it: one thin
+     edge per leaf (two pages), as many as the file has. Open, the leaves
+     already turned lie under one half and the rest under the other; the
+     closed booklet shows half of them under each. Each edge is light paper
+     over a fine dark line, 1.5 px apart: thin enough to look like paper, still
+     separate at the preview's size; past 8 under one half the stack stops
+     growing. */
+  function edges(g, mesh) {
+    var leaves = padded() / 2, step = 1.5, MAX = 8, turned = M.spread + 1;
+    var open = M.rtl ? [leaves - turned, turned] : [turned, leaves - turned];
+    mesh.cards.forEach(function (card) {
+      card.halves.forEach(function (half, h) {
+        var n = Math.min(MAX, card.name === "open" ? open[h] : Math.ceil(leaves / 2)), path = new Path2D(), edge = new Path2D();
+        outline(path, half);
+        half.bottom.forEach(function (q, k) { if (k) edge.lineTo(q[0], q[1]); else edge.moveTo(q[0], q[1]); });
+        for (var i = n; i >= 1; i--) {   // the lowest first, each a shade darker than the one above it
+          var c = Math.max(222, 248 - i);
+          g.save(); g.translate(0, i * step);
+          g.fillStyle = "rgb(" + c + "," + c + "," + c + ")"; g.fill(path);
+          var e = c - 75; g.strokeStyle = "rgb(" + e + "," + e + "," + e + ")"; g.lineWidth = 0.6; g.lineJoin = "round"; g.stroke(edge);   // the leaf's own edge line, opaque so its joins do not darken into ticks
+          g.restore();
+        }
+      });
+    });
   }
 
   /* Two staples on the spine, a quarter of the way from each end: a thin
