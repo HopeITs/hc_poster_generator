@@ -1232,6 +1232,10 @@ select.hc-inp{cursor:pointer;appearance:none;-webkit-appearance:none;
           <option value="2">شهادة (Testimony)</option>
           <option value="3">فتح باب التسجيل</option>
         </select></div>
+      <div class="dc-t13">
+      <div class="field"><label>المسار الرئيسي</label><select id="dcTrack"></select></div>
+      <div class="field" id="dcSpecField"><label>المسار التخصصي</label><select id="dcSpec"></select></div>
+      </div>
       <div class="dc-t3" style="display:none">
       <div class="sec-divider">الإعلان</div>
       <div class="field"><label>السطر <span class="hint">بين نجمتين *هيك* = كحلي عريض</span></label><input type="text" id="dcT3Intro" value="يعلن *مركز التدريب والتكوين DISC* في دمشق عن فتح باب التسجيل في:" dir="auto"></div>
@@ -3308,6 +3312,22 @@ $("hcExportBtn").onclick=hcExport;
                  t2back:"assets/disc/t2-bg3.jpg",t2front:"assets/disc/t2-front2.png",t2person:"assets/disc/t2-person.png",
                  t3head:"assets/disc/t3-head.png",t3scene:"assets/disc/t3-scene.jpg"};
   var DC_TPL_ASSETS={1:["bg","hero"],2:["t2back","t2front","t2person"],3:["t3head","t3scene"]};
+  /* Templates 1 and 3 are for a track, and some tracks for a specialty in it. */
+  var DC_TRACKS=[
+    {id:"engineering",name:"المسار الهندسي",specs:[{id:"architecture",name:"مسار الهندسة المعمارية"},{id:"civil",name:"مسار الهندسة المدنية"},{id:"solar",name:"المسار المهني المتكامل في الطاقة الشمسية"}]},
+    {id:"computer-science",name:"مسار علوم الحاسوب",specs:[]},
+    {id:"digital-marketing",name:"مسار التسويق الرقمي",specs:[]},
+    {id:"business",name:"مسار إدارة الأعمال",specs:[{id:"hr",name:"مسار الموارد البشرية"}]},
+    {id:"training",name:"مسار التكوين",specs:[]}
+  ];
+  /* Each track's (or specialty's) own look, from its design file as it arrives:
+       bg1  template 1's background picture, its pattern included (else assets/disc/bg.png, Computer Science's)
+       pat3 template 3's pattern behind the scene, a picture over the grey strip (else none)
+       t1, t3  the text it starts with, by DC_FIELDS name (else the fields keep theirs)
+     A specialty without its own takes its track's; keyed "track" or "track/specialty". */
+  var DC_TRACK_LOOK={};
+  // template 1's design is Computer Science's, template 3's Business Administration's
+  DC.tracks={1:{track:"computer-science",spec:""},3:{track:"business",spec:""}};
   var DC_T2_FONTS=[{w:300,url:"assets/disc/SomarSans-Light.otf"},{w:600,url:"assets/disc/SomarSans-SemiBold.otf"}], DC_T2_FAM="DISC Somar";
   var DC_T3_FONTS=[{w:600,url:"assets/disc/SomarSans-SemiBold.otf"},{w:700,url:"guideline-assistant/fonts/SomarSans-Bold.otf"}], DC_T3_FAM="DISC Somar3";
 
@@ -3323,7 +3343,8 @@ $("hcExportBtn").onclick=hcExport;
   /* Pictures as data: URIs: an SVG drawn through <img> for the export cannot
      load files. Only the open template's pictures (template 2's are ~4 MB). */
   function dcLoadAssets(cb){
-    var keys=DC_TPL_ASSETS[DC.tpl].filter(function(k){ return !DC.assets[k]; }), todo=keys.length;
+    var want=DC_TPL_ASSETS[DC.tpl].concat([dcTrackAsset(DC.tpl===1?"bg1":DC.tpl===3?"pat3":"")].filter(Boolean));
+    var keys=want.filter(function(k){ return !DC.assets[k]; }), todo=keys.length;
     var fonts=DC.tpl===2?dcLoadT2Fonts():DC.tpl===3?dcFaces(DC_T3_FONTS,DC_T3_FAM):Promise.resolve();
     if(!todo){ fonts.then(function(){ cb&&cb(); }); return; }
     keys.forEach(function(k){
@@ -3479,7 +3500,9 @@ $("hcExportBtn").onclick=hcExport;
     s+='<rect width="'+W+'" height="'+H+'" fill="#fff"/>';
     s+=img(A.t3head||DC_ASSETS.t3head,{x:0,y:0,w:W,h:T.head.h});
     s+=t3Rich(val("dcT3Intro"),T.intro,T.intro.by);
-    s+='<rect x="0" y="'+T.strip.y+'" width="'+W+'" height="'+T.strip.h+'" fill="'+T.strip.fill+'"/>'+t3Scene();
+    s+='<rect x="0" y="'+T.strip.y+'" width="'+W+'" height="'+T.strip.h+'" fill="'+T.strip.fill+'"/>';
+    var patK=dcTrackAsset("pat3"); if(patK) s+=img(A[patK]||DC_ASSETS[patK],{x:0,y:T.strip.y,w:W,h:T.strip.h});
+    s+=t3Scene();
     s+='<rect x="'+B.x+'" y="'+B.y+'" width="'+B.w+'" height="'+B.h+'" fill="'+T.navy+'"/>';
     var tl=val("dcT3Title").split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean).slice(0,2);
     var ty=tl.length===1?[(T.title.by[0]+T.title.by[1])/2]:T.title.by;
@@ -3500,7 +3523,8 @@ $("hcExportBtn").onclick=hcExport;
     if(withFonts) s+='<defs><style>'+(DC.tpl===2?dcT2FontCSS():DC.tpl===3?dcFacesCSS(DC_T3_FONTS,DC_T3_FAM):dcFontCSS())+'</style></defs>';
     if(DC.tpl===2) return t2SVG(s);
     if(DC.tpl===3) return t3SVG(s);
-    s+=img(A.bg||DC_ASSETS.bg,{x:0,y:0,w:W,h:H});
+    var bgK=dcTrackAsset("bg1")||"bg";
+    s+=img(A[bgK]||DC_ASSETS[bgK],{x:0,y:0,w:W,h:H});
     s+=img(DC.heroUser||A.hero||DC_ASSETS.hero,L.hero);
     s+=line(L.title,val("dcTitle"),C.navy);
     s+=line(L.sub,val("dcSub"),C.gray);
@@ -3522,9 +3546,47 @@ $("hcExportBtn").onclick=hcExport;
   function dcSetTpl(n){
     DC.tpl=n===2||n===3?n:1; if($("dcTpl")) $("dcTpl").value=String(DC.tpl);
     [1,2,3].forEach(function(t){ [].forEach.call(document.querySelectorAll("#dcApp .dc-t"+t),function(e){ e.style.display=DC.tpl===t?"":"none"; }); });
+    [].forEach.call(document.querySelectorAll("#dcApp .dc-t13"),function(e){ e.style.display=DC.tpl===2?"none":""; });
+    dcFillTracks();
     dcRender(); dcLoadAssets(dcRender);
   }
   if($("dcTpl")) $("dcTpl").addEventListener("change",function(){ dcSetTpl(+this.value); });
+
+  /* المسار الرئيسي and المسار التخصصي (templates 1 and 3; each keeps its own). */
+  function dcTrackState(){ return DC.tracks[DC.tpl]||null; }
+  function dcTrack(id){ return DC_TRACKS.filter(function(t){ return t.id===id; })[0]||DC_TRACKS[0]; }
+  function dcTrackLook(){ var st=dcTrackState(); if(!st) return {}; return (st.spec&&DC_TRACK_LOOK[st.track+"/"+st.spec])||DC_TRACK_LOOK[st.track]||{}; }
+  /* The asset key of this track's picture of a kind (bg1, pat3), registered on first use; "" when it has none. */
+  function dcTrackAsset(kind){
+    var url=kind&&dcTrackLook()[kind]; if(!url) return "";
+    var k=kind+":"+url; DC_ASSETS[k]=url; return k;
+  }
+  /* The track's label, for the archive and the file: the specialty's name, or the track's. */
+  function dcTrackLabel(){
+    var st=dcTrackState(); if(!st) return "";
+    var t=dcTrack(st.track), sp=t.specs.filter(function(x){ return x.id===st.spec; })[0];
+    return sp?sp.name:t.name;
+  }
+  function dcFillTracks(){
+    var st=dcTrackState(), tr=$("dcTrack"), sp=$("dcSpec"); if(!st||!tr||!sp) return;
+    tr.innerHTML=DC_TRACKS.map(function(t){ return '<option value="'+t.id+'">'+esc(t.name)+'</option>'; }).join("");
+    tr.value=st.track;
+    var t=dcTrack(st.track);
+    sp.innerHTML='<option value="">عام (بدون تخصص)</option>'+t.specs.map(function(x){ return '<option value="'+x.id+'">'+esc(x.name)+'</option>'; }).join("");
+    sp.value=st.spec||"";
+    $("dcSpecField").style.display=t.specs.length?"":"none";   // a track with no specialties: one list
+  }
+  /* A new track or specialty: its text in the fields, its pictures in the design. */
+  function dcSetTrack(track,spec){
+    var st=dcTrackState(); if(!st) return;
+    st.track=dcTrack(track).id; st.spec=dcTrack(st.track).specs.some(function(x){ return x.id===spec; })?spec:"";
+    dcFillTracks();
+    var text=dcTrackLook()["t"+DC.tpl]||{};
+    for(var k in text){ var e=$(DC_FIELDS[k]); if(e&&typeof text[k]==="string") e.value=text[k]; }
+    dcRender(); dcLoadAssets(dcRender);
+  }
+  if($("dcTrack")) $("dcTrack").addEventListener("change",function(){ dcSetTrack(this.value,""); });
+  if($("dcSpec")) $("dcSpec").addEventListener("change",function(){ var st=dcTrackState(); if(st) dcSetTrack(st.track,this.value); });
   function dcSetPhoto(src){
     DC.photoUser=src||null;
     var up=$("dcPhotoUp"); if(up){ up.childNodes[0].nodeValue=src?"✓ تم رفع الصورة":"اضغط لرفع الصورة"; up.classList.toggle("has",!!src); }   // silver until a photo is chosen, as in Study Zone
@@ -3663,14 +3725,18 @@ $("hcExportBtn").onclick=hcExport;
   var DC_FILE={1:"",2:"Testimony_",3:"Program_"};
   var DC_FIELDS={title:"dcTitle",sub:"dcSub",line1:"dcLine1",line2:"dcLine2",reg:"dcReg",regHl:"dcRegHl",bar:"dcBar",quote:"dcQuote",name:"dcName",
                  t3Intro:"dcT3Intro",t3Scene:"dcT3Scene",t3Title:"dcT3Title",t3Tag:"dcT3Tag",t3TopicsHead:"dcT3TopicsHead",t3Topics:"dcT3Topics",t3Details:"dcT3Details",t3Addr:"dcT3Addr",t3Phone:"dcT3Phone"};
-  function dcCollect(){ var d={app:"disc",v:2,tpl:DC.tpl}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; d.photo=DC.photoUser||null; d.scene=DC.sceneUser||null; return d; }
+  function dcCollect(){ var d={app:"disc",v:2,tpl:DC.tpl}; for(var k in DC_FIELDS) d[k]=val(DC_FIELDS[k]); d.image=DC.heroUser||null; d.photo=DC.photoUser||null; d.scene=DC.sceneUser||null;
+    var st=dcTrackState(); if(st){ d.track=st.track; d.spec=st.spec||""; d.trackLabel=dcTrackLabel(); }
+    return d; }
   function dcLoad(d){
     if(!d||typeof d!=="object"||d.app!=="disc"){ alert("بنية غير صحيحة"); return; }
     for(var k in DC_FIELDS){ var e=$(DC_FIELDS[k]); if(e&&typeof d[k]==="string") e.value=d[k]; }
     DC.photoUser=d.photo||null; dcSetPhoto(DC.photoUser);
     dcSetHero(d.image||null);
     dcSetScene(d.scene||null);
-    dcSetTpl(d.tpl===2||d.tpl===3?d.tpl:1);   // v1 projects were template 1
+    var t=d.tpl===2||d.tpl===3?d.tpl:1;   // v1 projects were template 1
+    if(d.track&&DC.tracks[t]){ DC.tracks[t].track=dcTrack(d.track).id; DC.tracks[t].spec=d.spec||""; }   // the saved text stays as saved
+    dcSetTpl(t);
   }
   if($("dcSaveBtn")) $("dcSaveBtn").onclick=function(){
     var blob=new Blob([JSON.stringify(dcCollect(),null,2)],{type:"application/json"});
@@ -3695,7 +3761,7 @@ $("hcExportBtn").onclick=hcExport;
     var um=$("userMgmtPage"); if(um) um.style.display="none";
     ["hcApp","cuApp","lpApp"].forEach(function(id){ var x=$(id); if(x) x.classList.remove("on"); });
     $("dcApp").classList.add("on");
-    dcShowUserBar();
+    dcShowUserBar(); dcFillTracks();
     try{ document.title="HC GENERATOR"; }catch(e){}
     dcRender();
     dcLoadAssets(dcRender);
@@ -3949,6 +4015,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
     lastSent={key:key,at:Date.now()};
     var img=href.indexOf("blob:")===0?blobs.get(href):dataToBlob(href);
     var tpl=slug==="hope-center"?"Story + Poster":(proj.model||proj.tpl)?"نموذج "+(proj.model||proj.tpl):"";
+    if(tpl&&proj.trackLabel) tpl+=" · "+proj.trackLabel;   // DISC: the track too
     send({project:slug,template:tpl,filename:name.replace(/(_Story|_Poster)?\.(png|jpe?g|webp)$/i,".json"),mime:"application/json"},new Blob([text],{type:"application/json"}),img);
   }
   function thumbOf(b){
@@ -4024,7 +4091,10 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   var TPL_NAMES={"disc":{"نموذج 1":"مسار تدريبي","نموذج 2":"شهادة (Testimony)","نموذج 3":"فتح باب التسجيل"},
                  "study-zone":{"نموذج 1":"بوستر إعلان","نموذج 2":"ستوري يوميّة"},
                  "children-university":{"نموذج 1":"فتح باب التسجيل","نموذج 2":"دعوة تخرّج","نموذج 3":"دعوة تخرّج (بدون صورة)"}};
-  function tplName(f){ return TPL_NAMES[f.project]&&TPL_NAMES[f.project][f.template]||f.template||""; }
+  function tplName(f){
+    var t=String(f.template||""), i=t.indexOf(" · "), base=i<0?t:t.slice(0,i), rest=i<0?"":t.slice(i);   // "نموذج 1 · مسار …"
+    return (TPL_NAMES[f.project]&&TPL_NAMES[f.project][base]||base)+rest;
+  }
   function load(reset){
     if(reset){ A.offset=0; A.files=[]; }
     var seq=A.seq=(A.seq||0)+1;   // a newer filter or search replaces this one
