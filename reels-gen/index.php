@@ -118,6 +118,18 @@
   .clip input[type=number]{width:100%;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-family:inherit;font-size:13px;direction:ltr;}
   .clip .tools{display:flex;gap:5px;flex-wrap:wrap;}
   .clip .tools button{flex:1;border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 0;font-size:13px;cursor:pointer;color:var(--ink);}
+  .clip .tools button.on{border-color:var(--accent);color:var(--accent);}
+  /* choosing the vertical frame of a wide shot */
+  .fr-dlg{position:fixed;inset:0;z-index:50;background:rgba(20,22,24,.55);display:flex;align-items:center;justify-content:center;padding:20px;}
+  .fr-box{background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:20px 22px;display:flex;flex-direction:column;gap:14px;max-width:100%;}
+  .fr-head{display:flex;flex-direction:column;gap:2px;}
+  .fr-head b{font-size:15px;font-weight:800;color:var(--ink);}
+  .fr-head span{font-size:12px;color:var(--muted);}
+  .fr-stage{position:relative;overflow:hidden;border-radius:10px;align-self:center;cursor:grab;touch-action:none;user-select:none;}
+  .fr-stage canvas{display:block;}
+  .fr-win{position:absolute;top:0;border:2px solid #fff;box-sizing:border-box;box-shadow:0 0 0 9999px rgba(0,0,0,.55);pointer-events:none;}
+  .fr-acts{display:flex;gap:8px;}
+  .fr-acts .btn{flex:1;padding:11px 14px;font-size:14px;}
   .clip .tools button:hover{border-color:var(--accent);color:var(--accent);}
   .chk{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink);cursor:pointer;}
   .chk input{accent-color:var(--navy);width:15px;height:15px;margin:0;}
@@ -299,6 +311,18 @@
           <button type="button" class="btn-line" id="rgAddCard">+ كرت نص</button></div>
         </div>
         <div class="clips" id="rgClips"><div class="no-clips">لا لقطات بعد — ابدأ بإضافة المواد من اليمين</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fr-dlg" id="rgFrameDlg" hidden>
+    <div class="fr-box" role="dialog" aria-modal="true" aria-labelledby="rgFrameT">
+      <div class="fr-head"><b id="rgFrameT">اختيار الإطار الطولي</b><span>اسحب المستطيل لتختار شو بيبيّن من اللقطة بالريل</span></div>
+      <div class="fr-stage"><canvas id="rgFrameCv"></canvas><div class="fr-win" id="rgFrameWin"></div></div>
+      <div class="fr-acts">
+        <button type="button" class="btn" id="rgFrameOk">تم</button>
+        <button type="button" class="btn-line" id="rgFrameCenter">رجّعه للنص</button>
+        <button type="button" class="btn-line" id="rgFrameCancel">إلغاء</button>
       </div>
     </div>
   </div>

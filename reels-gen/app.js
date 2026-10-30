@@ -185,12 +185,17 @@
 
   /* ---------- drawing (shared by preview, thumbnails and export) ---------- */
   /* Cover the frame with the shot, scaled by zoom (≥ 1) and turned by sway degrees.
-     A shot cut from a long video slides sideways to keep its focus (see
-     focusAt) in the middle, as far as the picture reaches. */
+     A wide shot sits where its frame was chosen by hand (it.pan: 0 left …
+     1 right, see the ↔ button); otherwise a shot cut from a long video
+     slides sideways to keep its focus (see focusAt) in the middle, as far as
+     the picture reaches, and any other shot is centred. */
   function drawMedia(g, w, h, it, zoom, sway) {
     var el = it.el, sw = it.w, sh = it.h, rot = it.rot % 180 !== 0;
     var rw = rot ? sh : sw, rh = rot ? sw : sh, s = Math.max(w / rw, h / rh) * zoom, dx = 0;
-    if (it.sum && !it.rot && S.sum && S.sum.name === it.name) {
+    if (it.pan != null) {
+      var room = Math.max(0, (rw * s - w) / 2);
+      dx = Math.max(-room, Math.min(room, (0.5 - it.pan) * rw * s));
+    } else if (it.sum && !it.rot && S.sum && S.sum.name === it.name) {
       var lim = Math.max(0, (sw * s - w) / 2);
       dx = Math.max(-lim, Math.min(lim, (0.5 - focusAt(el.currentTime)) * sw * s));
     }
@@ -568,6 +573,7 @@
                    : it.off ? '<div class="hint" style="color:var(--accent)">خارج الريل — الوقت ما بيكفي</div>' : "") +
           (it.broll != null ? '<div class="tools"><button type="button" data-a="swap" title="لقطة تغطية تانية من الفيديو">بدّل</button><button type="button" data-a="nobroll" title="بلا لقطة تغطية هون: الفكرة كلها على المتحدث">احذف</button></div>' : "") +
           '<div class="tools"><button type="button" data-a="card" title="كرت نص قبل هذه اللقطة">+ نص</button><button type="button" data-a="rot" title="تدوير 90°">↻</button>' +
+          (isWide(it) ? '<button type="button" data-a="frame" title="اختيار الإطار الطولي"' + (it.pan != null ? ' class="on"' : "") + '>↔</button>' : "") +
           '<button type="button" data-a="skip" title="' + (it.skip ? "إرجاع للريل" : "استبعاد من الريل") + '">' + (it.skip ? "↺" : "⊘") + '</button>' + moveDel + '</div>';
       }
       if (!it.missing) {
@@ -587,7 +593,8 @@
         var j = S.items.indexOf(it);
         if (a === "swap") { stop(); swapBroll(it); return; }
         if (a === "nobroll") { stop(); dropBroll(it); return; }
-        if (a === "rot") { it.rot = (it.rot + 90) % 360; thumb(it, c); drawAt(S.t); return; }
+        if (a === "rot") { it.rot = (it.rot + 90) % 360; it.pan = undefined; renderClips(); drawAt(S.t); return; }   // a frame chosen for the old side no longer fits
+        if (a === "frame") { stop(); framePick(it); return; }
         if (a === "skip") { it.skip = !it.skip; it.why = ""; relayout(); return; }
         if (a === "card") { S.items.splice(j, 0, newCard()); if (!voiceReady()) relayout(); else { stop(); renderClips(); } var ta2 = box.children[j] && box.children[j].querySelector("textarea"); if (ta2) ta2.focus(); return; }
         if (a === "del") {
@@ -638,6 +645,54 @@
       return seekEl(it, 0).then(function () { var cv = card.querySelector("canvas"); if (!cv) return; var g = cv.getContext("2d"); g.fillStyle = "#000"; g.fillRect(0, 0, 180, 320); drawSeg(g, 180, 320, it, it.kind === "card" ? it.len : 0); });
     });
   }
+  /* ---------- choosing the vertical frame of a wide shot ----------
+     The whole shot (a video at the middle of its clip) with a window the
+     shape of the reel over it; dragging the window sets it.pan, the middle
+     of the frame across the shot (0 … 1). «رجّعه للنص» clears it. */
+  function isWide(it) {
+    if (it.kind === "card" || !it.w || !it.h) return false;
+    var rot = it.rot % 180 !== 0, rw = rot ? it.h : it.w, rh = rot ? it.w : it.h;
+    return rw / rh > cv.width / cv.height + 0.01;
+  }
+  function framePick(it) {
+    var dlg = $("rgFrameDlg"), fc = $("rgFrameCv"), win = $("rgFrameWin"), stage = fc.parentNode;
+    var rot = it.rot % 180 !== 0, rw = rot ? it.h : it.w, rh = rot ? it.w : it.h;
+    var W = Math.min(760, innerWidth - 80), H = W * rh / rw;
+    if (H > innerHeight * 0.62) { H = innerHeight * 0.62; W = H * rw / rh; }
+    var dpr = Math.min(2, devicePixelRatio || 1), fw = H * cv.width / cv.height, pan = it.pan != null ? it.pan : 0.5;
+    fc.style.width = W + "px"; fc.style.height = H + "px"; fc.width = Math.round(W * dpr); fc.height = Math.round(H * dpr);
+    win.style.width = fw + "px"; win.style.height = H + "px";
+    function place() { pan = Math.max(fw / 2 / W, Math.min(1 - fw / 2 / W, pan)); win.style.left = (pan * W - fw / 2) + "px"; }
+    place(); dlg.hidden = false;
+    thumbQueue = thumbQueue.then(function () {
+      return seekEl(it, it.kind === "video" ? it.len / 2 : 0).then(function () {
+        var fg = fc.getContext("2d"), s = fc.width / rw;
+        fg.fillStyle = "#000"; fg.fillRect(0, 0, fc.width, fc.height);
+        fg.save(); fg.translate(fc.width / 2, fc.height / 2); fg.rotate((it.rot || 0) * Math.PI / 180);
+        fg.drawImage(it.el, -it.w * s / 2, -it.h * s / 2, it.w * s, it.h * s); fg.restore();
+      });
+    });
+    var grab = null;
+    stage.onpointerdown = function (e) {
+      var x = e.clientX - stage.getBoundingClientRect().left, left = pan * W - fw / 2;
+      grab = x >= left && x <= left + fw ? x - pan * W : 0;   // inside the window: hold it where taken; outside: jump there
+      pan = (x - grab) / W; place(); stage.setPointerCapture(e.pointerId); e.preventDefault();
+    };
+    stage.onpointermove = function (e) { if (grab == null) return; pan = (e.clientX - stage.getBoundingClientRect().left - grab) / W; place(); };
+    stage.onpointerup = stage.onpointercancel = function () { grab = null; };
+    function close(val) {
+      dlg.hidden = true; stage.onpointerdown = stage.onpointermove = stage.onpointerup = stage.onpointercancel = null; document.removeEventListener("keydown", key);
+      if (val === undefined) return;
+      it.pan = val === null ? undefined : val; renderClips(); drawAt(S.t);
+    }
+    function key(e) { if (e.key === "Escape") close(); }
+    document.addEventListener("keydown", key);
+    $("rgFrameOk").onclick = function () { close(Math.abs(pan - 0.5) < 0.002 ? null : pan); };
+    $("rgFrameCenter").onclick = function () { close(null); };
+    $("rgFrameCancel").onclick = function () { close(); };
+    dlg.onclick = function (e) { if (e.target === dlg) close(); };
+  }
+
   function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
   /* ---------- preview ---------- */
@@ -2024,7 +2079,7 @@
   /* ---------- projects (settings only; media is re-linked by file name) ---------- */
   function itemOut(it) {
     return it.kind === "card" ? { kind: "card", text: it.text, len: it.len, line: it.line }
-                              : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, tint: it.tint, sound: !!it.sound, mute: !!it.mute, off: !!it.off, skip: !!it.skip, why: it.why || "",
+                              : { name: it.name, kind: it.kind, start: it.start, len: it.len, rot: it.rot, pan: it.pan != null ? it.pan : null, tint: it.tint, sound: !!it.sound, mute: !!it.mute, off: !!it.off, skip: !!it.skip, why: it.why || "",
                                   sum: !!it.sum, center: it.center != null ? it.center : null, lo: it.hi != null ? it.lo : null, hi: it.hi != null ? it.hi : null,
                                   talk: !!it.talk, say: it.say || "", role: it.role || "",
                                   mom: it.mom != null ? it.mom : null, aStart: it.aStart != null ? it.aStart : null, broll: it.broll != null ? it.broll : null, cont: !!it.cont };
@@ -2034,7 +2089,7 @@
     list.forEach(function (x) {
       if (x.kind === "card") { var c = newCard(String(x.text || "")); c.len = +x.len || CARD_LEN; if (x.line != null) c.line = +x.line; out.push(c); return; }
       if (v === 1 && x.text && String(x.text).trim()) out.push(newCard(String(x.text)));   // v1 captions sat on the shot; they become a card before it
-      out.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, tint: !!x.tint, sound: !!x.sound, mute: !!x.mute, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true,
+      out.push({ id: nextId++, name: String(x.name || ""), kind: x.kind, start: +x.start || 0, len: +x.len || recipe().len, rot: +x.rot || 0, pan: x.pan != null ? Math.max(0, Math.min(1, +x.pan)) : undefined, tint: !!x.tint, sound: !!x.sound, mute: !!x.mute, off: !!x.off, skip: !!x.skip, why: String(x.why || ""), missing: true,
                  sum: !!x.sum, center: x.center != null ? +x.center : undefined, lo: x.hi != null ? +x.lo : undefined, hi: x.hi != null ? +x.hi : undefined,
                  talk: !!x.talk, say: String(x.say || ""), role: String(x.role || ""),
                  mom: x.mom != null ? +x.mom : undefined, aStart: x.aStart != null ? +x.aStart : undefined, broll: x.broll != null ? +x.broll : undefined, cont: !!x.cont });
