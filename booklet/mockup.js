@@ -154,9 +154,39 @@
       p.globalCompositeOperation = "destination-in"; p.fillStyle = "#000"; p.fill(shape);
       var g = cv.getContext("2d");
       g.drawImage(A.base, 0, 0); g.drawImage(paper, 0, 0);
+      // the staples: always on the cover, inside only at the middle spread
+      A.mesh.cards.forEach(function (card) {
+        if (card.name === "closed" || M.spread === middle()) staples(g, card.halves[0], card.name === "open");
+      });
       $("bkMockNote").textContent = "";
     }).catch(function () { if (run === M.run) $("bkMockNote").textContent = "تعذّر تجهيز المعاينة"; });
   }
+
+  /* Two staples on the spine, a quarter of the way from each end: a thin
+     metal bar along the fold, lit across its width, with a soft shadow.
+     Inside, only the two bent ends of each show, with a gap between them. */
+  function staples(g, half, inside) {
+    var t = half.top[half.top.length - 1], b = half.bottom[half.bottom.length - 1];
+    var dx = b[0] - t[0], dy = b[1] - t[1], len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
+    var L = len * 0.07, T = Math.max(3.5, len * 0.0084), end = L * 0.3;
+    [0.25, 0.75].forEach(function (f) {
+      g.save();
+      g.translate(t[0] + dx * f, t[1] + dy * f); g.rotate(ang);
+      var bar = new Path2D();
+      if (inside) { bar.roundRect(-L / 2, -T / 2, end, T, T / 2); bar.roundRect(L / 2 - end, -T / 2, end, T, T / 2); }
+      else bar.roundRect(-L / 2, -T / 2, L, T, T / 2);
+      g.shadowColor = "rgba(0,0,0,.35)"; g.shadowBlur = T * 0.9; g.shadowOffsetX = 1; g.shadowOffsetY = T * 0.35;
+      var metal = g.createLinearGradient(0, -T / 2, 0, T / 2);
+      metal.addColorStop(0, "#7d8187"); metal.addColorStop(0.35, "#eef0f2"); metal.addColorStop(0.6, "#b9bcc1"); metal.addColorStop(1, "#5f6368");
+      g.fillStyle = metal; g.fill(bar);
+      g.shadowColor = "transparent";
+      g.strokeStyle = "rgba(60,62,66,.55)"; g.lineWidth = 0.8; g.stroke(bar);
+      g.restore();
+    });
+  }
+
+  /* The middle spread of the booklet, where the staples show inside. */
+  function middle() { return padded() / 4 - 1; }
 
   function labels() {
     var n = spreads(), L = layout(), a = Math.min(L.open[0], L.open[1]), b = Math.max(L.open[0], L.open[1]);
