@@ -119,9 +119,9 @@
             <option value="left">يسار — للإنكليزي</option>
           </select>
         </div>
-        <div class="field">
+        <div class="field" hidden>   <!-- hidden for now: page numbers and fold marks both off -->
           <label class="tog"><input type="checkbox" id="bkNums">أرقام الصفحات <span>رقم صغير تحت كل صفحة</span></label>
-          <label class="tog"><input type="checkbox" id="bkFold" checked>علامة الطيّ <span>خط قصير بنص الورقة فوق وتحت</span></label>
+          <label class="tog"><input type="checkbox" id="bkFold">علامة الطيّ <span>خط قصير بنص الورقة فوق وتحت</span></label>
         </div>
         <div class="status" id="bkStatus"></div>
         <button type="button" class="btn" id="bkGo" disabled>DOWNLOAD</button>
