@@ -104,16 +104,16 @@
       fact("ورقة الطباعة", paperName(pw * 2, ph));
     var html = "";
     order(padded).forEach(function (sh, i) {
-      html += '<div class="sheet"><div class="sheet-n">الورقة ' + (i + 1) + "</div>" + side("وجه", halves(sh.front, rtl), i === 0) + side("ظهر", halves(sh.back, rtl), false) + "</div>";
+      html += '<div class="sheet"><div class="sheet-n">' + (i ? "الورقة " + (i + 1) : "الغلاف") + "</div>" + side("وجه", halves(sh.front, rtl)) + side("ظهر", halves(sh.back, rtl)) + "</div>";
     });
     $("bkSheets").innerHTML = html;
     function fact(k, v) { return '<div class="fact"><span>' + esc(k) + "</span><b>" + esc(v) + "</b></div>"; }
-    function side(label, h, outer) {
-      return '<div class="side"><span class="side-l">' + label + '</span><div class="spread">' + pg(h.left, outer) + pg(h.right, outer) + "</div></div>";
+    function side(label, h) {
+      return '<div class="side"><span class="side-l">' + label + '</span><div class="spread">' + pg(h.left) + pg(h.right) + "</div></div>";
     }
-    function pg(n, outer) {
-      var blank = n > S.pages, cover = outer && n === 1;
-      return '<div class="pg' + (blank ? " blank" : "") + (cover ? " cover" : "") + '">' + (blank ? "فاضية" : n) + "</div>";
+    function pg(n) {
+      var blank = n > S.pages;
+      return '<div class="pg' + (blank ? " blank" : "") + '">' + (blank ? "فاضية" : n) + "</div>";
     }
   }
 

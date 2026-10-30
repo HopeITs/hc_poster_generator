@@ -54,8 +54,8 @@
   .tog span{font-weight:500;color:var(--muted);font-size:11px;}
   .opts{display:flex;flex-direction:column;}
   .opts .status{margin:auto 0 10px;}   /* the note above the button, both at the card's foot */
-  .btn{width:100%;background:#f7941d;color:#fff;border:none;border-radius:12px;padding:13px 18px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;}
-  .btn:hover{background:#e08a16;}
+  .btn{width:100%;background:var(--red);color:#fff;border:none;border-radius:12px;padding:13px 18px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer;transition:.15s;}
+  .btn:hover:not(:disabled){background:#a51b1f;}
   .btn:disabled{opacity:.55;cursor:not-allowed;}
   .status{font-size:12px;font-weight:700;color:var(--muted);min-height:18px;margin-top:10px;text-align:center;line-height:1.6;}
   .status.err{color:var(--red);}
@@ -73,7 +73,6 @@
   .pg{height:44px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--ink);background:#fff;}
   .pg + .pg{border-left:1px dashed var(--line);}
   .pg.blank{color:var(--muted);font-size:11px;font-weight:700;background:var(--fill);}
-  .pg.cover{background:var(--navy);color:#fff;}
   .empty{padding:34px;text-align:center;color:var(--muted);font-size:14px;border:2px dashed var(--line);border-radius:14px;line-height:1.8;}
   .gate{max-width:520px;margin:60px auto;text-align:center;}
   .gate p{font-size:15px;font-weight:700;color:var(--ink);}
@@ -116,7 +115,7 @@
           <div class="sec">اتجاه التجليد</div>
           <select id="bkBinding">
             <option value="right">يمين — للعربي</option>
-            <option value="left">يسار — للإنكليزي</option>
+            <option value="left" selected>يسار — للإنكليزي</option>
           </select>
         </div>
         <div class="field" hidden>   <!-- hidden for now: page numbers and fold marks both off -->
@@ -133,7 +132,7 @@
         <div id="bkPlan" hidden>
           <div class="facts" id="bkFacts"></div>
           <div class="sheets" id="bkSheets"></div>
-          <p class="hint" style="margin:14px 0 0">اطبع على وجهين، والقلب على الحافة القصيرة (<bdi dir="ltr">Flip on short edge</bdi>)، وبعدين رتّب الأوراق فوق بعض متل ما هي واطويها من النص. الصفحة الكحلية هي الغلاف.</p>
+          <p class="hint" style="margin:14px 0 0">اطبع على وجهين، والقلب على الحافة القصيرة (<bdi dir="ltr">Flip on short edge</bdi>)، وبعدين رتّب الأوراق فوق بعض متل ما هي واطويها من النص.</p>
         </div>
       </div>
     </div>
