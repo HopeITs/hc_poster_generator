@@ -139,7 +139,7 @@
     </div>
 
     <div class="card" id="bkMock" hidden>
-      <div class="sec">المعاينة</div>
+      <div class="sec" style="text-align:center">المعاينة</div>
       <div class="mock"><canvas id="bkCanvas" width="2000" height="1404"></canvas><div class="mock-note" id="bkMockNote"></div></div>
       <div class="flip">
         <button type="button" id="bkRight" aria-label="قلب الصفحات">→</button>
