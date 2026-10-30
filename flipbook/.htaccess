@@ -1,0 +1,9 @@
+# The viewer is shown inside the tool page (the preview), so it alone may be
+# framed, and only by this site. Everything else keeps the root rules
+# (X-Frame-Options DENY, frame-ancestors 'none').
+<IfModule mod_headers.c>
+    <Files "viewer.html">
+        Header always set X-Frame-Options "SAMEORIGIN"
+        Header always edit Content-Security-Policy "frame-ancestors 'none'" "frame-ancestors 'self'"
+    </Files>
+</IfModule>
