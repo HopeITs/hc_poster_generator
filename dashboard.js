@@ -129,8 +129,8 @@
     d.use.forEach(function (r) {
       var t = tools[r.tool] || (tools[r.tool] = { visits: 0, secs: 0, by: {} });
       t.visits += r.visits; t.secs += r.secs; t.by[r.email] = (t.by[r.email] || 0) + r.secs;
-      people[r.email] = (people[r.email] || 0) + r.secs;
     });
+    (d.total || []).forEach(function (r) { people[r.email] = r.secs; });   // across tools, two tabs at once counted once
     function top(map) { var best = null; Object.keys(map).forEach(function (k) { if (!best || map[k] > map[best]) best = k; }); return best; }
     var tl = Object.keys(tools).sort(function (a, b) { return tools[b].secs - tools[a].secs; });
     $("dashTools").innerHTML = tl.length ? tl.map(function (k) {

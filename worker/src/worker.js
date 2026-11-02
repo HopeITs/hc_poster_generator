@@ -613,7 +613,10 @@ export default {
         var prVisit = String(prIn.visit || ""), prTool = String(prIn.tool || "");
         if (!/^[a-f0-9]{16,40}$/.test(prVisit) || PRESENCE_TOOLS.indexOf(prTool) < 0) return json({ error: "طلب غير صالح" }, 400);
         if (prIn.end) {
-          await env.DB.prepare("UPDATE presence SET ended=1, last_seen=datetime('now') WHERE visit=?1 AND email=?2").bind(prVisit, prU.email).run();
+          // ago: seconds since the tab was hidden (it is closed two minutes later), so that time does not count
+          var prAgo = Math.max(0, Math.min(3600, Math.round(+prIn.ago || 0)));
+          await env.DB.prepare("UPDATE presence SET ended=1, last_seen=MAX(last_seen, datetime('now', ?3)) WHERE visit=?1 AND email=?2")
+            .bind(prVisit, prU.email, "-" + prAgo + " seconds").run();
         } else {
           await env.DB.prepare(
             "INSERT INTO presence (visit, email, tool, started_at, last_seen) VALUES (?1, ?2, ?3, datetime('now'), datetime('now')) " +
@@ -624,8 +627,9 @@ export default {
 
       /* ---- 4ج) لوحة التحكم (Owner و Comms Manager) ----
          ?range=day (من نص ليل اليوم بتوقيت سوريا) | week (آخر 7 أيام) | month (آخر 30 يوم).
-         الوقت = من بداية الزيارة (أو بداية الفترة) لآخر نبضة، ونص دقيقة للنبضة الأخيرة.
-         الأرقام الإجمالية بتنحسب بالواجهة من سطور (المستخدم، الأداة). */
+         الوقت: كل زيارة فترة من بدايتها لآخر نبضة (والزيارة اللي لسا مفتوحة لحد النبضة الجاية،
+         دقيقة بالأكتر)، والفترات المتداخلة أو المتلاصقة بتندمج قبل الجمع: تابين مفتوحين سوا، أو
+         زيارات كتيرة ورا بعض، بينحسبو وقت واحد. الزيارات = عدد الفترات بعد الدمج. */
       if (request.method === "GET" && path === "/dashboard") {
         var dbU = await getSessionUser(env, request);
         if (!dbU) return json({ error: "غير مسجّل دخول" }, 401);
@@ -636,7 +640,6 @@ export default {
         var dbSince = dbRange === "month" ? new Date(Date.now() - 30 * 86400000) : dbRange === "week" ? new Date(Date.now() - 7 * 86400000) : dbDay;
         function sqlTime(d) { return d.toISOString().replace("T", " ").slice(0, 19); }
         var dbS = sqlTime(dbSince), dbD = sqlTime(dbDay);
-        var SECS = "MAX(0, (julianday(last_seen) - julianday(MAX(started_at, ?1))) * 86400) + 30";
         await env.DB.prepare("DELETE FROM presence WHERE last_seen < datetime('now','-90 days')").run();   // three months are kept
         var dbUsers = await env.DB.prepare("SELECT email, role, photo FROM users ORDER BY email").all();
         // where each one is: a visit still beating first (leaving one page for another
@@ -644,13 +647,48 @@ export default {
         var dbNow = await env.DB.prepare(
           "SELECT email, tool, last_seen, ended FROM (SELECT email, tool, last_seen, ended, ROW_NUMBER() OVER (PARTITION BY email " +
           "ORDER BY (ended = 0 AND last_seen > datetime('now','-150 seconds')) DESC, last_seen DESC) AS rn FROM presence) WHERE rn = 1").all();
-        var dbToday = await env.DB.prepare(
-          "SELECT email, MIN(started_at) AS first_in, MAX(last_seen) AS last_seen, CAST(SUM(" + SECS + ") AS INTEGER) AS secs FROM presence WHERE last_seen > ?1 GROUP BY email").bind(dbD).all();
-        var dbUse = await env.DB.prepare(
-          "SELECT email, tool, COUNT(*) AS visits, CAST(SUM(" + SECS + ") AS INTEGER) AS secs FROM presence WHERE last_seen > ?1 GROUP BY email, tool").bind(dbS).all();
+        var dbFrom = dbSince < dbDay ? dbS : dbD;
+        var dbRows = (await env.DB.prepare("SELECT email, tool, started_at, last_seen, ended FROM presence WHERE last_seen > ?1").bind(dbFrom).all()).results || [];
+        var nowMs = Date.now();
+        function ms(s) { return Date.parse(String(s).replace(" ", "T") + "Z"); }
+        function span(r, from) {   // [start, end] in ms, cut to the period
+          var a = Math.max(ms(r.started_at), from), b = r.ended ? ms(r.last_seen) : Math.min(ms(r.last_seen) + 60000, nowMs);
+          return b > a ? [a, b] : null;
+        }
+        /* The spans merged where they overlap or touch (within a minute): their total seconds and how many stretches remain. */
+        function merged(list) {
+          list.sort(function (x, y) { return x[0] - y[0]; });
+          var secs = 0, n = 0, cur = null;
+          list.forEach(function (s) {
+            if (cur && s[0] <= cur[1] + 60000) { cur[1] = Math.max(cur[1], s[1]); return; }
+            if (cur) { secs += cur[1] - cur[0]; n++; }
+            cur = [s[0], s[1]];
+          });
+          if (cur) { secs += cur[1] - cur[0]; n++; }
+          return { secs: Math.round(secs / 1000), n: n };
+        }
+        function group(rows, from, keyOf) {
+          var g = {};
+          rows.forEach(function (r) { var s = span(r, from); if (!s) return; var k = keyOf(r); (g[k] = g[k] || []).push(s); });
+          return g;
+        }
+        var dayMs = dbDay.getTime(), sinceMs = dbSince.getTime();
+        var todayRows = dbRows.filter(function (r) { return ms(r.last_seen) > dayMs; });
+        var dbToday = [], tFirst = {}, tLast = {};
+        todayRows.forEach(function (r) {
+          if (!tFirst[r.email] || r.started_at < tFirst[r.email]) tFirst[r.email] = r.started_at;
+          if (!tLast[r.email] || r.last_seen > tLast[r.email]) tLast[r.email] = r.last_seen;
+        });
+        var tG = group(todayRows, dayMs, function (r) { return r.email; });
+        Object.keys(tFirst).forEach(function (e) { dbToday.push({ email: e, first_in: tFirst[e], last_seen: tLast[e], secs: tG[e] ? merged(tG[e]).secs : 0 }); });
+        var rangeRows = dbRows.filter(function (r) { return ms(r.last_seen) > sinceMs; });
+        var uG = group(rangeRows, sinceMs, function (r) { return r.email + "\n" + r.tool; }), dbUse = [];
+        Object.keys(uG).forEach(function (k) { var m = merged(uG[k]), p = k.split("\n"); dbUse.push({ email: p[0], tool: p[1], visits: m.n, secs: m.secs }); });
+        var aG = group(rangeRows, sinceMs, function (r) { return r.email; }), dbTotal = [];   // per user, across tools: two tabs at once count once
+        Object.keys(aG).forEach(function (e) { dbTotal.push({ email: e, secs: merged(aG[e]).secs }); });
         var dbAi = await env.DB.prepare("SELECT email, kind, COUNT(*) AS n FROM ai_usage WHERE at > ?1 GROUP BY email, kind").bind(dbS).all();
         return json({ ok: true, now: sqlTime(new Date()), since: dbS,
-          users: dbUsers.results || [], live: dbNow.results || [], today: dbToday.results || [], use: dbUse.results || [], ai: dbAi.results || [] });
+          users: dbUsers.results || [], live: dbNow.results || [], today: dbToday, use: dbUse, total: dbTotal, ai: dbAi.results || [] });
       }
 
       /* ---- 5) قائمة المستخدمين (مفلترة حسب الدور + المشروع) ---- */
