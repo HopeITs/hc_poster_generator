@@ -54,6 +54,7 @@
     });
   }
   setInterval(decorate, 2000);
+  document.addEventListener("click", decorate, true);   // before an account photo's click opens its menu, so it opens whole
   if (document.readyState !== "loading") decorate(); else document.addEventListener("DOMContentLoaded", decorate);
 
   /* ---------- the page ---------- */

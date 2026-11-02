@@ -2111,6 +2111,8 @@ function wireAcct(avId,menuId){
     closeAcctMenus();
     if(open){ m.classList.add("on"); a.setAttribute("aria-expanded","true"); acctShape(m,a); }
   };
+  // items added or renamed later (the dashboard, the requests' count) redraw the glass with them
+  if(window.ResizeObserver) new ResizeObserver(function(){ if(m.classList.contains("on")) acctShape(m,a); }).observe(m);
 }
 // Menu item clicks are allowed to bubble, so this closes the menu after them.
 document.addEventListener("click",closeAcctMenus);
