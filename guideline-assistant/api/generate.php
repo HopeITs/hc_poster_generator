@@ -1,7 +1,8 @@
 <?php
 /**
  * POST /guideline-assistant/api/generate.php   (JSON)
- * body: { blocks:[...], govs:["HMS","ALP"|"all"], formats:["docx","pdf"] }
+ * body: { blocks:[...], govs:["HMS","ALP"|"all"], formats:["docx","pdf"], orient:"portrait"|"landscape" }
+ * المقاس العرضي من templates/landscape (نموذج لكل محافظة).
  * يبني لكل محافظة مستندًا على ترويستها (Word و/أو PDF). ملفّ واحد يُعاد مباشرةً،
  * وعدّة ملفّات تُجمَّع في ZIP.
  */
@@ -30,9 +31,12 @@ $blocks = $in['blocks'] ?? null;
 if (!is_array($blocks) || !$blocks) gg_fail('لا يوجد محتوى للتوليد');
 
 // المحافظات
+$landscape = ($in['orient'] ?? '') === 'landscape';
+$tmplDir = __DIR__ . '/../templates' . ($landscape ? '/landscape' : '');
+$haveGovs = array_values(array_filter(array_keys(GG_GOVS), function ($g) use ($tmplDir) { return is_file($tmplDir . DIRECTORY_SEPARATOR . $g . '.docx'); }));
 $govs = $in['govs'] ?? [];
-if (in_array('all', (array)$govs, true)) $govs = array_keys(GG_GOVS);
-$govs = array_values(array_intersect((array)$govs, array_keys(GG_GOVS)));
+if (in_array('all', (array)$govs, true)) $govs = $haveGovs;
+$govs = array_values(array_intersect((array)$govs, $haveGovs));
 if (!$govs) gg_fail('اختر محافظة واحدة على الأقل');
 
 // الصيغ
@@ -54,7 +58,6 @@ $title = preg_replace('/[\/\\\\:\*\?"<>\|\x00-\x1F]/u', '', $title);
 $title = mb_substr(trim($title), 0, 60);
 if ($title === '') $title = 'مستند';
 
-$tmplDir = __DIR__ . '/../templates';
 $work = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ga_out_' . bin2hex(random_bytes(4));
 @mkdir($work, 0700, true);
 
@@ -64,7 +67,7 @@ try {
         $tmpl = $tmplDir . DIRECTORY_SEPARATOR . $g . '.docx';
         if (!is_file($tmpl)) gg_fail("قالب المحافظة غير موجود: $g", 500);
 
-        $base = '001HC_' . $g . '_' . $title;
+        $base = '001HC_' . $g . '_' . $title . ($landscape ? '_Landscape' : '');
         $docxPath = $work . DIRECTORY_SEPARATOR . $base . '.docx';
         ga_gen_docx($blocks, $tmpl, $docxPath);
         // ملاحظة: تضمين الخطوط (ga_embed_fonts) مُعطَّل — كان يكسر بنية الملفّ

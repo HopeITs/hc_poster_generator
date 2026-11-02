@@ -12,6 +12,7 @@
 declare(strict_types=1);
 
 const GA_TWIP_CONTENT = 9638;   // عرض المحتوى في A4 بهوامش 2سم (11906 - 2*1134)
+const GA_TWIP_INSET = 828;      // ما بين عرض الجدول وعرض الصفحة بين هوامش القالب الطولي (11906 - 2*720 - 9638)
 
 /** تنسيق كل دور: الخطّ (لاتيني/عربي)، الحجم (نصف نقطة)، اللون، المحاذاة. */
 function ga_role_styles(): array
@@ -96,12 +97,12 @@ function ga_cell(string $text, int $colw, array $o): string
 }
 
 /** جدول بحدود البيت (0.5pt، #D3D3D5)، RTL. */
-function ga_table(array $rows): string
+function ga_table(array $rows, int $width = GA_TWIP_CONTENT): string
 {
     $maxCols = 0;
     foreach ($rows as $r) { $maxCols = max($maxCols, count($r)); }
     if ($maxCols === 0) return '';
-    $colw = intdiv(GA_TWIP_CONTENT, $maxCols);
+    $colw = intdiv($width, $maxCols);
 
     $b = 'w:val="single" w:sz="4" w:space="0" w:color="D3D3D5"';
     $borders = '<w:tblBorders>'
@@ -127,7 +128,7 @@ function ga_table(array $rows): string
 
     return '<w:tbl><w:tblPr>'
         . '<w:bidiVisual/>'
-        . '<w:tblW w:w="' . GA_TWIP_CONTENT . '" w:type="dxa"/>'
+        . '<w:tblW w:w="' . $width . '" w:type="dxa"/>'
         . '<w:jc w:val="center"/>'
         . $borders
         . '<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/>'
@@ -135,13 +136,13 @@ function ga_table(array $rows): string
 }
 
 /** يبني محتوى الجسم من الكتل المُراجَعة. */
-function ga_build_content(array $blocks): string
+function ga_build_content(array $blocks, int $width = GA_TWIP_CONTENT): string
 {
     $out = ga_empty_para();   // سطر فاصل تحت الهيدر
     foreach ($blocks as $b) {
         $type = $b['type'] ?? 'para';
         if ($type === 'table' && !empty($b['rows'])) {
-            $out .= ga_table($b['rows']);
+            $out .= ga_table($b['rows'], $width);
         } else {
             $text = trim((string)($b['text'] ?? ''));
             if ($text === '') continue;
@@ -180,7 +181,12 @@ function ga_gen_docx(array $blocks, string $templatePath, string $outPath): stri
         throw new RuntimeException('بنية القالب غير متوقّعة (body)');
     }
 
-    $newBody = ga_build_content($blocks) . $sectPr;
+    // عرض الجداول من صفحة القالب نفسه: الطولي 9638 كما كان، والعرضاني أعرض بنفس النسبة
+    $width = GA_TWIP_CONTENT;
+    if (preg_match('/<w:pgSz\b[^>]*w:w="(\d+)"/', $sectPr, $pw) && preg_match('/<w:pgMar\b[^>]*w:right="(\d+)"[^>]*w:left="(\d+)"/', $sectPr, $pm)) {
+        $width = max(GA_TWIP_CONTENT, (int)$pw[1] - (int)$pm[1] - (int)$pm[2] - GA_TWIP_INSET);
+    }
+    $newBody = ga_build_content($blocks, $width) . $sectPr;
     $newDoc = substr($doc, 0, $contentStart + 1) . $newBody . substr($doc, $bodyClose);
 
     // انسخ القالب واستبدل document.xml (يبقى كل شيء آخر: الترويسة، الوسائط، الأنماط)

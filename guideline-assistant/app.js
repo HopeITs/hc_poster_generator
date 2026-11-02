@@ -144,7 +144,7 @@
     fetch("api/generate.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ blocks: lastBlocks, govs: govs, formats: formats })
+      body: JSON.stringify({ blocks: lastBlocks, govs: govs, formats: formats, orient: orient() })
     })
       .then(function (res) {
         if (!res.ok) {
@@ -159,6 +159,9 @@
   }
 
   if (genBtn) genBtn.addEventListener("click", generate);
+
+  // المقاس: طولي (الافتراضي) أو عرضي، لكل المحافظات
+  function orient() { var r = document.querySelector('input[name="gaOrient"]:checked'); return r ? r.value : "portrait"; }
 
   // «كل المحافظات» يعطّل الاختيار الفرديّ
   if (govAll) {
