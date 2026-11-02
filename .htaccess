@@ -36,6 +36,13 @@ RedirectMatch 404 "/\.(git|env|htaccess|htpasswd)"
     # No need for camera/mic/geolocation in this app.
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 
+    # Scripts and styles: the browser asks each time whether they changed (a
+    # 304 when not), so an update reaches everyone at once instead of after the
+    # browser's own guess at how long its copy stays fresh.
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+
     # Content Security Policy.
     #
     # The inline scripts are allowed by sha256 hash rather than 'unsafe-inline',

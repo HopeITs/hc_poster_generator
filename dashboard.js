@@ -26,7 +26,7 @@
   /* «قبل 5 د», «اليوم 14:20», «أمس 09:05» or the date. */
   function ago(s, now) {
     var d = when(s), sec = (when(now) - d) / 1000; if (isNaN(d)) return "—";
-    if (sec < 90) return "هلق";
+    if (sec < 90) return "الآن";
     if (sec < 3600) return "قبل " + Math.round(sec / 60) + " د";
     var t = new Date(), y = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
     if (d.toDateString() === t.toDateString()) return "اليوم " + hm(s);
@@ -120,7 +120,7 @@
       return "<tr><td>" + who(u) + "</td>" +
         '<td><span class="dash-st' + (on ? " on" : "") + '"><b></b>' + (on ? "أونلاين" : "أوفلاين") + (on && x ? "<small>" + esc(TOOL[x.tool] || x.tool) + "</small>" : "") + "</span></td>" +
         '<td class="dt">' + (t ? hm(t.first_in) : "—") + "</td>" +
-        '<td class="dt">' + (on ? "هلق" : x ? ago(x.last_seen, now) : "ما دخل بعد") + "</td>" +
+        '<td class="dt">' + (on ? "الآن" : x ? ago(x.last_seen, now) : "ما دخل بعد") + "</td>" +
         '<td class="dash-n">' + (t ? dur(t.secs) : "—") + "</td></tr>";
     }).join("");
 
@@ -156,7 +156,7 @@
     // the summary on top
     var nOn = d.users.filter(function (u) { return online(u.email); }).length;
     var total = pl.reduce(function (s, e) { return s + people[e]; }, 0);
-    $("dashSum").innerHTML = '<div><span>أونلاين هلق</span><b>' + nOn + '</b></div><div><span>دخلو اليوم</span><b>' + d.today.length + "</b></div>" +
+    $("dashSum").innerHTML = '<div><span>أونلاين الآن</span><b>' + nOn + '</b></div><div><span>دخلو اليوم</span><b>' + d.today.length + "</b></div>" +
       "<div><span>الوقت على الموقع · " + RANGE[range] + "</span><b>" + dur(total) + "</b></div><div><span>أكتر أداة · " + RANGE[range] + "</span><b>" + esc(tl.length ? TOOL[tl[0]] || tl[0] : "—") + "</b></div>";
     ["dashR1", "dashR2", "dashR3"].forEach(function (id) { $(id).textContent = "· " + RANGE[range]; });
   }
