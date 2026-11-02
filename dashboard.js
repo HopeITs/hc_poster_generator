@@ -11,7 +11,7 @@
   var WORKER = "https://studyzone-auth.ct-aleppo3.workers.dev", TOKEN_KEY = "sz_auth_token", ONLINE_S = 150;
   var TOOL = { "home": "صفحة المشاريع", "hope-center": "Hope Center", "study-zone": "Study Zone", "children-university": "Children University",
     "disc": "DISC", "leap": "LEAP", "guideline-assistant": "Guidelines Assistant", "thumbnail-gen": "Thumbnail Gen", "reels-gen": "Reels Gen",
-    "text-transcription": "Text Transcription", "meeting-transcription": "Meeting Transcription", "booklet-maker": "Booklet Maker", "flipbook": "Flipbook" };
+    "text-transcription": "Text Transcription", "meeting-transcription": "Meeting Transcription", "booklet-maker": "Booklet Maker", "flipbook": "Flipbook", "presentation-maker": "Presentation Maker" };
   var AI = { music: "موسيقى Reels Gen", script: "نص Reels Gen", voice: "صوت Reels Gen", moments: "تلخيص فيديو (Reels Gen)", critique: "مراجعة التلخيص (Reels Gen)",
     meeting: "تفريغ اجتماع", transcribe: "تفريغ نص", magnific: "تحويل لستايل DISC" };
   var RANGE = { day: "اليوم", week: "آخر 7 أيام", month: "آخر 30 يوم" };

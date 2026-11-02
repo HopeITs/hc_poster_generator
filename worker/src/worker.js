@@ -43,7 +43,7 @@ const MAGNIFIC_DAILY_MAX    = 15;               // صور «أسلوب DISC» (M
 const ACCESS_MAX_PER_REQUEST = 12, ACCESS_DAILY_MAX = 20, ACCESS_RETRY_DAYS = 7;
 // Pages that report presence (presence.js): the projects page, the five poster projects and the tools
 const PRESENCE_TOOLS = ["home", "hope-center", "study-zone", "children-university", "disc", "leap", "guideline-assistant", "thumbnail-gen",
-  "reels-gen", "text-transcription", "meeting-transcription", "booklet-maker", "flipbook"];
+  "reels-gen", "text-transcription", "meeting-transcription", "booklet-maker", "flipbook", "presentation-maker"];
 // الأرشيف: كل تصميم يُنزَّل من Poster Maker وThumbnail Gen، مع ملف مشروعه، في قاعدة ARCHIVE المنفصلة
 const ARCHIVE_PROJECTS = ["study-zone", "hope-center", "children-university", "leap", "disc", "thumbnail-gen"];
 const ARCHIVE_CHUNK = 700 * 1024;               // بايت لكل قطعة (base64 ≈ 0.93 MB، تحت حدّ السجل 2 MB)
