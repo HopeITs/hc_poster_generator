@@ -41,6 +41,9 @@ const MEETING_DAILY_MAX     = 30;               // أجزاء اجتماعات (
 const MAGNIFIC_DAILY_MAX    = 15;               // صور «أسلوب DISC» (Magnific، رصيد مدفوع) لكل مستخدم خلال 24 ساعة
 // طلبات الصلاحيات: أدوات بالطلب الواحد، أدوات بالـ 24 ساعة، وأيام قبل إعادة طلب أداة انرفضت
 const ACCESS_MAX_PER_REQUEST = 12, ACCESS_DAILY_MAX = 20, ACCESS_RETRY_DAYS = 7;
+// Pages that report presence (presence.js): the projects page, the five poster projects and the tools
+const PRESENCE_TOOLS = ["home", "hope-center", "study-zone", "children-university", "disc", "leap", "guideline-assistant", "thumbnail-gen",
+  "reels-gen", "text-transcription", "meeting-transcription", "booklet-maker", "flipbook", "presentation-maker"];
 // الأرشيف: كل تصميم يُنزَّل من Poster Maker وThumbnail Gen، مع ملف مشروعه، في قاعدة ARCHIVE المنفصلة
 const ARCHIVE_PROJECTS = ["study-zone", "hope-center", "children-university", "leap", "disc", "thumbnail-gen"];
 const ARCHIVE_CHUNK = 700 * 1024;               // بايت لكل قطعة (base64 ≈ 0.93 MB، تحت حدّ السجل 2 MB)
@@ -587,8 +590,105 @@ export default {
       /* ---- 4) تسجيل خروج ---- */
       if (request.method === "POST" && path === "/logout") {
         var me2 = await getSessionUser(env, request);
-        if (me2) await env.DB.prepare("DELETE FROM sessions WHERE token=?1").bind(me2.token).run();
+        if (me2) {
+          await env.DB.prepare("DELETE FROM sessions WHERE token=?1").bind(me2.token).run();
+          await env.DB.prepare("UPDATE presence SET ended=1 WHERE email=?1 AND ended=0").bind(me2.email).run();   // offline at once
+        }
         return json({ ok: true });
+      }
+
+      /* ---- 4ب) التواجد: مين فاتح الموقع وعلى أي أداة ----
+         presence.js بكل صفحة بيبعت نبضة كل دقيقة طالما التاب ظاهرة: {visit, tool}. الزيارة
+         سطر بجدول presence (من started_at لآخر نبضة last_seen)، وبتسكّر (ended=1) لما تنخفى
+         التاب أو تنسكّر أو عند تسجيل الخروج. التوكن ممكن ييجي بالجسم لأن sendBeacon ما بيبعت هيدر.
+         أونلاين = نبضة آخر دقيقتين بزيارة مفتوحة. */
+      if (request.method === "POST" && path === "/presence") {
+        var prIn = null;
+        try { prIn = JSON.parse(await request.text()); } catch (e) {}
+        if (!prIn) return json({ error: "طلب غير صالح" }, 400);
+        var prReq = prIn.token && !request.headers.get("Authorization")
+          ? new Request(request.url, { headers: { "Authorization": "Bearer " + String(prIn.token) } }) : request;
+        var prU = await getSessionUser(env, prReq);
+        if (!prU) return json({ error: "غير مسجّل دخول" }, 401);
+        var prVisit = String(prIn.visit || ""), prTool = String(prIn.tool || "");
+        if (!/^[a-f0-9]{16,40}$/.test(prVisit) || PRESENCE_TOOLS.indexOf(prTool) < 0) return json({ error: "طلب غير صالح" }, 400);
+        if (prIn.end) {
+          // ago: seconds since the tab was hidden (it is closed two minutes later), so that time does not count
+          var prAgo = Math.max(0, Math.min(3600, Math.round(+prIn.ago || 0)));
+          await env.DB.prepare("UPDATE presence SET ended=1, last_seen=MAX(last_seen, datetime('now', ?3)) WHERE visit=?1 AND email=?2")
+            .bind(prVisit, prU.email, "-" + prAgo + " seconds").run();
+        } else {
+          await env.DB.prepare(
+            "INSERT INTO presence (visit, email, tool, started_at, last_seen) VALUES (?1, ?2, ?3, datetime('now'), datetime('now')) " +
+            "ON CONFLICT(visit) DO UPDATE SET last_seen=datetime('now'), ended=0 WHERE presence.email=excluded.email").bind(prVisit, prU.email, prTool).run();
+        }
+        return json({ ok: true });
+      }
+
+      /* ---- 4ج) لوحة التحكم (Owner و Comms Manager) ----
+         ?range=day (من نص ليل اليوم بتوقيت سوريا) | week (آخر 7 أيام) | month (آخر 30 يوم).
+         الوقت: كل زيارة فترة من بدايتها لآخر نبضة (والزيارة اللي لسا مفتوحة لحد النبضة الجاية،
+         دقيقة بالأكتر)، والفترات المتداخلة أو المتلاصقة بتندمج قبل الجمع: تابين مفتوحين سوا، أو
+         زيارات كتيرة ورا بعض، بينحسبو وقت واحد. الزيارات = عدد الفترات بعد الدمج. */
+      if (request.method === "GET" && path === "/dashboard") {
+        var dbU = await getSessionUser(env, request);
+        if (!dbU) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!isGlobalRole(dbU.role)) return json({ error: "غير مصرّح" }, 403);
+        var dbRange = url.searchParams.get("range");
+        var dbSyria = new Date(Date.now() + 3 * 3600000);   // Syria is UTC+3 all year
+        var dbDay = new Date(Date.UTC(dbSyria.getUTCFullYear(), dbSyria.getUTCMonth(), dbSyria.getUTCDate()) - 3 * 3600000);
+        var dbSince = dbRange === "month" ? new Date(Date.now() - 30 * 86400000) : dbRange === "week" ? new Date(Date.now() - 7 * 86400000) : dbDay;
+        function sqlTime(d) { return d.toISOString().replace("T", " ").slice(0, 19); }
+        var dbS = sqlTime(dbSince), dbD = sqlTime(dbDay);
+        await env.DB.prepare("DELETE FROM presence WHERE last_seen < datetime('now','-90 days')").run();   // three months are kept
+        var dbUsers = await env.DB.prepare("SELECT email, role, photo FROM users ORDER BY email").all();
+        // where each one is: a visit still beating first (leaving one page for another
+        // ends the old visit in the same second the new one starts), else the latest
+        var dbNow = await env.DB.prepare(
+          "SELECT email, tool, last_seen, ended FROM (SELECT email, tool, last_seen, ended, ROW_NUMBER() OVER (PARTITION BY email " +
+          "ORDER BY (ended = 0 AND last_seen > datetime('now','-150 seconds')) DESC, last_seen DESC) AS rn FROM presence) WHERE rn = 1").all();
+        var dbFrom = dbSince < dbDay ? dbS : dbD;
+        var dbRows = (await env.DB.prepare("SELECT email, tool, started_at, last_seen, ended FROM presence WHERE last_seen > ?1").bind(dbFrom).all()).results || [];
+        var nowMs = Date.now();
+        function ms(s) { return Date.parse(String(s).replace(" ", "T") + "Z"); }
+        function span(r, from) {   // [start, end] in ms, cut to the period
+          var a = Math.max(ms(r.started_at), from), b = r.ended ? ms(r.last_seen) : Math.min(ms(r.last_seen) + 60000, nowMs);
+          return b > a ? [a, b] : null;
+        }
+        /* The spans merged where they overlap or touch (within a minute): their total seconds and how many stretches remain. */
+        function merged(list) {
+          list.sort(function (x, y) { return x[0] - y[0]; });
+          var secs = 0, n = 0, cur = null;
+          list.forEach(function (s) {
+            if (cur && s[0] <= cur[1] + 60000) { cur[1] = Math.max(cur[1], s[1]); return; }
+            if (cur) { secs += cur[1] - cur[0]; n++; }
+            cur = [s[0], s[1]];
+          });
+          if (cur) { secs += cur[1] - cur[0]; n++; }
+          return { secs: Math.round(secs / 1000), n: n };
+        }
+        function group(rows, from, keyOf) {
+          var g = {};
+          rows.forEach(function (r) { var s = span(r, from); if (!s) return; var k = keyOf(r); (g[k] = g[k] || []).push(s); });
+          return g;
+        }
+        var dayMs = dbDay.getTime(), sinceMs = dbSince.getTime();
+        var todayRows = dbRows.filter(function (r) { return ms(r.last_seen) > dayMs; });
+        var dbToday = [], tFirst = {}, tLast = {};
+        todayRows.forEach(function (r) {
+          if (!tFirst[r.email] || r.started_at < tFirst[r.email]) tFirst[r.email] = r.started_at;
+          if (!tLast[r.email] || r.last_seen > tLast[r.email]) tLast[r.email] = r.last_seen;
+        });
+        var tG = group(todayRows, dayMs, function (r) { return r.email; });
+        Object.keys(tFirst).forEach(function (e) { dbToday.push({ email: e, first_in: tFirst[e], last_seen: tLast[e], secs: tG[e] ? merged(tG[e]).secs : 0 }); });
+        var rangeRows = dbRows.filter(function (r) { return ms(r.last_seen) > sinceMs; });
+        var uG = group(rangeRows, sinceMs, function (r) { return r.email + "\n" + r.tool; }), dbUse = [];
+        Object.keys(uG).forEach(function (k) { var m = merged(uG[k]), p = k.split("\n"); dbUse.push({ email: p[0], tool: p[1], visits: m.n, secs: m.secs }); });
+        var aG = group(rangeRows, sinceMs, function (r) { return r.email; }), dbTotal = [];   // per user, across tools: two tabs at once count once
+        Object.keys(aG).forEach(function (e) { dbTotal.push({ email: e, secs: merged(aG[e]).secs }); });
+        var dbAi = await env.DB.prepare("SELECT email, kind, COUNT(*) AS n FROM ai_usage WHERE at > ?1 GROUP BY email, kind").bind(dbS).all();
+        return json({ ok: true, now: sqlTime(new Date()), since: dbS,
+          users: dbUsers.results || [], live: dbNow.results || [], today: dbToday, use: dbUse, total: dbTotal, ai: dbAi.results || [] });
       }
 
       /* ---- 5) قائمة المستخدمين (مفلترة حسب الدور + المشروع) ---- */

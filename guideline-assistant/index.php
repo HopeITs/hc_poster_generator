@@ -149,9 +149,18 @@
       </div>
     </div>
 
+    <!-- المقاس -->
+    <div class="card">
+      <div class="sec-title">3 · المقاس</div>
+      <div class="opts">
+        <label class="chk"><input type="radio" name="gaOrient" value="portrait" checked><span>طولي</span></label>
+        <label class="chk"><input type="radio" name="gaOrient" value="landscape"><span>عرضي</span></label>
+      </div>
+    </div>
+
     <!-- الإخراج -->
     <div class="card">
-      <div class="sec-title">3 · صيغة الإخراج</div>
+      <div class="sec-title">4 · صيغة الإخراج</div>
       <div class="opts">
         <label class="chk"><input type="checkbox" class="ga-fmt" value="docx" checked><span>Word</span></label>
         <label class="chk"><input type="checkbox" class="ga-fmt" value="pdf"><span>PDF</span></label>
@@ -174,6 +183,7 @@
   </div>
 
   <script src="app.js" defer></script>
+  <script src="../presence.js" data-tool="guideline-assistant" defer></script>
 
   <div class="foot">HC Generator, a project by Christian Hope Center. © <?= date('Y') ?> All Rights Reserved.</div>
 

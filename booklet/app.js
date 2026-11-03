@@ -14,7 +14,8 @@
   var WORKER = "https://studyzone-auth.ct-aleppo3.workers.dev";
   var TOKEN_KEY = "sz_auth_token", SLUG = "booklet-maker";
   var MM = 72 / 25.4;                    // points per millimetre
-  var GUTTER_MM = 5;                     // between the two pages at the fold
+  var GUTTER_MM = 0;                     // between the two pages at the fold: none, so each page fills its half edge to edge
+  var INNER_TRIM = 1.5;                  // points cut off each page at the fold (about half a millimetre), see place()
   var MAX_BYTES = 200 * 1048576;
   var SHEETS = [["A3", 297, 420], ["A4", 210, 297], ["A5", 148, 210], ["A6", 105, 148], ["B4", 250, 353], ["B5", 176, 250],
                 ["Letter", 215.9, 279.4], ["Legal", 215.9, 355.6], ["Tabloid", 279.4, 431.8]];
@@ -104,16 +105,16 @@
       fact("ورقة الطباعة", paperName(pw * 2, ph));
     var html = "";
     order(padded).forEach(function (sh, i) {
-      html += '<div class="sheet"><div class="sheet-n">الورقة ' + (i + 1) + "</div>" + side("وجه", halves(sh.front, rtl), i === 0) + side("ظهر", halves(sh.back, rtl), false) + "</div>";
+      html += '<div class="sheet"><div class="sheet-n">' + (i ? "الورقة " + (i + 1) : "الغلاف") + "</div>" + side("وجه", halves(sh.front, rtl)) + side("ظهر", halves(sh.back, rtl)) + "</div>";
     });
     $("bkSheets").innerHTML = html;
     function fact(k, v) { return '<div class="fact"><span>' + esc(k) + "</span><b>" + esc(v) + "</b></div>"; }
-    function side(label, h, outer) {
-      return '<div class="side"><span class="side-l">' + label + '</span><div class="spread">' + pg(h.left, outer) + pg(h.right, outer) + "</div></div>";
+    function side(label, h) {
+      return '<div class="side"><span class="side-l">' + label + '</span><div class="spread">' + pg(h.left) + pg(h.right) + "</div></div>";
     }
-    function pg(n, outer) {
-      var blank = n > S.pages, cover = outer && n === 1;
-      return '<div class="pg' + (blank ? " blank" : "") + (cover ? " cover" : "") + '">' + (blank ? "فاضية" : n) + "</div>";
+    function pg(n) {
+      var blank = n > S.pages;
+      return '<div class="pg' + (blank ? " blank" : "") + '">' + (blank ? "فاضية" : n) + "</div>";
     }
   }
 
@@ -147,18 +148,25 @@
             });
           });
           return out.save();
-          /* One page into its half: as large as fits once the gutter is
-             taken on the fold side, pushed to the outer edge, centred in height. */
+          /* One page into its half: as large as fits (a page the shape of
+             the first fills it exactly), against the fold, centred in height.
+             Its inner INNER_TRIM goes past the fold and is clipped off: pages
+             exported from a two-page layout carry a sliver of the facing
+             page there, which would show as a line at the fold. The page is
+             widened by that much, so nothing turns white. */
           function place(sheet, num, x0, isLeft) {
             if (num > n) return;
             var p = src.getPage(num - 1), sz = pageSize(p), g = gutter / 2;
             var s = Math.min((slotW - g) / sz.w, slotH / sz.h), w = sz.w * s, hh = sz.h * s;
-            var x = isLeft ? x0 + (slotW - g - w) : x0 + g, y = (slotH - hh) / 2;
-            var e = emb[num - 1], r = sz.r;
-            if (r === 0) sheet.drawPage(e, { x: x, y: y, xScale: s, yScale: s });
-            else if (r === 90) sheet.drawPage(e, { x: x, y: y + hh, xScale: s, yScale: s, rotate: PL.degrees(-90) });
-            else if (r === 180) sheet.drawPage(e, { x: x + w, y: y + hh, xScale: s, yScale: s, rotate: PL.degrees(180) });
-            else sheet.drawPage(e, { x: x + w, y: y, xScale: s, yScale: s, rotate: PL.degrees(90) });
+            var t = Math.min(INNER_TRIM, w / 4), k = (w + t) / w;
+            var x = isLeft ? x0 + (slotW - g - w) : x0 + g - t, y = (slotH - hh) / 2;
+            var e = emb[num - 1], r = sz.r, wide = w + t;
+            sheet.pushOperators(PL.pushGraphicsState(), PL.rectangle(x0, 0, slotW, slotH), PL.clip(), PL.endPath());
+            if (r === 0) sheet.drawPage(e, { x: x, y: y, xScale: s * k, yScale: s });
+            else if (r === 90) sheet.drawPage(e, { x: x, y: y + hh, xScale: s, yScale: s * k, rotate: PL.degrees(-90) });
+            else if (r === 180) sheet.drawPage(e, { x: x + wide, y: y + hh, xScale: s * k, yScale: s, rotate: PL.degrees(180) });
+            else sheet.drawPage(e, { x: x + wide, y: y, xScale: s, yScale: s * k, rotate: PL.degrees(90) });
+            sheet.pushOperators(PL.popGraphicsState());
           }
         });
       });

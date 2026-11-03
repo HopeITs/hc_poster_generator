@@ -75,7 +75,7 @@
   .item .body{display:flex;flex-direction:column;gap:8px;min-width:0;}
   .item .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;font-weight:700;color:var(--muted);}
   .tag{border-radius:999px;padding:2px 9px;font-size:11px;font-weight:800;background:var(--fill);color:var(--ink);}
-  .tag.gem{background:#fdecec;color:var(--red);}
+  .tag.gem{background:#f4f4f5;color:var(--red);}
   .warn{color:var(--red);}
   .item textarea{width:100%;min-height:140px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-family:inherit;font-size:14px;line-height:1.75;color:var(--ink);background:#fff;unicode-bidi:plaintext;}
   /* a document: its fields, each label and value editable, then the full text folded away */
@@ -170,6 +170,7 @@
   </div>
 
   <script src="app.js" defer></script>
+  <script src="../presence.js" data-tool="text-transcription" defer></script>
 
   <div class="foot">HC Generator, a project by Christian Hope Center. © <?= date('Y') ?> All Rights Reserved.</div>
 </body>
