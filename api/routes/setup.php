@@ -74,6 +74,8 @@ function route_setup(string $method, string $path): void
             // الجلسات والروابط مرتبطة بالإيميل نصّاً لا بمفتاح، فتُنقل يدوياً
             db_run('DELETE FROM sessions WHERE email = ?', [$old]);         // يُخرجه ليدخل بالجديد
             db_run('UPDATE user_projects SET email = ? WHERE email = ?', [$newEmail, $old]);
+            // المفاتيح تنتقل لا تُحذف: البرامج المربوطة تبقى تعمل بعد تغيير الإيميل
+            db_run('UPDATE api_keys SET email = ? WHERE email = ?', [$newEmail, $old]);
             db_run('DELETE FROM login_attempts WHERE email = ?', [$old]);
             $pdo->commit();
         } catch (Throwable $e) {

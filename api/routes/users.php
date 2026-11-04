@@ -78,7 +78,8 @@ function route_users(string $method, string $path): void
 
     /* ---- إضافة مستخدم ---- */
     if ($method === 'POST' && $path === '/users/add') {
-        $actor = require_user();
+        // جلسة لا مفتاح: حساب ينشئه مفتاح مسرَّب يبقى بعد إلغائه
+        $actor = require_session();
         if (!can_manage($actor['role'])) fail('لا صلاحية', 403);
 
         $b     = body();
@@ -137,6 +138,7 @@ function route_users(string $method, string $path): void
         try {
             db_run('DELETE FROM users WHERE email = ?', [$email]);
             db_run('DELETE FROM sessions WHERE email = ?', [$email]);      // يُخرجه فوراً
+            db_run('DELETE FROM api_keys WHERE email = ?', [$email]);      // ومفاتيحه معه
             db_run('DELETE FROM user_projects WHERE email = ?', [$email]);
             db_run('DELETE FROM login_attempts WHERE email = ?', [$email]);
             $pdo->commit();
@@ -183,7 +185,8 @@ function route_users(string $method, string $path): void
 
     /* ---- تعيين كلمة سر لمستخدم ---- */
     if ($method === 'POST' && $path === '/users/set-password') {
-        $actor = require_user();
+        // جلسة لا مفتاح: كلمة سر يضعها مفتاح مسرَّب تبقى صالحة بعد إلغائه
+        $actor = require_session();
         if (!can_manage($actor['role'])) fail('لا صلاحية', 403);
 
         $b      = body();

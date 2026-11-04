@@ -6,7 +6,8 @@
  * REQUEST_URI بعد /api، ليعمل سواء كان الـAPI في جذر النطاق أو في مجلد.
  *
  * لا رؤوس CORS: الواجهة والـAPI على الأصل نفسه، وهذا بالضبط ما يسمح
- * باستعمال كوكي HttpOnly بدل توكن في localStorage.
+ * باستعمال كوكي HttpOnly بدل توكن في localStorage. البرامج الخارجية تدخل
+ * بمفتاح API من خادمها (routes/keys.php)، والخوادم لا تحتاج CORS.
  */
 
 declare(strict_types=1);
@@ -24,6 +25,7 @@ require __DIR__ . '/routes/projects.php';
 require __DIR__ . '/routes/photo.php';
 require __DIR__ . '/routes/notify.php';
 require __DIR__ . '/routes/setup.php';
+require __DIR__ . '/routes/keys.php';
 
 /** المسار المطلوب، بلا الشرطة الأخيرة. مثال: /login */
 function route_path(): string
@@ -61,6 +63,7 @@ try {
     route_photo($method, $path);
     route_notify($method, $path);
     route_setup($method, $path);
+    route_keys($method, $path);
 
     fail('Not found', 404);
 

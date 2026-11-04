@@ -80,11 +80,19 @@ function end_session(): void
     session_cookie('', time() - 3600);
 }
 
-/** المستخدم الحالي من الكوكي، أو null. تحذف الجلسة إن انتهت صلاحيتها. */
+/**
+ * المستخدم الحالي، أو null. المصدر مفتاح API إن أُرسل، وإلا كوكي الجلسة.
+ * تحذف الجلسة إن انتهت صلاحيتها.
+ *
+ * 'via' يقول من أين جاء: 'session' أو 'key'. مع المفتاح يأتي 'scope' أيضاً.
+ */
 function current_user(): ?array
 {
     static $cached = false;
     if ($cached !== false) return $cached;
+
+    $key = presented_api_key();
+    if ($key !== null) return $cached = api_key_user($key);
 
     $token = $_COOKIE[COOKIE_NAME] ?? '';
     if ($token === '' || !ctype_xdigit($token)) return $cached = null;
@@ -108,15 +116,101 @@ function current_user(): ?array
         'project_id' => $row['project_id'] === null ? null : (int)$row['project_id'],
         'photo'      => $row['photo'],
         'token'      => $row['token'],
+        'via'        => 'session',
     ];
 }
 
-/** يوقف الطلب بـ401 إن لم يكن هناك مستخدم. */
+/**
+ * يوقف الطلب بـ401 إن لم يكن هناك مستخدم.
+ * مفتاح read يُرفض في أي طلب غير GET، فلا يغيّر شيئاً مهما كان دور صاحبه.
+ */
 function require_user(): array
 {
     $u = current_user();
     if (!$u) fail('غير مسجّل دخول', 401);
+    if ($u['via'] === 'key' && $u['scope'] !== 'write' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+        fail('هذا المفتاح للقراءة فقط', 403);
+    }
     return $u;
+}
+
+/**
+ * مثل require_user لكن بجلسة متصفح حصراً. لإدارة المفاتيح نفسها:
+ * مفتاح مسرَّب لا يستطيع أن يولّد مفاتيح أخرى تبقى بعد إلغائه.
+ */
+function require_session(): array
+{
+    $u = require_user();
+    if ($u['via'] !== 'session') fail('هذه العملية تتطلب تسجيل الدخول من المتصفح', 403);
+    return $u;
+}
+
+/* ---------- مفاتيح API ---------- */
+
+const API_KEY_PREFIX = 'pgk_';
+
+/** مفتاح جديد: البادئة + 40 محرف hex (160 بت). */
+function make_api_key(): string
+{
+    return API_KEY_PREFIX . bin2hex(random_bytes(20));
+}
+
+function api_key_hash(string $key): string
+{
+    return hash('sha256', $key);
+}
+
+/**
+ * المفتاح المُرسَل في الطلب، أو null إن لم يُرسَل.
+ * يُقبل في Authorization: Bearer أو في X-API-Key.
+ *
+ * Apache مع FastCGI يحذف رأس Authorization ما لم يمرّره api/.htaccess،
+ * فيصل أحياناً باسم REDIRECT_HTTP_AUTHORIZATION.
+ */
+function presented_api_key(): ?string
+{
+    $auth = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    if (preg_match('/^Bearer\s+(\S+)$/i', trim($auth), $m)) return $m[1];
+
+    $x = trim((string)($_SERVER['HTTP_X_API_KEY'] ?? ''));
+    return $x === '' ? null : $x;
+}
+
+/**
+ * صاحب المفتاح بدوره الحالي، أو يوقف الطلب بـ401.
+ * لا رجوع إلى الكوكي عند مفتاح خاطئ: من أرسل مفتاحاً يريد أن يُعرَف به.
+ */
+function api_key_user(string $key): array
+{
+    if (!str_starts_with($key, API_KEY_PREFIX)) fail('مفتاح API غير صالح', 401);
+
+    $row = db_one(
+        'SELECT k.id, k.scope, k.expires_at, k.last_used_at, u.email, u.role, u.project_id, u.photo
+           FROM api_keys k JOIN users u ON u.email = k.email
+          WHERE k.key_hash = ?',
+        [api_key_hash($key)]
+    );
+    if (!$row) fail('مفتاح API غير صالح', 401);
+
+    if ($row['expires_at'] !== null && strtotime((string)$row['expires_at'] . ' UTC') < time()) {
+        fail('انتهت صلاحية مفتاح API', 401);
+    }
+
+    // مرة في الدقيقة على الأكثر، لا كتابة مع كل طلب
+    $now = time();
+    if ($row['last_used_at'] === null || strtotime((string)$row['last_used_at'] . ' UTC') < $now - 60) {
+        db_run('UPDATE api_keys SET last_used_at = ? WHERE id = ?', [gmdate('Y-m-d H:i:s', $now), $row['id']]);
+    }
+
+    return [
+        'email'      => $row['email'],
+        'role'       => $row['role'],
+        'project_id' => $row['project_id'] === null ? null : (int)$row['project_id'],
+        'photo'      => $row['photo'],
+        'via'        => 'key',
+        'key_id'     => (int)$row['id'],
+        'scope'      => $row['scope'],
+    ];
 }
 
 /* ---------- حظر محاولات الدخول ---------- */

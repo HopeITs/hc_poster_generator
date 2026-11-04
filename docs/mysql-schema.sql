@@ -63,4 +63,21 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   KEY idx_la_ip (ip, at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- مفاتيح API للبرامج الخارجية. المفتاح يعمل بصلاحيات صاحبه الحالية،
+-- ولا يُخزَّن نصّه أبداً: بصمة SHA-256 فقط، فتسريب الجدول لا يكشف مفتاحاً.
+-- يكفي SHA-256 بلا ملح لأن المفتاح 160 بت عشوائية لا كلمة سر بشرية.
+CREATE TABLE IF NOT EXISTS api_keys (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  email        VARCHAR(255) NOT NULL,             -- صاحب المفتاح
+  name         VARCHAR(100) NOT NULL,             -- اسم البرنامج الذي يستعمله
+  key_hash     CHAR(64)     NOT NULL,             -- SHA-256 بصيغة hex
+  prefix       VARCHAR(16)  NOT NULL,             -- بداية المفتاح، ليُعرَف في القائمة
+  scope        VARCHAR(10)  NOT NULL DEFAULT 'read',   -- read | write
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at   DATETIME     NULL,                 -- NULL = بلا انتهاء
+  last_used_at DATETIME     NULL,
+  UNIQUE KEY uq_api_keys_hash (key_hash),
+  KEY idx_api_keys_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
