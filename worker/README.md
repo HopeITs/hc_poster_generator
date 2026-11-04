@@ -26,7 +26,12 @@ store and survive deploys:
   for the Reels Gen routes, so their free daily quota is not shared with the
   other tools; they use `GEMINI_API_KEY` until it is set
 - `TRANSCRIBE_GEMINI_KEY` (optional) — the same for Text Transcription's
-  `/transcribe/images`, which otherwise shares the Reels Gen key
+  `/transcribe/images`, which otherwise shares the Reels Gen key (and so does
+  `/extract/id`)
+- `HCHR_API_KEY` (optional) — the shared secret HC-HR's server sends to
+  `/extract/id`; that route answers 503 until it is
+  set. Generate a long random value, set it here and as `POST_GEN_API_KEY` in
+  HC-HR's `.env`
 
 ## Deploying
 
@@ -76,6 +81,7 @@ wrangler d1 export studyzone-db --remote --output backup.sql
 | POST | `/reels/moments` | `reels-gen` access |
 | POST | `/reels/critique` | `reels-gen` access |
 | POST | `/transcribe/images` | `text-transcription` access |
+| POST | `/extract/id` | `HCHR_API_KEY` |
 
 The `/access/*` routes keep access requests in `access_requests`, one row per
 tool. A user asks for locked tools, with an optional reason; the Owner or the

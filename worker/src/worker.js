@@ -81,6 +81,30 @@ const TRANSCRIBE_MAX_BYTES  = 30 * 1048576;
 const TRANSCRIBE_INLINE_BYTES = 1536 * 1024;
 // نوع «فاتورة» (قسم المحاسبة): خاناته الثابتة — [العنوان بالواجهة، اسمها بردّ Gemini]
 const INVOICE_FIELDS = [["تاريخ الفاتورة", "invoice_date"], ["رقم الفاتورة", "invoice_number"], ["تفاصيل الفاتورة (انكليزي)", "details_en"], ["المبلغ الإجمالي", "total"]];   // up to this the images travel inside the request, not uploaded first
+// HC-HR — قراءة الهوية الشخصية لإدخالها (/extract/id)، من خادم HC-HR بمفتاح HCHR_API_KEY
+const EXTRACT_DAILY_MAX = 300;                  // طلبات خلال 24 ساعة لخادم HC-HR كله
+const EXTRACT_MAX_FILES = 4;                    // وجه الهوية وظهرها، وربما صفحة من جواز السفر
+const EXTRACT_MAX_BYTES = 20 * 1048576;
+const EXTRACT_MIMES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+/* The fields an ID card returns, named as HC-HR's columns so the form fills without a lookup.
+   [name, what Gemini is told it is]. Every value is a string, "" when the document has none. */
+const EXTRACT_ID_FIELDS = [
+  ["national_number", "the national number (الرقم الوطني), digits only"],
+  ["first_name_ar", "the holder's first name (الاسم), in Arabic as printed"],
+  ["last_name_ar", "the family name (النسبة / الكنية), in Arabic as printed"],
+  ["father_name_ar", "the father's name (اسم الأب), in Arabic as printed"],
+  ["mother_name_ar", "the mother's name (اسم الأم) as printed, first and family name together"],
+  ["first_name_en", "first_name_ar written in Latin letters the way Syrian names usually are (e.g. محمد → Mohammad)"],
+  ["last_name_en", "last_name_ar in Latin letters, the same way"],
+  ["father_name_en", "father_name_ar in Latin letters, the same way"],
+  ["mother_name_en", "mother_name_ar in Latin letters, the same way"],
+  ["pob_ar", "the place of birth (مكان الولادة), in Arabic as printed"],
+  ["pob_en", "pob_ar in English (the usual English name of the city or town)"],
+  ["dob", "the date of birth (تاريخ الولادة) as YYYY-MM-DD"],
+  ["gender", "\"male\" or \"female\" when the card says it (الجنس), else \"\""],
+  ["civil_registry_office", "the civil registry office (الأمانة / أمانة السجل المدني), as printed"],
+  ["civil_registry_number", "the registry entry number (القيد / رقم القيد), as printed"],
+];
 // أهداف الريل وبنية كل هدف — Gemini يختار واحداً من المحتوى ويرتّب الأفكار حسبه
 const MOMENTS_GOALS = {
   "تعريف بمشروع":  "what the project is, then who it serves, then what they do there, then how to join or learn more",
@@ -130,6 +154,17 @@ async function verifyPassword(password, stored) {
   if (a.length !== b.length) return false;
   var diff = 0;
   for (var i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// A shared secret compared in constant time: both sides hashed first, so neither length nor content leaks through timing
+async function sameSecret(given, expected) {
+  if (!given || !expected) return false;
+  var enc = new TextEncoder();
+  var a = new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(given)));
+  var b = new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(expected)));
+  var diff = 0;
+  for (var i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
   return diff === 0;
 }
 
@@ -1482,6 +1517,63 @@ txDocRules +
           });
           // lite: the main model was busy or over its daily quota and the lighter one read these — less exact, digits above all
           return { ok: true, images: images, texts: images.map(function (im) { return im.text; }), model: txR.model, lite: /lite/.test(txR.model || "") };
+        });
+      }
+
+      /* ---- 7b2) HC-HR: قراءة الهوية الشخصية لإدخالها ----
+         من خادم HC-HR لا من متصفح: Authorization: Bearer <HCHR_API_KEY>، وبلا المفتاح لا تعمل.
+         الطلب multipart/form-data، الملفات في «files» (صور أو PDF). الرد يتدفّق (slowJSON):
+         {ok, kind: "id", doc_type, fields:{…}, text, model, lite} أو {error}. لا يُحفظ شيء من المحتوى هنا. */
+      if (request.method === "POST" && path === "/extract/id") {
+        if (!env.HCHR_API_KEY) return json({ error: "HCHR_API_KEY is not set" }, 503);
+        if (!(await sameSecret(String(request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim(), env.HCHR_API_KEY))) return json({ error: "unauthorized" }, 401);
+        var exKey = transcribeKey(env);
+        if (!exKey) return json({ error: "Gemini key is not set" }, 500);
+        if (Number(request.headers.get("Content-Length") || 0) > EXTRACT_MAX_BYTES + 65536) return json({ error: "files too large" }, 413);
+        if ((await usedToday(env, "api:hc-hr", "extract")) >= EXTRACT_DAILY_MAX) return json({ error: "daily limit reached" }, 429);
+        var exForm; try { exForm = await request.formData(); } catch (e) { return json({ error: "expected multipart/form-data" }, 400); }
+        var exFiles = exForm.getAll("files").filter(function (f) { return f && typeof f.arrayBuffer === "function"; });
+        if (!exFiles.length || exFiles.length > EXTRACT_MAX_FILES) return json({ error: "send 1 to " + EXTRACT_MAX_FILES + " files" }, 400);
+        if (exFiles.some(function (f) { return EXTRACT_MIMES.indexOf(f.type) < 0; })) return json({ error: "files must be JPEG, PNG, WebP or PDF" }, 415);
+        var exBytes = await Promise.all(exFiles.map(function (f) { return f.arrayBuffer(); }));
+        var exTotal = exBytes.reduce(function (s, b) { return s + b.byteLength; }, 0);
+        if (exTotal > EXTRACT_MAX_BYTES) return json({ error: "files too large" }, 413);
+        var exFields = EXTRACT_ID_FIELDS, exProps = { doc_type: { type: "STRING" }, text: { type: "STRING" } };
+        exFields.forEach(function (f) { exProps[f[0]] = { type: "STRING" }; });
+        var exOrder = ["doc_type"].concat(exFields.map(function (f) { return f[0]; }), ["text"]);
+        return slowJSON(async function () {
+          var exInline = exTotal <= TRANSCRIBE_INLINE_BYTES;
+          var ups = exInline ? [] : await Promise.all(exBytes.map(function (b, i) { return geminiUpload(exKey, b, exFiles[i].type, "hc-hr-id-" + (i + 1)); }));
+          var exR;
+          try {
+            var bad = ups.filter(function (u) { return u.error; })[0];
+            if (bad) return { error: bad.error.replace("الصوت", "الملف") };
+            var exParts = [];
+            exBytes.forEach(function (b, i) {
+              exParts.push({ text: "File " + (i + 1) + (exFiles[i].type === "application/pdf" ? " (PDF):" : " (image):") },
+                exInline ? { inline_data: { mime_type: exFiles[i].type, data: base64(b) } } : { file_data: { mime_type: exFiles[i].type, file_uri: ups[i].file.uri } });
+            });
+            exR = await geminiJSON(exKey, ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"], {
+              system_instruction: { parts: [{ text:
+"The files are one person's identity document — usually a Syrian national ID card, front and back, sometimes a passport or family booklet page. Read them together as one document.\n" +
+"Fill each field from what is written on it:\n" +
+exFields.map(function (f) { return "- '" + f[0] + "': " + f[1] + "."; }).join("\n") + "\n" +
+"Names, places and numbers are copied exactly — never guessed, completed or corrected. A field the document does not show, or that you cannot read with certainty, is \"\".\n" +
+"Digits: copy every number digit by digit, keeping every zero; in the fields write Western digits (0-9) even when the document uses Arabic-Indic ones (٠١٢٣٤٥٦٧٨٩ — the Arabic zero is a small dot). Dates in the fields are YYYY-MM-DD; when a date's day, month or year cannot be read, the field is \"\".\n" +
+"'doc_type' names the document in Arabic (like «بطاقة شخصية سورية» or «جواز سفر سوري»). 'text' is the full transcription of every file in reading order, exactly as written, with a line «— صفحة N —» before each page after the first; a word you cannot read is […].\n" +
+"Return ONLY JSON." }] },
+              contents: [{ role: "user", parts: exParts }],
+              generationConfig: { temperature: 0, maxOutputTokens: 32768, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json",
+                mediaResolution: "MEDIA_RESOLUTION_HIGH",   // the Arabic-Indic zero is a dot that a lower resolution loses
+                responseSchema: { type: "OBJECT", required: exOrder, propertyOrdering: exOrder, properties: exProps } }
+            }, "extract-id");
+          } finally { ups.forEach(function (u) { geminiDelete(exKey, ctx, u.file); }); }
+          if (exR.error) return { error: exR.error };
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES ('api:hc-hr', 'extract', datetime('now'))").run();
+          var d = exR.data || {}, fields = {};
+          exFields.forEach(function (f) { fields[f[0]] = String(d[f[0]] == null ? "" : d[f[0]]).trim().slice(0, 400); });
+          return { ok: true, kind: "id", doc_type: String(d.doc_type || "").trim().slice(0, 80), fields: fields,
+                   text: String(d.text || "").slice(0, 200000), model: exR.model, lite: /lite/.test(exR.model || "") };
         });
       }
 
