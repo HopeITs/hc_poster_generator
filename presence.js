@@ -40,6 +40,8 @@
     else { clearTimeout(hideTimer); beat(); }
   });
   window.addEventListener("pagehide", function () { end(document.hidden ? Math.round((Date.now() - hiddenAt) / 1000) : 0); });
+  // back to a page the browser kept in memory («→ المشاريع» goes back in history): a new visit starts at once
+  window.addEventListener("pageshow", function (e) { if (e.persisted) beat(); });
   window.hcPresence = { tool: function (name) { if (name === tool) { beat(); return; } end(0); tool = name; beat(); } };
   beat();
 })();

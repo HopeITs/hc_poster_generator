@@ -106,17 +106,7 @@
   function token() { try { return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY); } catch (e) { return null; } }
 
   /* ---------- access (same rule as Thumbnail Gen) ---------- */
-  function checkAccess() {
-    var t = token();
-    if (!t) { location.href = "../"; return Promise.reject(new Error("no session")); }
-    return fetch(WORKER + "/projects", { headers: { "Authorization": "Bearer " + t } })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-      .then(function (r) {
-        if (!r.ok) { location.href = "../"; throw new Error("session"); }
-        var me = ((r.d && r.d.projects) || []).filter(function (p) { return p.slug === SLUG; })[0];
-        if (!me || me.status !== "ready") { $("rgGateMsg").textContent = "لا تملك صلاحية الوصول إلى هذه الأداة."; throw new Error("denied"); }
-      });
-  }
+  function checkAccess() { return hcToolAccess(SLUG, "rg"); }   // ../tool-access.js: at once from the kept answer, checked again behind
 
   /* ---------- timeline ---------- */
   function recipe() { return RECIPES[S.recipe] || RECIPES.question; }

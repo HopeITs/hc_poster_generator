@@ -14,7 +14,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meeting Transcription</title>
-<style>
+<style>@view-transition{navigation:auto;}
   @font-face{font-family:'Somar Sans';font-weight:400;src:url('../guideline-assistant/fonts/SomarSans-Regular.otf') format('opentype');font-display:swap;}
   @font-face{font-family:'Somar Sans';font-weight:700;src:url('../guideline-assistant/fonts/SomarSans-Bold.otf') format('opentype');font-display:block;}
   @font-face{font-family:'Somar Sans';font-weight:900;src:url('../guideline-assistant/fonts/SomarSans-Black.otf') format('opentype');font-display:swap;}
@@ -119,6 +119,8 @@
       </div>
     </div>
   </div>
+
+  <script src="../tool-access.js" defer></script>
 
   <script src="app.js" defer></script>
   <script src="../presence.js" data-tool="meeting-transcription" defer></script>

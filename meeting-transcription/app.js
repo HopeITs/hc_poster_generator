@@ -27,17 +27,7 @@
   function wait(s) { return new Promise(function (r) { setTimeout(r, s * 1000); }); }
 
   /* ---------- access (same rule as Text Transcription) ---------- */
-  function checkAccess() {
-    var t = token();
-    if (!t) { location.href = "../"; return Promise.reject(new Error("no session")); }
-    return fetch(WORKER + "/projects", { headers: { "Authorization": "Bearer " + t } })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-      .then(function (r) {
-        if (!r.ok) { location.href = "../"; throw new Error("session"); }
-        var me = ((r.d && r.d.projects) || []).filter(function (p) { return p.slug === SLUG; })[0];
-        if (!me || me.status !== "ready") { $("mtGateMsg").textContent = "لا تملك صلاحية الوصول إلى هذه الأداة."; throw new Error("denied"); }
-      });
-  }
+  function checkAccess() { return hcToolAccess(SLUG, "mt"); }   // ../tool-access.js: at once from the kept answer, checked again behind
 
   /* ---------- the recording ---------- */
   function setFile(f) {

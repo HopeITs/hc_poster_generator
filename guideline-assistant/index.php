@@ -13,7 +13,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Guidelines Assistant</title>
-<style>
+<style>@view-transition{navigation:auto;}
   @font-face{font-family:'Somar Sans';font-weight:400;src:url('fonts/SomarSans-Regular.otf') format('opentype');font-display:swap;}
   @font-face{font-family:'Somar Sans';font-weight:500;src:url('fonts/SomarSans-Medium.otf') format('opentype');font-display:swap;}
   @font-face{font-family:'Somar Sans';font-weight:600;src:url('fonts/SomarSans-SemiBold.otf') format('opentype');font-display:swap;}
@@ -181,6 +181,8 @@
     </div>
 
   </div>
+
+  <script src="../tool-access.js" defer></script>
 
   <script src="app.js" defer></script>
   <script src="../presence.js" data-tool="guideline-assistant" defer></script>

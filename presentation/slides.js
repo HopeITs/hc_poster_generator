@@ -97,7 +97,7 @@
       { t: "rect", x: x + w - 48, y: y + 56, w: 48, h: 3, fill: color === c.b.main ? c.b.dark : c.b.main }
     ];
   }
-  function blankPhoto(c) { return c.rtl ? "اكبس لتختار صورة" : "Click to choose a photo"; }
+  function blankPhoto(c) { return c.rtl ? "اكبس مرتين لتختار صورة" : "Double-click to choose a photo"; }
 
   var DRAW = {
     cover: function (s, c) {
@@ -236,9 +236,22 @@
 
   /* A slide's shapes for its place in the deck, mirrored for English. Outside
      the editor (ctx.edit), what hangs on an empty field (the cover's tag box,
-     «تقديم» without a presenter) is left out. */
+     «تقديم» without a presenter) is left out. A box the user resized keeps its
+     new size (slide.box, by field, in the Arabic layout's place), and a box the
+     user formatted from the ribbon keeps its formatting (slide.fmt, by field:
+     size, weight, color, align, lh, italic, underline, strike, shadow, spacing,
+     caps, hl, indent, dir). A photo dragged in its frame keeps the part shown
+     (slide.pos, by field: px and py from 0 to 1, as CSS object-position). */
   function shapes(slide, ctx) {
-    var list = (DRAW[slide.type] || DRAW.textphoto)(slide, ctx);
+    var list = (DRAW[slide.type] || DRAW.textphoto)(slide, ctx), box = slide.box || {}, fmt = slide.fmt || {}, pos = slide.pos || {};
+    list = list.map(function (e) {
+      var r = e.key && box[e.key], f = e.key && fmt[e.key], p = e.key && e.t === "img" && pos[e.key], k; if (!r && !f && !p) return e;
+      var m = {}; for (k in e) m[k] = e[k];
+      if (r) { m.x = r.x; m.y = r.y; m.w = r.w; m.h = r.h; }
+      if (p) { m.px = p.x; m.py = p.y; }
+      if (f) for (k in f) m[k] = f[k];
+      return m;
+    });
     if (!ctx.edit) list = list.filter(function (e) { return !e.dep || String(get(slide, e.dep) || "").trim(); });
     if (ctx.rtl) return list;
     return list.map(function (e) {
@@ -250,9 +263,12 @@
   }
   /* The side a text box keeps its lines on: start is right in Arabic, left in English. */
   function side(e, rtl) {
-    if (e.align === "center" || e.align === "left" || e.align === "right") return e.align;
+    if (e.align === "center" || e.align === "left" || e.align === "right" || e.align === "justify") return e.align;
     return e.align === "end" ? (rtl ? "left" : "right") : (rtl ? "right" : "left");
   }
+  /* The way a text box's lines run: chosen from the ribbon, or the deck's language
+     (a box marked ltr, such as a web address, always runs left to right). */
+  function dirOf(e, rtl) { return e.dir || (e.ltr ? "ltr" : (rtl ? "rtl" : "ltr")); }
 
-  window.PMSlides = { W: W, H: H, LOGO_RATIO: LOGO_RATIO, GREY_PHOTO: GREY_PHOTO, BRANDS: BRANDS, NAMES: T, ORDER: ORDER, blank: blank, shapes: shapes, side: side, get: get };
+  window.PMSlides = { W: W, H: H, LOGO_RATIO: LOGO_RATIO, GREY_PHOTO: GREY_PHOTO, BRANDS: BRANDS, NAMES: T, ORDER: ORDER, blank: blank, shapes: shapes, side: side, dirOf: dirOf, get: get };
 })();

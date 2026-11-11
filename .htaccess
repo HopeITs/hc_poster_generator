@@ -36,11 +36,23 @@ RedirectMatch 404 "/\.(git|env|htaccess|htpasswd)"
     # No need for camera/mic/geolocation in this app.
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 
-    # Scripts and styles: the browser asks each time whether they changed (a
-    # 304 when not), so an update reaches everyone at once instead of after the
-    # browser's own guess at how long its copy stays fresh.
-    <FilesMatch "\.(js|css)$">
+    # Caching. Every check with this server costs most of a second, and asking
+    # about each file before a page could run was most of the wait when a tool
+    # opened. So:
+    # - pages (html, php) are checked each time: they are small, and an inline
+    #   script must match its CSP hash below;
+    # - scripts and styles are used at once from the browser's copy and checked
+    #   behind (stale-while-revalidate): an update shows from the next opening;
+    # - fonts, images, sounds and data change rarely: kept for a day, used past
+    #   that while a fresh copy comes behind.
+    <FilesMatch "\.(html|php)$">
         Header set Cache-Control "no-cache"
+    </FilesMatch>
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "max-age=0, stale-while-revalidate=604800"
+    </FilesMatch>
+    <FilesMatch "\.(otf|ttf|woff2?|png|jpe?g|webp|gif|svg|ico|mp3|m4a|json)$">
+        Header set Cache-Control "max-age=86400, stale-while-revalidate=2592000"
     </FilesMatch>
 
     # Content Security Policy.
@@ -65,5 +77,11 @@ RedirectMatch 404 "/\.(git|env|htaccess|htpasswd)"
     # connect-src: the auth Worker is gone -- the API is same-origin now, so
     # 'self' covers it. The remaining external origin is the AI image
     # conversion Worker, still called by Study Zone's "تحويل لستايل" button.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-70CNCZThryLdAB+LT7Gr1sGv8xezUiMECLT3eO65Wcg=' 'sha256-9hZU5XKfEIclCrUDbm02muXKCIJV3g12Tw9DstLTx8M=' 'sha256-Y6GozmqNxk/rME6fAMCDJiGqm0TIgnOTvbgHRj6VYTo=' 'sha256-0xTptBbP4YQT+NnH4VUQvXO7VEcVCUbYjTHP2C0FO8s=' 'sha256-DQvwH0gjdZ1jOkssieDiojHakUEnUkDXSRe5EagEzaU=' 'sha256-tNbf0ImqTXvqGTrMsuOsYw4LW0as+/lVs5TKVZvhji8=' 'sha256-7Ba8IutL2TUtbzXIPSMMkKdaDqHxbSRk/XoprTnph2Q=' 'sha256-en6Bn3b/O/A76+na3mVAjwqeBtCXsGf9ewtjJVoqzWc=' 'sha256-/NuEaF4Rq1IrSpwfNr9V8s+rRVmkCKYzMlo5VrhK64w=' 'sha256-yhCvRZsa0oeWCGTDfbFLWA8XzH8i0fAWvAUI5DaSlIU='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://studyzone-auth.ct-aleppo3.workers.dev https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Lr5xrZuC4Wx89exZck5OqVBfiUSILeXg3OGVUBF+O3g=' 'sha256-9hZU5XKfEIclCrUDbm02muXKCIJV3g12Tw9DstLTx8M=' 'sha256-Y6GozmqNxk/rME6fAMCDJiGqm0TIgnOTvbgHRj6VYTo=' 'sha256-0xTptBbP4YQT+NnH4VUQvXO7VEcVCUbYjTHP2C0FO8s=' 'sha256-DQvwH0gjdZ1jOkssieDiojHakUEnUkDXSRe5EagEzaU=' 'sha256-tNbf0ImqTXvqGTrMsuOsYw4LW0as+/lVs5TKVZvhji8=' 'sha256-7Ba8IutL2TUtbzXIPSMMkKdaDqHxbSRk/XoprTnph2Q=' 'sha256-en6Bn3b/O/A76+na3mVAjwqeBtCXsGf9ewtjJVoqzWc=' 'sha256-/NuEaF4Rq1IrSpwfNr9V8s+rRVmkCKYzMlo5VrhK64w=' 'sha256-yhCvRZsa0oeWCGTDfbFLWA8XzH8i0fAWvAUI5DaSlIU='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://studyzone-auth.ct-aleppo3.workers.dev https://empty-fog-2a2b.ct-aleppo3.workers.dev; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+</IfModule>
+
+# Compression: text goes over the wire gzipped (index.html is about half the
+# size). Without mod_deflate on the server this does nothing.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain application/javascript text/javascript application/json image/svg+xml font/otf font/ttf application/vnd.ms-opentype application/x-font-ttf
 </IfModule>

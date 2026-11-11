@@ -35,18 +35,7 @@
   /* ---------- access ---------- */
   function token() { try { return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY); } catch (e) { return null; } }
   function deny(msg) { $("tgGateMsg").textContent = msg; }
-  function checkAccess() {
-    var t = token();
-    if (!t) { location.href = "../"; return Promise.reject(new Error("no session")); }
-    return fetch(WORKER + "/projects", { headers: { "Authorization": "Bearer " + t } })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-      .then(function (r) {
-        if (!r.ok) { location.href = "../"; throw new Error("session"); }
-        var ps = (r.d && r.d.projects) || [];
-        var me = ps.filter(function (p) { return p.slug === SLUG; })[0];
-        if (!me || me.status !== "ready") { deny("لا تملك صلاحية الوصول إلى هذه الأداة."); throw new Error("denied"); }
-      });
-  }
+  function checkAccess() { return hcToolAccess(SLUG, "tg"); }   // ../tool-access.js: at once from the kept answer, checked again behind
 
   /* ---------- assets ---------- */
   function loadAssets() {

@@ -3,7 +3,9 @@
    user with a green dot while online and the tool they are on, today's first
    sign-in, last seen and time on the site; per tool its visits, time and top
    user; who spends the most time; and who uses the AI requests most. The
-   period (today, the week, the month) applies to the last three. The page
+   period (today, the week, the month) applies to the last three. The Owner
+   builds the site and would always top them, so is left out of those numbers
+   and stays only in the list of users. The page
    refreshes itself every 30 seconds while open. Built like «سجل الصلاحيات»,
    with the archive's page styles (arc-*). */
 (function () {
@@ -106,6 +108,7 @@
   function render(d) {
     var byEmail = {}, now = d.now;
     d.users.forEach(function (u) { byEmail[u.email] = u; });
+    function counted(r) { var u = byEmail[r.email]; return !(u && u.role === "owner"); }
     var live = {}, today = {};
     d.live.forEach(function (x) { live[x.email] = x; });
     d.today.forEach(function (x) { today[x.email] = x; });
@@ -127,11 +130,11 @@
 
     // per tool and per user over the period
     var tools = {}, people = {};
-    d.use.forEach(function (r) {
+    d.use.filter(counted).forEach(function (r) {
       var t = tools[r.tool] || (tools[r.tool] = { visits: 0, secs: 0, by: {} });
       t.visits += r.visits; t.secs += r.secs; t.by[r.email] = (t.by[r.email] || 0) + r.secs;
     });
-    (d.total || []).forEach(function (r) { people[r.email] = r.secs; });   // across tools, two tabs at once counted once
+    (d.total || []).filter(counted).forEach(function (r) { people[r.email] = r.secs; });   // across tools, two tabs at once counted once
     function top(map) { var best = null; Object.keys(map).forEach(function (k) { if (!best || map[k] > map[best]) best = k; }); return best; }
     var tl = Object.keys(tools).sort(function (a, b) { return tools[b].secs - tools[a].secs; });
     $("dashTools").innerHTML = tl.length ? tl.map(function (k) {
@@ -147,7 +150,7 @@
     }).join("") : '<tr><td colspan="4" class="arc-empty">ما في استخدام بهالفترة</td></tr>';
 
     var ai = {};
-    d.ai.forEach(function (r) { var a = ai[r.kind] || (ai[r.kind] = { n: 0, by: {} }); a.n += r.n; a.by[r.email] = (a.by[r.email] || 0) + r.n; });
+    d.ai.filter(counted).forEach(function (r) { var a = ai[r.kind] || (ai[r.kind] = { n: 0, by: {} }); a.n += r.n; a.by[r.email] = (a.by[r.email] || 0) + r.n; });
     var al = Object.keys(ai).sort(function (a, b) { return ai[b].n - ai[a].n; });
     $("dashAi").innerHTML = al.length ? al.map(function (k) {
       var a = ai[k], b = top(a.by);

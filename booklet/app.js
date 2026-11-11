@@ -27,18 +27,7 @@
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
   /* ---------- access: the booklet-maker project; the Owner and the Comms Manager always ---------- */
-  function checkAccess() {
-    var t = token();
-    if (!t) { location.href = "../"; return Promise.reject(new Error("no session")); }
-    return fetch(WORKER + "/me", { headers: { "Authorization": "Bearer " + t } })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-      .then(function (r) {
-        if (!r.ok || !r.d || !r.d.user) { location.href = "../"; throw new Error("session"); }
-        var role = r.d.user.role, me = (r.d.projects || []).filter(function (p) { return p.slug === SLUG; })[0];
-        if (role === "owner" || role === "comms") return;
-        if (!me || me.status !== "ready") { $("bkGateMsg").textContent = "لا تملك صلاحية الوصول إلى هذه الأداة."; throw new Error("denied"); }
-      });
-  }
+  function checkAccess() { return hcToolAccess(SLUG, "bk"); }   // ../tool-access.js: at once from the kept answer, checked again behind
 
   /* ---------- the order ---------- */
   /* Sheet by sheet, outermost first: the front holds the last and the first
