@@ -195,6 +195,103 @@ async function hasProjectSlug(env, user, slug) {
   var list = await getAccessibleProjects(env, user.email, user.role);
   return list.some(function (p) { return p.slug === slug && p.status === "ready"; });
 }
+/* ---------- Text Transcription: the files read by Gemini ----------
+   Shared by the tool's page (/transcribe/images) and the API (/api/v1/transcribe).
+   bytes: the files one after another, sizes and mimes: each one's length and type
+   (an image or application/pdf). Returns {ok, images, texts, model, lite} or {error};
+   the caller counts the use. */
+async function transcribeRun(env, ctx, txKey, bytes, txSizes, txMimes, langCode, modeIn) {
+  var txPdf = txMimes.indexOf("application/pdf") >= 0;
+  var txLang = { "ara+eng": "Arabic and English", ara: "Arabic", eng: "English" }[langCode] || "Arabic and English";
+  var txMode = ["text", "doc", "auto", "invoice"].indexOf(modeIn) >= 0 ? modeIn : "text";
+  var txDocRules =txMode === "text" ? "" : txMode === "invoice" ?
+"EVERY file is an invoice or receipt (for the accounting team). Besides 'text', fill:\n" +
+"- 'invoice_date': the invoice's date exactly as printed (not reformatted); \"\" if there is none.\n" +
+"- 'invoice_number': the invoice or receipt number exactly as printed, digits and letters as they are; \"\" if there is none.\n" +
+"- 'details_en': IN ENGLISH, what the invoice is for — each item or service on its own line with its quantity when shown, like \"2 x A4 printer paper (box)\" or \"Generator maintenance — October\". Translate Arabic item names into plain English; keep brand and model names as they are. Only what the invoice lists; nothing invented.\n" +
+"- 'total': the final amount to pay exactly as printed, with its currency (like \"1,250,000 SYP\" or \"450.00 USD\"); when several totals appear (before and after tax or discount), the final payable one.\n" +
+"Unreadable: […].\n" :
+    (txMode === "doc" ? "EVERY file is an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, form): its kind is \"document\".\n"
+                      : "Decide for each image: an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, filled form) is kind \"document\"; anything else is kind \"text\".\n") +
+"For a document: 'doc_type' names it in Arabic (like «بطاقة شخصية سورية — الوجه» or «جواز سفر»). 'fields' lists every labelled item on it, in the order it appears: 'label' is the field's name as printed (Arabic when the document has it, e.g. «الاسم», «اسم الأب», «اسم الأم», «تاريخ الولادة», «مكان الولادة», «الرقم الوطني»), or a short Arabic name when the value has no printed label; 'value' is exactly what is written there — names, dates and numbers digit for digit, never reformatted or guessed. Unreadable: […]. Leave out the document's title, emblems and printed headings. 'text' still holds the full transcription.\n" +
+"For kind \"text\": 'fields' is [] and 'doc_type' is \"\".\n";
+  var off = 0, parts = txSizes.map(function (n) { var b = bytes.slice(off, off + n); off += n; return b; });
+  // Small batches go inline (no upload round trip, ~1 s saved); bigger ones through the
+  // Files API, so the Worker never base64-encodes megabytes.
+  var txInline = bytes.byteLength <= TRANSCRIBE_INLINE_BYTES, txT0 = Date.now();
+  var ups = txInline ? [] : await Promise.all(parts.map(function (b, i) { return geminiUpload(txKey, b, txMimes[i], "text-transcription-" + (i + 1)); }));
+  console.log("transcribe " + (txInline ? "inline" : "upload") + " " + parts.length + " image(s), " + Math.round(bytes.byteLength / 1024) + " KB: " + (Date.now() - txT0) + "ms");
+  var txR;
+  try {
+    var bad = ups.filter(function (u) { return u.error; })[0];
+    if (bad) return { error: bad.error.replace("الصوت", "الصورة") };
+    var txParts = [];
+    parts.forEach(function (b, i) {
+      txParts.push({ text: "File " + (i + 1) + (txMimes[i] === "application/pdf" ? " (PDF):" : " (image):") },
+        txInline ? { inline_data: { mime_type: txMimes[i], data: base64(b) } } : { file_data: { mime_type: txMimes[i], file_uri: ups[i].file.uri } });
+    });
+    txR = await geminiJSON(txKey, ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"], {
+      system_instruction: { parts: [{ text:
+"You transcribe the text in images and PDF files. Each numbered file is one entry in 'images', its 'n' the file's number; a PDF is one entry however many pages it has. For EACH file, in order, write all the text it contains exactly as written: the same language and spelling, no translation, no correction, no summary, nothing added. The text is mostly in " + txLang + ".\n" +
+"Keep the reading order (Arabic right to left, then top to bottom; columns one after another), the line breaks and the paragraphs. Headings and list items go on their own lines. A table is one line per row, its cells separated by ' | '.\n" +
+"Keep Arabic letters, diacritics and digits as they appear. Mark a word you cannot read as […]. If an image has no text, its text is \"\".\n" +
+"Numbers: copy every number digit by digit in the digits the image uses, keeping every zero (also leading and trailing ones) and the digits' order; count the digits of each number before writing it.\n" +
+txDocRules +
+(txPdf ? "For a PDF, transcribe every page in order; before each page after the first, put a line of its own reading exactly: — صفحة N — (with the page number for N, no quotation marks). For a document or invoice that runs over several pages, read its fields from all of them.\n" : "") +
+"Return ONLY JSON: one entry per file in 'images', covering all " + parts.length + " files." }] },
+      contents: [{ role: "user", parts: txParts }],
+      // no thinking: copying text needs none, and it was most of the wait (9.4 s of 12 for one card)
+      generationConfig: { temperature: 0, maxOutputTokens: txPdf ? 65536 : 32768, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json",
+        // the full picture, not a downsampled one: the Arabic-Indic zero is a dot that a lower resolution loses
+        mediaResolution: "MEDIA_RESOLUTION_HIGH",
+        responseSchema: {
+        type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: txMode === "text"
+          ? { type: "OBJECT", required: ["n", "text"], properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } }
+          : txMode === "invoice"
+          ? { type: "OBJECT", required: ["n", "invoice_date", "invoice_number", "details_en", "total", "text"], propertyOrdering: ["n", "invoice_date", "invoice_number", "details_en", "total", "text"], properties: {
+              n: { type: "INTEGER" }, invoice_date: { type: "STRING" }, invoice_number: { type: "STRING" }, details_en: { type: "STRING" }, total: { type: "STRING" }, text: { type: "STRING" } } }
+          : { type: "OBJECT", required: ["n", "kind", "doc_type", "fields", "text"], propertyOrdering: ["n", "kind", "doc_type", "fields", "text"], properties: {
+              n: { type: "INTEGER" }, kind: { type: "STRING", enum: ["text", "document"] }, doc_type: { type: "STRING" },
+              fields: { type: "ARRAY", items: { type: "OBJECT", required: ["label", "value"], properties: { label: { type: "STRING" }, value: { type: "STRING" } } } },
+              text: { type: "STRING" } } } } } } }
+    }, "transcribe-images-" + txMode);
+  } finally { ups.forEach(function (u) { geminiDelete(txKey, ctx, u.file); }); }
+  if (txR.error) return { error: txR.error };
+  var images = parts.map(function () { return { text: "", kind: "text", docType: "", fields: [] }; });
+  ((txR.data && txR.data.images) || []).forEach(function (x) {
+    var n = Math.round(Number(x && x.n)); if (!(n >= 1 && n <= images.length)) return;
+    if (txMode === "invoice") {   // the four fields accounting asked for, always present and in this order
+      images[n - 1] = { text: String(x.text || "").slice(0, 200000), kind: "document", docType: "فاتورة",
+        fields: INVOICE_FIELDS.map(function (f) { return { label: f[0], value: String(x[f[1]] || "").trim().slice(0, 2000) }; }) };
+      return;
+    }
+    var fields = (Array.isArray(x.fields) ? x.fields : []).slice(0, 60).map(function (f) {
+      return { label: String(f && f.label || "").trim().slice(0, 80), value: String(f && f.value || "").trim().slice(0, 400) };
+    }).filter(function (f) { return f.label || f.value; });
+    var doc = txMode !== "text" && x.kind === "document" && fields.length > 0;
+    images[n - 1] = { text: String(x.text || "").slice(0, 200000), kind: doc ? "document" : "text", docType: doc ? String(x.doc_type || "").trim().slice(0, 80) : "", fields: doc ? fields : [] };
+  });
+  // lite: the main model was busy or over its daily quota and the lighter one read these — less exact, digits above all
+  return { ok: true, images: images, texts: images.map(function (im) { return im.text; }), model: txR.model, lite: /lite/.test(txR.model || "") };
+}
+
+/* ---------- API keys (api_keys): one per outside site; only the key's SHA-256 is stored ---------- */
+async function apiClient(env, request) {
+  var m = /^Bearer\s+(\S{20,200})$/.exec(request.headers.get("Authorization") || "");
+  if (!m) return null;
+  var h = buf2hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(m[1])));
+  var row = await env.DB.prepare("SELECT name, daily_max FROM api_keys WHERE hash=?1 AND active=1").bind(h).first();
+  return row ? { name: row.name, daily_max: Number(row.daily_max) || 0 } : null;
+}
+// A file's type as Gemini reads it, from its stated type or else its name; "" for any other file
+function apiMime(f) {
+  var t = String(f.type || "").toLowerCase(), n = String(f.name || "").toLowerCase();
+  if (t === "image/jpg") t = "image/jpeg";
+  if (["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"].indexOf(t) >= 0) return t;
+  var ext = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heif", pdf: "application/pdf" }[n.split(".").pop()];
+  return ext || "";
+}
+
 async function usedToday(env, email, kind) {
   var since = new Date(Date.now() - 86400000).toISOString().replace("T", " ").slice(0, 19);
   var row = await env.DB.prepare("SELECT COUNT(*) AS c FROM ai_usage WHERE email=?1 AND kind=?2 AND at>?3").bind(email, kind, since).first();
@@ -1407,81 +1504,52 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
         var txSizes = (Array.isArray(txIn.meta.sizes) ? txIn.meta.sizes : []).map(function (n) { return Math.max(0, Math.floor(Number(n) || 0)); });
         // each file is a JPEG or a PDF (Gemini reads a PDF's pages itself, text layer or scan)
         var txMimes = txSizes.map(function (n, i) { return Array.isArray(txIn.meta.mimes) && txIn.meta.mimes[i] === "application/pdf" ? "application/pdf" : "image/jpeg"; });
-        var txPdf = txMimes.indexOf("application/pdf") >= 0;
         if (!txSizes.length || txSizes.length > TRANSCRIBE_MAX_IMAGES || txSizes.reduce(function (s, n) { return s + n; }, 0) !== txIn.audio.byteLength) return json({ error: "طلب غير صالح" }, 400);
-        var txLang = { "ara+eng": "Arabic and English", ara: "Arabic", eng: "English" }[txIn.meta.lang] || "Arabic and English";
-        var txMode = ["text", "doc", "auto", "invoice"].indexOf(txIn.meta.mode) >= 0 ? txIn.meta.mode : "text";
-        var txDocRules =txMode === "text" ? "" : txMode === "invoice" ?
-"EVERY file is an invoice or receipt (for the accounting team). Besides 'text', fill:\n" +
-"- 'invoice_date': the invoice's date exactly as printed (not reformatted); \"\" if there is none.\n" +
-"- 'invoice_number': the invoice or receipt number exactly as printed, digits and letters as they are; \"\" if there is none.\n" +
-"- 'details_en': IN ENGLISH, what the invoice is for — each item or service on its own line with its quantity when shown, like \"2 x A4 printer paper (box)\" or \"Generator maintenance — October\". Translate Arabic item names into plain English; keep brand and model names as they are. Only what the invoice lists; nothing invented.\n" +
-"- 'total': the final amount to pay exactly as printed, with its currency (like \"1,250,000 SYP\" or \"450.00 USD\"); when several totals appear (before and after tax or discount), the final payable one.\n" +
-"Unreadable: […].\n" :
-          (txMode === "doc" ? "EVERY file is an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, form): its kind is \"document\".\n"
-                            : "Decide for each image: an identity card or official document (national ID front or back, passport, family booklet, student or work card, certificate, filled form) is kind \"document\"; anything else is kind \"text\".\n") +
-"For a document: 'doc_type' names it in Arabic (like «بطاقة شخصية سورية — الوجه» or «جواز سفر»). 'fields' lists every labelled item on it, in the order it appears: 'label' is the field's name as printed (Arabic when the document has it, e.g. «الاسم», «اسم الأب», «اسم الأم», «تاريخ الولادة», «مكان الولادة», «الرقم الوطني»), or a short Arabic name when the value has no printed label; 'value' is exactly what is written there — names, dates and numbers digit for digit, never reformatted or guessed. Unreadable: […]. Leave out the document's title, emblems and printed headings. 'text' still holds the full transcription.\n" +
-"For kind \"text\": 'fields' is [] and 'doc_type' is \"\".\n";
         return slowJSON(async function () {
-          var off = 0, parts = txSizes.map(function (n) { var b = txIn.audio.slice(off, off + n); off += n; return b; });
-          // Small batches go inline (no upload round trip, ~1 s saved); bigger ones through the
-          // Files API, so the Worker never base64-encodes megabytes.
-          var txInline = txIn.audio.byteLength <= TRANSCRIBE_INLINE_BYTES, txT0 = Date.now();
-          var ups = txInline ? [] : await Promise.all(parts.map(function (b, i) { return geminiUpload(txKey, b, txMimes[i], "text-transcription-" + (i + 1)); }));
-          console.log("transcribe " + (txInline ? "inline" : "upload") + " " + parts.length + " image(s), " + Math.round(txIn.audio.byteLength / 1024) + " KB: " + (Date.now() - txT0) + "ms");
-          var txR;
-          try {
-            var bad = ups.filter(function (u) { return u.error; })[0];
-            if (bad) return { error: bad.error.replace("الصوت", "الصورة") };
-            var txParts = [];
-            parts.forEach(function (b, i) {
-              txParts.push({ text: "File " + (i + 1) + (txMimes[i] === "application/pdf" ? " (PDF):" : " (image):") },
-                txInline ? { inline_data: { mime_type: txMimes[i], data: base64(b) } } : { file_data: { mime_type: txMimes[i], file_uri: ups[i].file.uri } });
-            });
-            txR = await geminiJSON(txKey, ["gemini-flash-latest", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-flash-lite-latest"], {
-              system_instruction: { parts: [{ text:
-"You transcribe the text in images and PDF files. Each numbered file is one entry in 'images', its 'n' the file's number; a PDF is one entry however many pages it has. For EACH file, in order, write all the text it contains exactly as written: the same language and spelling, no translation, no correction, no summary, nothing added. The text is mostly in " + txLang + ".\n" +
-"Keep the reading order (Arabic right to left, then top to bottom; columns one after another), the line breaks and the paragraphs. Headings and list items go on their own lines. A table is one line per row, its cells separated by ' | '.\n" +
-"Keep Arabic letters, diacritics and digits as they appear. Mark a word you cannot read as […]. If an image has no text, its text is \"\".\n" +
-"Numbers: copy every number digit by digit in the digits the image uses, keeping every zero (also leading and trailing ones) and the digits' order; count the digits of each number before writing it.\n" +
-txDocRules +
-(txPdf ? "For a PDF, transcribe every page in order; before each page after the first, put a line of its own reading exactly: — صفحة N — (with the page number for N, no quotation marks). For a document or invoice that runs over several pages, read its fields from all of them.\n" : "") +
-"Return ONLY JSON: one entry per file in 'images', covering all " + parts.length + " files." }] },
-              contents: [{ role: "user", parts: txParts }],
-              // no thinking: copying text needs none, and it was most of the wait (9.4 s of 12 for one card)
-              generationConfig: { temperature: 0, maxOutputTokens: txPdf ? 65536 : 32768, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: "application/json",
-                // the full picture, not a downsampled one: the Arabic-Indic zero is a dot that a lower resolution loses
-                mediaResolution: "MEDIA_RESOLUTION_HIGH",
-                responseSchema: {
-                type: "OBJECT", required: ["images"], properties: { images: { type: "ARRAY", items: txMode === "text"
-                  ? { type: "OBJECT", required: ["n", "text"], properties: { n: { type: "INTEGER" }, text: { type: "STRING" } } }
-                  : txMode === "invoice"
-                  ? { type: "OBJECT", required: ["n", "invoice_date", "invoice_number", "details_en", "total", "text"], propertyOrdering: ["n", "invoice_date", "invoice_number", "details_en", "total", "text"], properties: {
-                      n: { type: "INTEGER" }, invoice_date: { type: "STRING" }, invoice_number: { type: "STRING" }, details_en: { type: "STRING" }, total: { type: "STRING" }, text: { type: "STRING" } } }
-                  : { type: "OBJECT", required: ["n", "kind", "doc_type", "fields", "text"], propertyOrdering: ["n", "kind", "doc_type", "fields", "text"], properties: {
-                      n: { type: "INTEGER" }, kind: { type: "STRING", enum: ["text", "document"] }, doc_type: { type: "STRING" },
-                      fields: { type: "ARRAY", items: { type: "OBJECT", required: ["label", "value"], properties: { label: { type: "STRING" }, value: { type: "STRING" } } } },
-                      text: { type: "STRING" } } } } } } }
-            }, "transcribe-images-" + txMode);
-          } finally { ups.forEach(function (u) { geminiDelete(txKey, ctx, u.file); }); }
-          if (txR.error) return { error: txR.error };
-          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'transcribe', datetime('now'))").bind(txUser.email).run();
-          var images = parts.map(function () { return { text: "", kind: "text", docType: "", fields: [] }; });
-          ((txR.data && txR.data.images) || []).forEach(function (x) {
-            var n = Math.round(Number(x && x.n)); if (!(n >= 1 && n <= images.length)) return;
-            if (txMode === "invoice") {   // the four fields accounting asked for, always present and in this order
-              images[n - 1] = { text: String(x.text || "").slice(0, 200000), kind: "document", docType: "فاتورة",
-                fields: INVOICE_FIELDS.map(function (f) { return { label: f[0], value: String(x[f[1]] || "").trim().slice(0, 2000) }; }) };
-              return;
-            }
-            var fields = (Array.isArray(x.fields) ? x.fields : []).slice(0, 60).map(function (f) {
-              return { label: String(f && f.label || "").trim().slice(0, 80), value: String(f && f.value || "").trim().slice(0, 400) };
-            }).filter(function (f) { return f.label || f.value; });
-            var doc = txMode !== "text" && x.kind === "document" && fields.length > 0;
-            images[n - 1] = { text: String(x.text || "").slice(0, 200000), kind: doc ? "document" : "text", docType: doc ? String(x.doc_type || "").trim().slice(0, 80) : "", fields: doc ? fields : [] };
-          });
-          // lite: the main model was busy or over its daily quota and the lighter one read these — less exact, digits above all
-          return { ok: true, images: images, texts: images.map(function (im) { return im.text; }), model: txR.model, lite: /lite/.test(txR.model || "") };
+          var r = await transcribeRun(env, ctx, txKey, txIn.audio, txSizes, txMimes, txIn.meta.lang, txIn.meta.mode);
+          if (r.ok) await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'transcribe', datetime('now'))").bind(txUser.email).run();
+          return r;
+        });
+      }
+
+      /* ---- 7b7ب) Text Transcription API: the same reading, for another website's server ----
+         POST multipart/form-data: files (1–6 images or PDFs), mode (text | doc | auto | invoice),
+         lang (ara | eng | ara+eng), with «Authorization: Bearer <key>». A key belongs to one
+         site (api_keys: name, SHA-256 of the key, daily_max, active) and has its own cap over
+         24 h; its uses are logged in ai_usage as «api:<name>». Nothing sent is kept.
+         Checks fail at once with their HTTP status and {error, code}; the reading itself
+         streams (slowJSON: spaces, then the JSON) and a failure there is {error, code: "failed"}
+         with 200. The guide for the other site's developers: docs/text-transcription-api.md. */
+      if (path === "/api/v1/transcribe") {
+        if (request.method !== "POST") return json({ error: "Use POST.", code: "method" }, 405);
+        var apC = await apiClient(env, request);
+        if (!apC) return json({ error: "Missing, wrong or disabled API key.", code: "unauthorized" }, 401);
+        var apKey = transcribeKey(env);
+        if (!apKey) return json({ error: "The service is not set up.", code: "unavailable" }, 503);
+        if (Number(request.headers.get("Content-Length") || 0) > TRANSCRIBE_MAX_BYTES) return json({ error: "The files are larger than 30 MB in all.", code: "too_large" }, 413);
+        if ((await usedToday(env, "api:" + apC.name, "api-transcribe")) >= apC.daily_max) return json({ error: "This key has used its " + apC.daily_max + " requests for the last 24 hours.", code: "daily_limit" }, 429);
+        var apForm;
+        try { apForm = await request.formData(); } catch (e) { return json({ error: "Send the files as multipart/form-data.", code: "bad_request" }, 400); }
+        var apFiles = [];   // «files», repeated, or as PHP names them: files[0], files[1]…
+        for (var apE of apForm.entries()) if (/^files?(\[\d*\])?$/.test(apE[0]) && apE[1] && typeof apE[1] === "object" && typeof apE[1].arrayBuffer === "function" && apE[1].size > 0) apFiles.push(apE[1]);
+        if (!apFiles.length) return json({ error: "No files: send them in the «files» field.", code: "no_files" }, 400);
+        if (apFiles.length > TRANSCRIBE_MAX_IMAGES) return json({ error: "At most " + TRANSCRIBE_MAX_IMAGES + " files per request.", code: "too_many_files" }, 400);
+        var apMimes = apFiles.map(apiMime);
+        var apBad = apMimes.indexOf("");
+        if (apBad >= 0) return json({ error: "«" + (apFiles[apBad].name || "file " + (apBad + 1)) + "» is not a JPEG, PNG, WebP, HEIC or PDF file.", code: "bad_type" }, 415);
+        var apMode = String(apForm.get("mode") || "text"), apLang = String(apForm.get("lang") || "ara+eng");
+        if (["text", "doc", "auto", "invoice"].indexOf(apMode) < 0) return json({ error: "mode is one of: text, doc, auto, invoice.", code: "bad_mode" }, 400);
+        if (["ara", "eng", "ara+eng"].indexOf(apLang) < 0) return json({ error: "lang is one of: ara, eng, ara+eng.", code: "bad_lang" }, 400);
+        var apBufs = await Promise.all(apFiles.map(function (f) { return f.arrayBuffer(); }));
+        var apSizes = apBufs.map(function (b) { return b.byteLength; }), apAll = new Uint8Array(apSizes.reduce(function (x, y) { return x + y; }, 0)), apOff = 0;
+        apBufs.forEach(function (b) { apAll.set(new Uint8Array(b), apOff); apOff += b.byteLength; });
+        return slowJSON(async function () {
+          var r = await transcribeRun(env, ctx, apKey, apAll.buffer, apSizes, apMimes, apLang, apMode);
+          if (!r.ok) return { error: r.error, code: "failed" };
+          await env.DB.prepare("INSERT INTO ai_usage (email, kind, at) VALUES (?1, 'api-transcribe', datetime('now'))").bind("api:" + apC.name).run();
+          return { ok: true, mode: apMode, files: r.images.map(function (im, i) {
+            return { name: apFiles[i].name || "", text: im.text, kind: im.kind, docType: im.docType, fields: im.fields };
+          }), lite: r.lite };
         });
       }
 

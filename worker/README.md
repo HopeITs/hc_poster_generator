@@ -139,6 +139,23 @@ revises the runs from the transcript with that critique in hand.
 `/transcribe/images` takes up to six images as raw JPEG bytes, passes them to
 Gemini's Files API as they are, returns each one's text, and deletes them.
 
+`/api/v1/transcribe` is the same reading for another website's server: files
+in `multipart/form-data` and `Authorization: Bearer <key>` instead of a
+session. Each outside site has its own key, made with `tools/api-key.ps1`,
+which shows the key once and stores only its SHA-256; its uses are logged in
+`ai_usage` as `api:<name>` and capped by its `daily_max` over 24 h. The guide
+for the other site's developers is `docs/text-transcription-api.md`. The table:
+
+```sql
+CREATE TABLE IF NOT EXISTS api_keys (
+  name TEXT PRIMARY KEY,                    -- the site, in a-z, 0-9 and «-»
+  hash TEXT NOT NULL UNIQUE,                -- SHA-256 of the key, in hex; the key itself is kept nowhere
+  daily_max INTEGER NOT NULL DEFAULT 10,    -- requests over 24 h
+  active INTEGER NOT NULL DEFAULT 1,        -- 0 stops the key at once
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
 Photo endpoints take the email from the session, never from the request body,
 so a user cannot modify anyone else's photo. Deletion is a `POST` because
 `cors()` only advertises `GET, POST, OPTIONS`.
