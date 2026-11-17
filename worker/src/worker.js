@@ -43,9 +43,9 @@ const MAGNIFIC_DAILY_MAX    = 15;               // صور «أسلوب DISC» (M
 const ACCESS_MAX_PER_REQUEST = 12, ACCESS_DAILY_MAX = 20, ACCESS_RETRY_DAYS = 7;
 // Pages that report presence (presence.js): the projects page, the five poster projects and the tools
 const PRESENCE_TOOLS = ["home", "hope-center", "study-zone", "children-university", "disc", "leap", "guideline-assistant", "thumbnail-gen",
-  "reels-gen", "text-transcription", "meeting-transcription", "booklet-maker", "flipbook", "presentation-maker"];
+  "reels-gen", "text-transcription", "meeting-transcription", "booklet-maker", "flipbook", "presentation-maker", "business-card"];
 // الأرشيف: كل تصميم يُنزَّل من Poster Maker وThumbnail Gen، مع ملف مشروعه، في قاعدة ARCHIVE المنفصلة
-const ARCHIVE_PROJECTS = ["study-zone", "hope-center", "children-university", "leap", "disc", "thumbnail-gen"];
+const ARCHIVE_PROJECTS = ["study-zone", "hope-center", "children-university", "leap", "disc", "thumbnail-gen", "business-card"];
 const ARCHIVE_CHUNK = 700 * 1024;               // بايت لكل قطعة (base64 ≈ 0.93 MB، تحت حدّ السجل 2 MB)
 const ARCHIVE_MAX_FILE = 15 * 1048576, ARCHIVE_MAX_PROJECT = 25 * 1048576;
 const ARCHIVE_DB_LIMIT = 500 * 1048576;         // حجم قاعدة D1 بالخطة المجانية
@@ -291,6 +291,46 @@ function apiMime(f) {
   var ext = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heif", pdf: "application/pdf" }[n.split(".").pop()];
   return ext || "";
 }
+
+/* ---------- Business Card Maker: the staff sheet ----------
+   The Google Sheet of staff, read as CSV from the link in STAFF_SHEET_URL (a
+   secret: whoever has the link reads the sheet). Only what a card needs leaves
+   here: Name, Position, City, E-mail and the phone (HC Mobile, else Mobile).
+   Read at most every five minutes. */
+var staffCache = { at: 0, rows: null };
+var CARD_STREET = { aleppo: "Al Villat Street" };   // the office's street, by city; editable on the card
+function parseCSV(text) {
+  var rows = [], row = [], cell = "", q = false;
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; continue; }
+    if (ch === '"') q = true;
+    else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+async function staffRows(env) {
+  if (!env.STAFF_SHEET_URL) return null;
+  if (staffCache.rows && Date.now() - staffCache.at < 300000) return staffCache.rows;
+  var r = await fetch(env.STAFF_SHEET_URL, { redirect: "follow" });
+  if (!r.ok) throw new Error("تعذّر قراءة جدول الموظفين (" + r.status + ")");
+  var all = parseCSV(await r.text()), head = (all.shift() || []).map(function (h) { return String(h).trim().toLowerCase(); });
+  function col(names) { for (var i = 0; i < names.length; i++) { var k = head.indexOf(names[i]); if (k >= 0) return k; } return -1; }
+  var c = { name: col(["name"]), title: col(["position"]), city: col(["city"]), email: col(["e-mail", "email"]), hc: col(["hc mobile"]), mob: col(["mobile"]) };
+  if (c.email < 0 || c.name < 0) throw new Error("جدول الموظفين ما فيه عمود Name أو E-mail");
+  function at(row, k) { return k >= 0 ? String(row[k] || "").replace(/\s+/g, " ").trim() : ""; }
+  var rows = all.map(function (row) {
+    var city = at(row, c.city), key = city.toLowerCase();
+    return { name: at(row, c.name), title: at(row, c.title), phone: at(row, c.hc) || at(row, c.mob), city: city ? city[0].toUpperCase() + city.slice(1) : "",
+             street: CARD_STREET[key] || "", email: at(row, c.email).toLowerCase() };
+  }).filter(function (x) { return x.email && x.name; });
+  staffCache = { at: Date.now(), rows: rows };
+  return rows;
+}
+function cardOf(row) { return row ? { name: row.name, title: row.title, phone: row.phone, city: row.city, street: row.street, email: row.email } : null; }
 
 async function usedToday(env, email, kind) {
   var since = new Date(Date.now() - 86400000).toISOString().replace("T", " ").slice(0, 19);
@@ -658,6 +698,28 @@ export default {
         if (!me) return json({ error: "غير مسجّل دخول" }, 401);
         var meProjs = await getAccessibleProjects(env, me.email, me.role);
         return json({ ok: true, user: { email: me.email, role: me.role, project_id: me.project_id, photo: me.photo }, projects: meProjs, project: meProjs[0] || null });
+      }
+
+      /* ---- 3أ) Business Card Maker: the card's details from the staff sheet ----
+         GET /cards/me: the signed-in person's row (by their own session email), and
+         for the Owner and the Comms Manager the staff names and emails to pick from.
+         GET /cards/staff?email=: one person's row, for the Owner and the Comms Manager.
+         {ok, configured, card|null, staff?}; configured is false while STAFF_SHEET_URL is unset. */
+      if (request.method === "GET" && (path === "/cards/me" || path === "/cards/staff")) {
+        var bcU = await getSessionUser(env, request);
+        if (!bcU) return json({ error: "غير مسجّل دخول" }, 401);
+        if (!(await hasProjectSlug(env, bcU, "business-card"))) return json({ error: "لا صلاحية" }, 403);
+        var bcAll = isGlobalRole(bcU.role);
+        if (path === "/cards/staff" && !bcAll) return json({ error: "لا صلاحية" }, 403);
+        var bcRows;
+        try { bcRows = await staffRows(env); } catch (e) { return json({ error: e.message || "تعذّر قراءة جدول الموظفين" }, 502); }
+        if (!bcRows) return json({ ok: true, configured: false, card: null });
+        var bcWho = path === "/cards/me" ? bcU.email : String(url.searchParams.get("email") || "");
+        var bcRow = bcRows.filter(function (x) { return x.email === bcWho.trim().toLowerCase(); })[0];
+        var bcOut = { ok: true, configured: true, card: cardOf(bcRow) };
+        if (path === "/cards/me" && bcAll) bcOut.staff = bcRows.map(function (x) { return { name: x.name, email: x.email }; })
+          .sort(function (a, b) { return a.name.localeCompare(b.name); });
+        return json(bcOut);
       }
 
       /* ---- 3ب) الصورة الشخصية ----
@@ -1337,7 +1399,7 @@ momentsRules(crLo, crRoom) + "Return ONLY JSON." }] },
           if (used && used.b + fSize + pSize > ARCHIVE_DB_LIMIT * 0.95) return json({ error: "الأرشيف ممتلئ" }, 507);
           var arId = makeToken().slice(0, 32), stmts = [];
           stmts.push(env.ARCHIVE.prepare("INSERT INTO files (id, email, project, tool, template, filename, mime, size, proj_size, thumb) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)").bind(
-            arId, arUser.email, am.project, am.project === "thumbnail-gen" ? "thumbnail" : "poster", String(am.template || "").slice(0, 60),
+            arId, arUser.email, am.project, am.project === "thumbnail-gen" ? "thumbnail" : am.project === "business-card" ? "card" : "poster", String(am.template || "").slice(0, 60),
             String(am.filename || "design.png").replace(/[\\/:*?"<>|]/g, "").slice(0, 160), /^(image\/(png|jpeg|webp)|application\/json)$/.test(am.mime) ? am.mime : "image/png",
             fSize, pSize, /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(am.thumb || "") && am.thumb.length < 120000 ? am.thumb : ""));
           [["file", arIn.audio.slice(0, fSize)], ["project", arIn.audio.slice(fSize)]].forEach(function (p) {

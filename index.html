@@ -441,9 +441,10 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
     <img class="hc-logo" src="assets/ui/login-logo.svg" alt="Christian Hope Center">
     <input class="hc-field hc-user" id="loginEmail" type="email" autocomplete="username" placeholder="Username">
     <input class="hc-field hc-pass" id="loginPass" type="password" autocomplete="current-password" placeholder="Password">
+    <button type="button" class="hc-eye" id="loginEye" aria-label="إظهار كلمة السر" aria-pressed="false"><svg class="open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="shut" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2M6.6 6.6C3.9 8.3 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
     <input type="checkbox" class="hc-rem-box" id="loginRemember" checked>
     <label class="hc-rem-hit" for="loginRemember"></label>
-    <button class="hc-btn" id="loginBtn" type="button"></button>
+    <button class="hc-btn" id="loginBtn" type="button">LOGIN</button>
     <div class="hc-err" id="loginErr"></div>
   </div>
   <div class="app-copyright">HC Generator, a project by Christian Hope Center. © 2026 All Rights Reserved.</div>
@@ -458,17 +459,23 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
   font-family:'Somar Sans';font-size:clamp(9px,2.55vw,11.25px);color:#fff;direction:ltr;box-sizing:border-box;padding:0 12px 0 4px;margin:0;}
 .hc-field::placeholder{color:rgba(255,255,255,.55);}
 .hc-user{top:49.55%;}
-.hc-pass{top:61.20%;}
+.hc-pass{top:61.20%;width:44.3%;}
+/* show or hide the password: the eye at the field's end */
+.hc-eye{position:absolute;left:76.6%;top:61.20%;width:6.4%;height:9.18%;padding:0;margin:0;border:none;background:transparent;color:rgba(255,255,255,.6);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;}
+.hc-eye:hover,.hc-eye:focus-visible{color:#fff;outline:none;}
+.hc-eye svg{width:46%;height:auto;}
+.hc-eye .shut,.hc-eye.on .open{display:none;}
+.hc-eye.on .shut{display:block;}
 .hc-rem-box{position:absolute;left:25.56%;top:74.4%;width:2.71%;height:2.46%;margin:0;padding:0;z-index:2;box-sizing:border-box;-webkit-appearance:none;appearance:none;border:none;cursor:pointer;background:url("data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iTGF5ZXJfMiIgZGF0YS1uYW1lPSJMYXllciAyIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCI+CiAgPGRlZnM+CiAgICA8c3R5bGU+CiAgICAgIC5jbHMtMSB7CiAgICAgICAgZmlsbDogI2ZmZjsKICAgICAgfQogICAgPC9zdHlsZT4KICA8L2RlZnM+CiAgPGcgaWQ9IkxheWVyXzEtMiIgZGF0YS1uYW1lPSJMYXllciAxIj4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTE1LjkxLDFjMS43LDAsMy4wOSwxLjM5LDMuMDksMy4wOXYxMS44MmMwLDEuNy0xLjM5LDMuMDktMy4wOSwzLjA5SDQuMDljLTEuNywwLTMuMDktMS4zOS0zLjA5LTMuMDlWNC4wOWMwLTEuNywxLjM5LTMuMDksMy4wOS0zLjA5aDExLjgyTTE1LjkxLDBINC4wOUMxLjgzLDAsMCwxLjgzLDAsNC4wOXYxMS44MmMwLDIuMjYsMS44Myw0LjA5LDQuMDksNC4wOWgxMS44MmMyLjI2LDAsNC4wOS0xLjgzLDQuMDktNC4wOVY0LjA5YzAtMi4yNi0xLjgzLTQuMDktNC4wOS00LjA5aDBaIi8+CiAgPC9nPgo8L3N2Zz4=") center/contain no-repeat;}
 .hc-rem-box:checked{background:url("data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iTGF5ZXJfMiIgZGF0YS1uYW1lPSJMYXllciAyIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCI+CiAgPGRlZnM+CiAgICA8c3R5bGU+CiAgICAgIC5jbHMtMSB7CiAgICAgICAgZmlsbDogI2ZmZjsKICAgICAgfQoKICAgICAgLmNscy0yIHsKICAgICAgICBmaWxsOiAjYmMyMTI2OwogICAgICB9CiAgICA8L3N0eWxlPgogIDwvZGVmcz4KICA8ZyBpZD0iTGF5ZXJfMS0yIiBkYXRhLW5hbWU9IkxheWVyIDEiPgogICAgPHJlY3QgY2xhc3M9ImNscy0yIiB4PSIwIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHJ4PSI0LjA5IiByeT0iNC4wOSIvPgogICAgPHBvbHlnb24gY2xhc3M9ImNscy0xIiBwb2ludHM9IjcuNDkgMTQuNjMgMy43NiAxMC45IDUuMzcgOS4yOSA3LjQ5IDExLjQxIDE0LjE1IDQuNzUgMTUuNzYgNi4zNiA3LjQ5IDE0LjYzIi8+CiAgPC9nPgo8L3N2Zz4=") center/contain no-repeat;}
 .hc-rem-hit{position:absolute;left:25%;top:72.5%;width:34%;height:5%;cursor:pointer;z-index:3;}
 
 .hc-btn{position:absolute;left:22.18%;top:81.96%;width:61.45%;height:9.22%;background:transparent;border:none;
-  border-radius:8px;cursor:pointer;color:transparent;transition:.15s;display:flex;align-items:center;justify-content:center;font-family:'Somar Sans';font-weight:700;letter-spacing:2px;font-size:14px;direction:ltr;}
+  border-radius:8px;cursor:pointer;color:#fff;transition:.15s;display:flex;align-items:center;justify-content:center;font-family:'Somar Sans';font-weight:700;letter-spacing:0;font-size:min(14px,3.1vw);direction:ltr;}   /* LOGIN is this text now, not drawn in the card picture: the same in both states */
 .hc-btn.loading,.hc-btn.loading:hover,.hc-btn.loading:active{background:#bc2126;color:#fff;}
 .hc-btn:hover{background:rgba(255,255,255,.10);}
 .hc-btn:active{background:rgba(0,0,0,.08);}
-.hc-err{position:absolute;left:0;right:0;top:92.5%;text-align:center;color:#fff;font-size:12px;direction:rtl;
+.hc-err{position:absolute;left:0;right:0;top:92.5%;text-align:center;color:#fff;font-size:12px;direction:ltr;
   text-shadow:0 1px 3px rgba(0,0,0,.5);min-height:0;font-family:'Somar Sans';}
 </style>
 <style>
@@ -550,6 +557,9 @@ option:hover,option:focus,option:active,option:checked,option:checked:hover{
       </a>
       <a class="proj-card" id="pgPresent" href="presentation/" style="--pc-hover:#be1f24;display:none" data-hint="عروض تقديمية PowerPoint بهوية المشروع">
         <span class="proj-name">Presentation Maker</span>
+      </a>
+      <a class="proj-card" id="pgCard" href="business-card/" style="--pc-hover:#be1f24;display:none" data-hint="كرت فيزيت بمعلوماتك من جدول الموظفين، جاهز للطباعة">
+        <span class="proj-name">Business Card Maker</span>
       </a>
     </div>
   </div>
@@ -1415,8 +1425,8 @@ var Auth = (function(){
     try{
       var res=await api("/login","POST",{email:email,password:password,remember:!!remember});
       if(res.ok&&res.data.token&&res.data.user){ setToken(res.data.token,!!remember); current=res.data.user; applyBrand(res.data.project); return {ok:true}; }
-      return {ok:false,error:(res.data&&res.data.error)||"فشل تسجيل الدخول"};
-    }catch(e){ return {ok:false,error:"تعذّر الاتصال بالخادم"}; }
+      return {ok:false,status:res.status,error:(res.data&&res.data.error)||"فشل تسجيل الدخول"};
+    }catch(e){ return {ok:false,status:0,error:"تعذّر الاتصال بالخادم"}; }
   }
   // الخادم يمسح الكوكي وصف الجلسة؛ لا شيء محلي يُنظَّف
   async function logout(){ try{ await api("/logout","POST",{}); }catch(e){} clearToken(); current=null; }
@@ -2389,7 +2399,7 @@ $("logoutBtn").onclick=async function(){
   await Auth.logout();
   $("appRoot").style.display="none";
   $("loginGate").style.display="flex";
-  $("loginPass").value=""; $("loginErr").textContent="";
+  $("loginPass").value=""; $("loginPass").type="password"; $("loginEye").classList.remove("on"); $("loginErr").textContent="";
 };
 function startApp(){
   $("loginGate").style.display="none";
@@ -2401,8 +2411,8 @@ function startApp(){
 /* After signing in, everyone lands on the tools list — even with one tool —
    and picks it there; the tools they lack show locked. */
 function afterAuth(){ showProjectPicker(); }
-var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription", MEETTR_SLUG="meeting-transcription", BOOKLET_SLUG="booklet-maker", FLIPBOOK_SLUG="flipbook", PRESENT_SLUG="presentation-maker";
-var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/","meeting-transcription":"meeting-transcription/","booklet-maker":"booklet/","flipbook":"flipbook/","presentation-maker":"presentation/"};   // standalone tool pages
+var THUMBGEN_SLUG="thumbnail-gen", REELSGEN_SLUG="reels-gen", TEXTTR_SLUG="text-transcription", MEETTR_SLUG="meeting-transcription", BOOKLET_SLUG="booklet-maker", FLIPBOOK_SLUG="flipbook", PRESENT_SLUG="presentation-maker", CARD_SLUG="business-card";
+var TOOL_PAGES={"thumbnail-gen":"thumbnail-gen/","reels-gen":"reels-gen/","text-transcription":"text-transcription/","meeting-transcription":"meeting-transcription/","booklet-maker":"booklet/","flipbook":"flipbook/","presentation-maker":"presentation/","business-card":"business-card/"};   // standalone tool pages
 function openProject(p){
   if(p && TOOL_PAGES[p.slug]){ location.href=TOOL_PAGES[p.slug]; return; }
   if(p && window.hcPresence) hcPresence.tool(p.slug);   // the dashboard's «where is everyone»
@@ -2436,7 +2446,7 @@ async function showProjectPicker(){
   // but they live in the tools box under Guidelines Assistant rather than in the project list.
   // The Owner and the Comms Manager reach every tool, a new one too before it is a project.
   var me=Auth.current&&Auth.current(), all=!!(me&&(me.role==="owner"||me.role==="comms"));
-  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"],[BOOKLET_SLUG,"pgBooklet"],[FLIPBOOK_SLUG,"pgFlipbook"],[PRESENT_SLUG,"pgPresent"]].forEach(function(t){
+  [[THUMBGEN_SLUG,"pgThumbGen"],[REELSGEN_SLUG,"pgReelsGen"],[TEXTTR_SLUG,"pgTextTr"],[MEETTR_SLUG,"pgMeetTr"],[BOOKLET_SLUG,"pgBooklet"],[FLIPBOOK_SLUG,"pgFlipbook"],[PRESENT_SLUG,"pgPresent"],[CARD_SLUG,"pgCard"]].forEach(function(t){
     var a=$(t[1]), p=mine[t[0]]; if(!a) return;
     a.style.display=""; a.dataset.slug=t[0];
     setLocked(a,!all&&!(p&&p.status==="ready"));
@@ -2490,12 +2500,19 @@ async function doLogin(){
   var btn=$("loginBtn"); btn.disabled=true; btn.classList.add("loading"); btn.textContent="LOGGING IN…";
   $("loginErr").textContent="";
   var res=await Auth.login($("loginEmail").value, $("loginPass").value, $("loginRemember").checked);
-  btn.disabled=false; btn.classList.remove("loading"); btn.textContent="";
+  btn.disabled=false; btn.classList.remove("loading"); btn.textContent="LOGIN";
   if(res.ok){ afterAuth(); }
-  else { $("loginErr").textContent=res.error||"الإيميل أو كلمة السر غير صحيحة"; }
+  // the sign-in page is in English, so are its messages
+  else { $("loginErr").textContent=res.status===401?"Incorrect email or password.":res.status===429?"Too many attempts. Please try again in 15 minutes.":res.status===0?"Can't reach the server. Check your connection and try again.":"Sign-in failed. Please try again."; }
 }
 $("loginBtn").onclick=doLogin;
 $("loginPass").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin();});
+$("loginEye").onclick=function(){
+  var p=$("loginPass"), show=p.type==="password";
+  p.type=show?"text":"password"; this.classList.toggle("on",show);
+  this.setAttribute("aria-pressed",show?"true":"false"); this.setAttribute("aria-label",show?"إخفاء كلمة السر":"إظهار كلمة السر");
+  p.focus();
+};
 $("loginEmail").addEventListener("keydown",function(e){if(e.key==="Enter")doLogin();});
 
 /* بدء التشغيل: استعادة جلسة سابقة أو عرض البوّابة.
@@ -4044,7 +4061,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   var $=function(id){return document.getElementById(id);};
   function tok(){ try{ return localStorage.getItem(TOKEN_KEY)||sessionStorage.getItem(TOKEN_KEY); }catch(e){ return null; } }
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-  var PROJ={"hope-center":"Hope Center","study-zone":"Study Zone","children-university":"Children University","disc":"DISC","leap":"LEAP","thumbnail-gen":"Thumbnail Gen"};
+  var PROJ={"hope-center":"Hope Center","study-zone":"Study Zone","children-university":"Children University","disc":"DISC","leap":"LEAP","thumbnail-gen":"Thumbnail Gen","business-card":"Business Card Maker"};
   var KEY={"study-zone":"sz","hope-center":"hc","children-university":"cu","leap":"lp","disc":"dc"};
 
   /* Study Zone lives in the page's global scope; the others register in ARC_REG from inside their own blocks. */
@@ -4213,7 +4230,7 @@ table.arc-t{width:100%;border-collapse:collapse;font-size:13px;}
   }
   /* «افتح للتعديل»: the generator of that project, with the saved design in it. */
   function openForEdit(slug,d){
-    if(slug==="thumbnail-gen"){ try{ sessionStorage.setItem("arcOpen",JSON.stringify(d)); }catch(e){} location.href="thumbnail-gen/"; return; }
+    if(slug==="thumbnail-gen"||slug==="business-card"){ try{ sessionStorage.setItem("arcOpen",JSON.stringify(d)); }catch(e){} location.href=slug+"/"; return; }
     Auth.projects().then(function(res){
       var p=((res&&res.projects)||[]).filter(function(x){ return x.slug===slug; })[0];
       if(!p){ alert("ما عندك صلاحية على مشروع "+(PROJ[slug]||slug)); return; }
